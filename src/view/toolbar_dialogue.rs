@@ -1,6 +1,6 @@
 use iced::{
     Element, Length,
-    widget::{button, column, radio, row, text, vertical_space},
+    widget::{button, column, radio, row, space, text},
 };
 
 use crate::{
@@ -27,7 +27,7 @@ pub fn toolbar_dialogue(settings: &CanvasSettings) -> Element<'_, Message> {
 
     let export_tools = row![export_png].spacing(8.0);
 
-    column![toolbar, vertical_space(), export_tools]
+    column![toolbar, space::vertical(), export_tools]
         .padding(8.0)
         .width(Length::Fill)
         .height(100.0)

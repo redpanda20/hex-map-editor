@@ -1,8 +1,9 @@
 use iced::{
-    Alignment, Color, Element, Length, Task,
+    Alignment, Border, Color, Element, Length, Task,
+    border::Radius,
     widget::{
-        button, checkbox, column, container, horizontal_rule, horizontal_space, mouse_area, row,
-        scrollable, text, text_input,
+        button, checkbox, column, container, mouse_area, row, rule, scrollable, space, text,
+        text_input,
     },
 };
 
@@ -77,7 +78,7 @@ pub fn layer_panel<'a>(layer_panel: &LayerPanel, layers: &Vec<Layer>) -> Element
         .align_x(Alignment::Center);
 
     column![
-        horizontal_rule(2.0),
+        rule::horizontal(2.0),
         heading,
         scrollable_content,
         add_layer_button
@@ -100,11 +101,12 @@ fn layer_row<'a>(
         None => false,
     };
 
-    let visibility_toggle = checkbox("", layer.visible)
+    let visibility_toggle = checkbox(layer.visible)
         .on_toggle(move |state| Message::EditLayerVisibility(layer_index, state));
 
     let name: Element<'_, LayerPanelMessage> = match (is_editing, is_active) {
         (true, ..) => text_input("Layer name...", &layer_panel.edit_layer.clone().unwrap().1)
+            .width(Length::FillPortion(3))
             .on_input(LayerPanelMessage::LayerEdit)
             .on_submit(LayerPanelMessage::CommitLayerEdit)
             .into(),
@@ -122,18 +124,24 @@ fn layer_row<'a>(
     let content = row![
         visibility_toggle,
         name.map(|message| message.into()),
-        horizontal_space(),
+        space::horizontal(),
         delete_button
     ]
-    .align_y(Alignment::Center);
+    .align_y(Alignment::Center)
+    .spacing(6.0);
 
     let content = container(content)
-        .padding([3, 6])
+        .padding(4.0)
         .style(move |_| match is_active {
             true => container::Style {
                 background: Some(iced::Background::Color(Color::from_rgba8(
                     80, 120, 200, 0.2,
                 ))),
+                border: Border {
+                    color: Color::BLACK,
+                    width: 0.0,
+                    radius: Radius::new(2.0),
+                },
                 ..Default::default()
             },
             false => container::Style::default(),

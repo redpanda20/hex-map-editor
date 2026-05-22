@@ -1,5 +1,5 @@
 use iced::{
-    Color, Element, Length, Task,
+    Color, Element, Length, Task, Theme,
     widget::{canvas, column, row},
 };
 
@@ -57,6 +57,10 @@ impl App {
 
     pub fn title(&self) -> String {
         format!("HexMap Editor")
+    }
+
+    pub fn theme(&self) -> Option<Theme> {
+        Some(Theme::Dark)
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {

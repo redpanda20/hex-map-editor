@@ -18,10 +18,16 @@ pub fn main() -> iced::Result {
         std::env::set_var("WAYLAND_DISPLAY", "");
     }
 
-    iced::application(App::title, App::update, App::view)
-        .theme(|_| iced::Theme::Dark)
+    iced::application(App::new, App::update, App::view)
         .antialiasing(true)
-        .run_with(App::new)
+        .title(App::title)
+        .theme(App::theme)
+        .run()
+
+    // iced::application(App::title, App::update, App::view)
+    //     .theme(|_| iced::Theme::Dark)
+    //     .antialiasing(true)
+    //     .run_with(App::new)
 }
 
 // WASM entry point

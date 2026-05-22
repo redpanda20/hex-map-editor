@@ -1,6 +1,9 @@
 use iced::{
     Color, Point, Rectangle, Theme, Vector, mouse,
-    widget::canvas::{self, Event, Fill, Frame, Geometry, Path, Program, Stroke},
+    widget::{
+        Action,
+        canvas::{self, Event, Fill, Frame, Geometry, Path, Program, Stroke},
+    },
 };
 
 use crate::{
@@ -72,14 +75,14 @@ impl<'a> Program<Message> for HexCanvas<'a> {
     fn update(
         &self,
         state: &mut CanvasState,
-        event: Event,
+        event: &Event,
         bounds: Rectangle,
         cursor: mouse::Cursor,
-    ) -> (canvas::event::Status, Option<Message>) {
+    ) -> Option<Action<Message>> {
         let Some(cursor_pos) = cursor.position_in(bounds) else {
             state.dragging = false;
             state.last_drag_pos = None;
-            return (canvas::event::Status::Ignored, None);
+            return None;
         };
 
         match event {
@@ -87,23 +90,17 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                 state.dragging = true;
                 state.last_drag_pos = Some(cursor_pos);
                 match self.settings.tool {
-                    Tool::Pan => (canvas::event::Status::Captured, None),
+                    Tool::Pan => Some(Action::capture()),
 
                     Tool::Paint => {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
-                        (
-                            canvas::event::Status::Captured,
-                            Some(Message::PaintTile(coord)),
-                        )
+                        Some(Action::publish(Message::PaintTile(coord)))
                     }
                     Tool::Erase => {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
-                        (
-                            canvas::event::Status::Captured,
-                            Some(Message::EraseTile(coord)),
-                        )
+                        Some(Action::publish(Message::EraseTile(coord)))
                     }
                 }
             }
@@ -111,12 +108,12 @@ impl<'a> Program<Message> for HexCanvas<'a> {
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 state.dragging = false;
                 state.last_drag_pos = None;
-                (canvas::event::Status::Ignored, None)
+                None
             }
 
             Event::Mouse(mouse::Event::CursorMoved { .. }) => {
                 if !state.dragging {
-                    return (canvas::event::Status::Ignored, None);
+                    return None;
                 };
 
                 let last = state.last_drag_pos;
@@ -124,29 +121,25 @@ impl<'a> Program<Message> for HexCanvas<'a> {
 
                 match self.settings.tool {
                     Tool::Pan => match last {
-                        None => (canvas::event::Status::Ignored, None),
+                        None => None,
                         Some(last) => {
                             let dx = cursor_pos.x - last.x;
                             let dy = cursor_pos.y - last.y;
                             state.pan.0 += dx;
                             state.pan.1 += dy;
                             state.request_redraw();
-                            (canvas::event::Status::Captured, None)
+                            Some(Action::request_redraw().and_capture())
                         }
                     },
                     Tool::Paint => {
+                        let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
-                        (
-                            canvas::event::Status::Captured,
-                            Some(Message::PaintTile(self.screen_to_hex(state, cursor_pos))),
-                        )
+                        Some(Action::publish(Message::PaintTile(coord)))
                     }
                     Tool::Erase => {
+                        let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
-                        (
-                            canvas::event::Status::Captured,
-                            Some(Message::EraseTile(self.screen_to_hex(state, cursor_pos))),
-                        )
+                        Some(Action::publish(Message::EraseTile(coord)))
                     }
                 }
             }
@@ -158,19 +151,24 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                 };
                 state.zoom = f32::clamp(state.zoom + delta * 0.01, 0.1, 10.0);
                 state.request_redraw();
-                (canvas::event::Status::Captured, None)
+                Some(Action::request_redraw().and_capture())
             }
 
-            _ => (canvas::event::Status::Ignored, None),
+            _ => None,
         }
     }
 
     fn mouse_interaction(
         &self,
         state: &CanvasState,
-        _bounds: Rectangle,
-        _cursor: mouse::Cursor,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
     ) -> mouse::Interaction {
+        match cursor.position() {
+            Some(pos) if bounds.contains(pos) => (),
+            _ => return mouse::Interaction::Idle,
+        };
+
         match self.settings.tool {
             Tool::Pan if state.dragging => mouse::Interaction::Grabbing,
             Tool::Pan => mouse::Interaction::Grab,
