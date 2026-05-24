@@ -1,3 +1,6 @@
+// Force windows to not spawn a terminal
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod app;
 mod export;
 mod state;
