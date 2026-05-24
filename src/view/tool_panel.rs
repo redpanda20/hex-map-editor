@@ -3,19 +3,16 @@ use iced::{
     widget::{button, column, radio, row, space, text},
 };
 
-use crate::{
-    app::Message,
-    view::{CanvasSettings, Tool},
-};
+use crate::{app::Message, state::Tool};
 
-pub fn toolbar_dialogue(settings: &CanvasSettings) -> Element<'_, Message> {
-    let paint_tool = radio("Paint", Tool::Paint, Some(settings.tool), |_| {
+pub fn toolbar_panel(current_tool: &Tool) -> Element<'_, Message> {
+    let paint_tool = radio("Paint", Tool::Paint, Some(*current_tool), |_| {
         Message::ChangeTool(Tool::Paint)
     });
-    let pan_tool = radio("Pan", Tool::Pan, Some(settings.tool), |_| {
+    let pan_tool = radio("Pan", Tool::Pan, Some(*current_tool), |_| {
         Message::ChangeTool(Tool::Pan)
     });
-    let erase_tool = radio("Erase", Tool::Erase, Some(settings.tool), |_| {
+    let erase_tool = radio("Erase", Tool::Erase, Some(*current_tool), |_| {
         Message::ChangeTool(Tool::Erase)
     });
 
@@ -30,6 +27,6 @@ pub fn toolbar_dialogue(settings: &CanvasSettings) -> Element<'_, Message> {
     column![toolbar, space::vertical(), export_tools]
         .padding(8.0)
         .width(Length::Fill)
-        .height(100.0)
+        .height(Length::Fill)
         .into()
 }

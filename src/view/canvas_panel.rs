@@ -1,5 +1,5 @@
 use iced::{
-    Color, Point, Rectangle, Theme, Vector, mouse,
+    Point, Rectangle, Theme, Vector, mouse,
     widget::{
         Action,
         canvas::{self, Event, Fill, Frame, Geometry, Path, Program, Stroke},
@@ -8,7 +8,7 @@ use iced::{
 
 use crate::{
     app::Message,
-    state::{HexCoord, Layer},
+    state::{HEX_SIZE, HexCoord, Layer, Tool},
 };
 
 #[derive(Debug)]
@@ -38,21 +38,9 @@ impl CanvasState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Tool {
-    Paint,
-    Erase,
-    Pan,
-}
-
-pub struct CanvasSettings {
-    pub tool: Tool,
-    pub hex_size: f32,
-}
-
 pub struct HexCanvas<'a> {
     pub layers: &'a Vec<Layer>,
-    pub settings: &'a CanvasSettings,
+    pub tool: &'a Tool,
 }
 
 impl<'a> Program<Message> for HexCanvas<'a> {
@@ -62,12 +50,12 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         &self,
         state: &CanvasState,
         renderer: &iced::Renderer,
-        _theme: &Theme,
+        theme: &Theme,
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
         let geometry = state.cache.draw(renderer, bounds.size(), |frame| {
-            self.draw_map(state, frame, bounds);
+            self.draw_map(state, theme, frame, bounds);
         });
         vec![geometry]
     }
@@ -79,6 +67,12 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> Option<Action<Message>> {
+        if !cursor.is_over(bounds) {
+            state.dragging = false;
+            state.last_drag_pos = None;
+            return None;
+        }
+
         let Some(cursor_pos) = cursor.position_in(bounds) else {
             state.dragging = false;
             state.last_drag_pos = None;
@@ -89,7 +83,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 state.dragging = true;
                 state.last_drag_pos = Some(cursor_pos);
-                match self.settings.tool {
+                match self.tool {
                     Tool::Pan => Some(Action::capture()),
 
                     Tool::Paint => {
@@ -119,7 +113,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                 let last = state.last_drag_pos;
                 state.last_drag_pos = Some(cursor_pos);
 
-                match self.settings.tool {
+                match self.tool {
                     Tool::Pan => match last {
                         None => None,
                         Some(last) => {
@@ -164,12 +158,11 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> mouse::Interaction {
-        match cursor.position() {
-            Some(pos) if bounds.contains(pos) => (),
-            _ => return mouse::Interaction::Idle,
-        };
+        if !cursor.is_over(bounds) {
+            return mouse::Interaction::Idle;
+        }
 
-        match self.settings.tool {
+        match self.tool {
             Tool::Pan if state.dragging => mouse::Interaction::Grabbing,
             Tool::Pan => mouse::Interaction::Grab,
             Tool::Paint => mouse::Interaction::Crosshair,
@@ -179,14 +172,14 @@ impl<'a> Program<Message> for HexCanvas<'a> {
 }
 
 impl<'a> HexCanvas<'a> {
-    fn draw_map(&self, state: &CanvasState, frame: &mut Frame, bounds: Rectangle) {
+    fn draw_map(&self, state: &CanvasState, theme: &Theme, frame: &mut Frame, bounds: Rectangle) {
         let pan = state.pan;
         let zoom = state.zoom;
-        let hex_w = self.settings.hex_size * 2.0;
-        let hex_h = self.settings.hex_size * (3.0_f32).sqrt();
+        let hex_w = HEX_SIZE * 2.0;
+        let hex_h = HEX_SIZE * (3.0_f32).sqrt();
 
         // Background
-        frame.fill_rectangle(Point::ORIGIN, bounds.size(), Color::from_rgb8(30, 32, 40));
+        // frame.fill_rectangle(Point::ORIGIN, bounds.size(), Color::from_rgb8(30, 32, 40));
 
         frame.translate(Vector::new(pan.0, pan.1));
         frame.scale(zoom);
@@ -206,7 +199,7 @@ impl<'a> HexCanvas<'a> {
                 continue;
             }
             for &coord in &layer.tiles {
-                let (cx, cy) = coord.to_pixel(self.settings.hex_size);
+                let (cx, cy) = coord.to_pixel();
 
                 // Cull tiles outside the visible map-space rectangle
                 if cx + hex_w < map_x0
@@ -231,7 +224,14 @@ impl<'a> HexCanvas<'a> {
                     frame.stroke(
                         &hex_path,
                         Stroke {
-                            style: canvas::Style::Solid(Color::from_rgba(1.0, 1.0, 1.0, 0.2)),
+                            style: canvas::Style::Solid(
+                                theme
+                                    .extended_palette()
+                                    .background
+                                    .base
+                                    .text
+                                    .scale_alpha(0.5),
+                            ),
                             width: 0.5,
                             ..Stroke::default()
                         },
@@ -249,15 +249,22 @@ impl<'a> HexCanvas<'a> {
             for col in col_min..=col_max {
                 for row in row_min..=row_max {
                     let coord = HexCoord::new(col, row);
-                    let (cx, cy) = coord.to_pixel(self.settings.hex_size);
+                    let (cx, cy) = coord.to_pixel();
 
                     frame.with_save(|frame| {
                         frame.translate(Vector::new(cx, cy));
                         frame.stroke(
                             &hex_path,
                             Stroke {
-                                style: canvas::Style::Solid(Color::from_rgba(1.0, 1.0, 1.0, 0.06)),
-                                width: 0.5,
+                                style: canvas::Style::Solid(
+                                    theme
+                                        .extended_palette()
+                                        .background
+                                        .base
+                                        .text
+                                        .scale_alpha(0.1),
+                                ),
+                                width: 1.0,
                                 ..Stroke::default()
                             },
                         );
@@ -268,21 +275,20 @@ impl<'a> HexCanvas<'a> {
     }
 
     fn screen_to_hex(&self, state: &CanvasState, screen: Point) -> HexCoord {
-        let hex_size = self.settings.hex_size;
         let pan = state.pan;
         let zoom = state.zoom;
 
         let map_x = (screen.x - pan.0) / zoom;
         let map_y = (screen.y - pan.1) / zoom;
-        HexCoord::from_pixel(map_x, map_y, hex_size)
+        HexCoord::from_pixel(map_x, map_y)
     }
 
     fn hex_path(&self) -> Path {
         let mut builder = canvas::path::Builder::new();
         for i in 0..6 {
             let angle = std::f32::consts::PI / 180.0 * (60.0 * i as f32);
-            let px = self.settings.hex_size * angle.cos();
-            let py = self.settings.hex_size * angle.sin();
+            let px = HEX_SIZE * angle.cos();
+            let py = HEX_SIZE * angle.sin();
             if i == 0 {
                 builder.move_to(Point::new(px, py));
             } else {

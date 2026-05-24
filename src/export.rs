@@ -104,7 +104,7 @@ pub fn export_png(layers: &Vec<Layer>, hex_size: f32, padding: f32) -> Vec<u8> {
         return out;
     }
 
-    let pixels: Vec<(f32, f32)> = all_coords.iter().map(|c| c.to_pixel(size)).collect();
+    let pixels: Vec<(f32, f32)> = all_coords.iter().map(|c| c.to_pixel()).collect();
     let xmin = pixels
         .iter()
         .map(|(x, _)| x)
@@ -153,7 +153,7 @@ pub fn export_png(layers: &Vec<Layer>, hex_size: f32, padding: f32) -> Vec<u8> {
             continue;
         }
         for tile in layer.tiles.iter() {
-            let (cx, cy) = tile.to_pixel(size);
+            let (cx, cy) = tile.to_pixel();
             let sx = cx - xmin;
             let sy = cy - ymin;
             let verts: Vec<(f32, f32)> = hex_vertices_f(sx, sy, size)

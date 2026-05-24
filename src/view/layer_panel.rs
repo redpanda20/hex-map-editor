@@ -2,8 +2,7 @@ use iced::{
     Alignment, Border, Color, Element, Length, Task,
     border::Radius,
     widget::{
-        button, checkbox, column, container, mouse_area, row, rule, scrollable, space, text,
-        text_input,
+        button, checkbox, column, container, mouse_area, row, scrollable, space, text, text_input,
     },
 };
 
@@ -31,6 +30,13 @@ impl From<LayerPanelMessage> for Message {
 }
 
 impl LayerPanel {
+    pub fn new() -> LayerPanel {
+        LayerPanel {
+            active_layer: Some(0),
+            edit_layer: None,
+        }
+    }
+
     pub fn update(&mut self, message: LayerPanelMessage) -> Task<Message> {
         match message {
             LayerPanelMessage::SelectLayer(optional_index) => {
@@ -59,6 +65,12 @@ impl LayerPanel {
     }
 }
 
+impl Default for LayerPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn layer_panel<'a>(layer_panel: &LayerPanel, layers: &Vec<Layer>) -> Element<'a, Message> {
     let layer_rows: Vec<Element<Message>> = layers
         .iter()
@@ -73,21 +85,12 @@ pub fn layer_panel<'a>(layer_panel: &LayerPanel, layers: &Vec<Layer>) -> Element
         .on_press(Message::AddLayer)
         .width(Length::Fill);
 
-    let heading = text("Layers")
+    column![scrollable_content, add_layer_button]
+        .height(Length::Fill)
         .width(Length::Fill)
-        .align_x(Alignment::Center);
-
-    column![
-        rule::horizontal(2.0),
-        heading,
-        scrollable_content,
-        add_layer_button
-    ]
-    .width(220)
-    .height(Length::Fill)
-    .spacing(4.0)
-    .padding(4.0)
-    .into()
+        .spacing(4.0)
+        .padding(4.0)
+        .into()
 }
 
 fn layer_row<'a>(

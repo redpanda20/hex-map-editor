@@ -1,56 +1,60 @@
 use iced::{
     Color, Element, Length, Task, Theme,
-    widget::{canvas, column, row},
+    widget::{canvas, container, pane_grid},
 };
 
 use crate::{
     export::{export_png, save_bytes_as},
-    state::{HexCoord, Layer},
+    state::{HexCoord, Layer, Tool},
     view::{
-        CanvasSettings, HexCanvas, LayerPanel, LayerPanelMessage, Tool, layer_panel,
-        toolbar_dialogue,
+        HexCanvas, LayerPanel, LayerPanelMessage, PaneType, default_pane_config, layer_panel,
+        toolbar_panel,
     },
 };
 
 pub struct App {
     layers: Vec<Layer>,
+    active_tool: Tool,
 
+    panes: pane_grid::State<PaneType>,
     layer_panel: LayerPanel,
-    hex_canvas: CanvasSettings,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    // Manage current tool
-    ChangeTool(Tool),
-
     // Manage layers
     AddLayer,
     RemoveLayer(usize),
     EditLayerName(usize, String),
     EditLayerVisibility(usize, bool),
 
+    // Manage current tool
+    ChangeTool(Tool),
+
     // Manage tiles
     PaintTile(HexCoord),
     EraseTile(HexCoord),
 
+    // Sub element
     LayerPanelEvent(LayerPanelMessage),
+
+    // Manage panels
+    PaneResized(pane_grid::ResizeEvent),
 
     ExportPng,
 }
 
 impl App {
     pub fn new() -> (Self, Task<Message>) {
+        let layers = vec![Layer::new("Layer 1", Color::from_rgba8(245, 196, 168, 0.9))];
+
+        let panes = pane_grid::State::with_configuration(default_pane_config());
+
         let app = Self {
-            layers: vec![Layer::new("Layer 1", Color::from_rgba8(245, 196, 168, 0.9))],
-            layer_panel: LayerPanel {
-                active_layer: Some(0),
-                edit_layer: None,
-            },
-            hex_canvas: CanvasSettings {
-                tool: Tool::Pan,
-                hex_size: 16.0,
-            },
+            layers,
+            layer_panel: LayerPanel::new(),
+            panes,
+            active_tool: Tool::default(),
         };
         (app, Task::none())
     }
@@ -121,11 +125,15 @@ impl App {
                 return self.layer_panel.update(layer_panel_message);
             }
 
-            Message::ChangeTool(new_tool) => self.hex_canvas.tool = new_tool,
+            Message::ChangeTool(new_tool) => self.active_tool = new_tool,
 
             Message::ExportPng => {
                 let bytes = export_png(&self.layers, 64.0, 80.0);
                 save_bytes_as(&bytes, "hexmap.png", "image/png");
+            }
+            Message::PaneResized(resize_event) => {
+                let pane_grid::ResizeEvent { split, ratio } = resize_event;
+                self.panes.resize(split, ratio);
             }
         }
 
@@ -133,20 +141,34 @@ impl App {
     }
 
     pub fn view<'a>(&'a self) -> Element<'a, Message> {
-        let layer_panel = layer_panel(&self.layer_panel, &self.layers);
-        let toolbar = toolbar_dialogue(&self.hex_canvas);
+        let grid = pane_grid(&self.panes, |_id, state, _is_maximised| {
+            let inner: Element<'_, Message> = match state {
+                PaneType::Toolbar => container(toolbar_panel(&self.active_tool))
+                    .style(container::bordered_box)
+                    .into(),
+                PaneType::Canvas => {
+                    let hex_canvas = HexCanvas {
+                        layers: &self.layers,
+                        tool: &self.active_tool,
+                    };
+                    canvas(hex_canvas)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .into()
+                }
+                PaneType::Layers => container(layer_panel(&self.layer_panel, &self.layers))
+                    .style(container::bordered_box)
+                    .into(),
+            };
 
-        let hex_canvas = HexCanvas {
-            layers: &self.layers,
-            settings: &self.hex_canvas,
-        };
-        let canvas_widget = canvas(hex_canvas).width(Length::Fill).height(Length::Fill);
+            pane_grid::Content::new(inner)
+        })
+        .on_resize(10, Message::PaneResized)
+        .spacing(2);
 
-        let dialogues = column![toolbar, layer_panel].width(220);
-
-        row![dialogues, canvas_widget]
-            .width(Length::Fill)
-            .height(Length::Fill)
+        container(grid)
+            .padding(2)
+            .style(|theme| container::background(theme.extended_palette().background.base.color))
             .into()
     }
 }

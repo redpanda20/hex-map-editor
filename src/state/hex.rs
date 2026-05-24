@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub const HEX_SIZE: f32 = 16.0;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct HexCoord {
     pub col: i32,
@@ -15,19 +17,19 @@ impl HexCoord {
 
     /// Convert hex offset coord → pixel centre (flat-top hexagons).
     /// `size` is the circumradius (centre → vertex).
-    pub fn to_pixel(self, size: f32) -> (f32, f32) {
-        let w = size * 2.0;
-        let h = size * (3.0_f32).sqrt();
+    pub fn to_pixel(self) -> (f32, f32) {
+        let w = HEX_SIZE * 2.0;
+        let h = HEX_SIZE * (3.0_f32).sqrt();
         let x = self.col as f32 * w * 0.75;
         let y = self.row as f32 * h + if self.col % 2 != 0 { h * 0.5 } else { 0.0 };
         (x, y)
     }
 
     /// Snap a pixel position to the nearest hex coordinate.
-    pub fn from_pixel(px: f32, py: f32, size: f32) -> Self {
+    pub fn from_pixel(px: f32, py: f32) -> Self {
         // Use cube-coordinate rounding for accuracy.
-        let w = size * 2.0;
-        let h = size * (3.0_f32).sqrt();
+        let w = HEX_SIZE * 2.0;
+        let h = HEX_SIZE * (3.0_f32).sqrt();
 
         let col_approx = px / (w * 0.75);
         let col = col_approx.round() as i32;
@@ -48,8 +50,8 @@ impl HexCoord {
         candidates
             .iter()
             .min_by(|a, b| {
-                let (ax, ay) = a.to_pixel(size);
-                let (bx, by) = b.to_pixel(size);
+                let (ax, ay) = a.to_pixel();
+                let (bx, by) = b.to_pixel();
                 let da = (ax - px).powi(2) + (ay - py).powi(2);
                 let db = (bx - px).powi(2) + (by - py).powi(2);
                 da.partial_cmp(&db).unwrap()
