@@ -199,19 +199,14 @@ impl<'a> HexCanvas<'a> {
                 continue;
             }
             for &coord in &layer.tiles {
-                let (cx, cy) = coord.to_pixel();
+                let (x, y) = coord.to_pixel(HEX_SIZE);
 
-                // Cull tiles outside the visible map-space rectangle
-                if cx + hex_w < map_x0
-                    || cx - hex_w > map_x1
-                    || cy + hex_h < map_y0
-                    || cy - hex_h > map_y1
-                {
+                if !bounds.contains(Point { x, y }) {
                     continue;
                 }
 
                 frame.with_save(|frame| {
-                    frame.translate(Vector::new(cx, cy));
+                    frame.translate(Vector::new(x, y));
 
                     frame.fill(
                         &hex_path,
@@ -249,7 +244,7 @@ impl<'a> HexCanvas<'a> {
             for col in col_min..=col_max {
                 for row in row_min..=row_max {
                     let coord = HexCoord::new(col, row);
-                    let (cx, cy) = coord.to_pixel();
+                    let (cx, cy) = coord.to_pixel(HEX_SIZE);
 
                     frame.with_save(|frame| {
                         frame.translate(Vector::new(cx, cy));
@@ -280,7 +275,7 @@ impl<'a> HexCanvas<'a> {
 
         let map_x = (screen.x - pan.0) / zoom;
         let map_y = (screen.y - pan.1) / zoom;
-        HexCoord::from_pixel(map_x, map_y)
+        HexCoord::from_pixel(map_x, map_y, HEX_SIZE)
     }
 
     fn hex_path(&self) -> Path {

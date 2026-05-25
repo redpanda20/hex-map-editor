@@ -8,8 +8,8 @@ use crate::{
     export::{export_png, save_bytes_as},
     state::{HexCoord, Layer, Tool},
     view::{
-        HexCanvas, LayerPanel, LayerPanelMessage, PaneType, default_pane_config, layer_panel,
-        toolbar_panel,
+        HexCanvas, LayerPanel, LayerPanelMessage, PaneType, colour_panel, default_pane_config,
+        layer_panel, toolbar_panel,
     },
 };
 
@@ -28,6 +28,7 @@ pub enum Message {
     RemoveLayer(usize),
     EditLayerName(usize, String),
     EditLayerVisibility(usize, bool),
+    EditLayerColor(usize, Color),
 
     // Manage current tool
     ChangeTool(Tool),
@@ -109,6 +110,11 @@ impl App {
                     layer.name = new_name;
                 }
             }
+            Message::EditLayerColor(index, new_color) => {
+                if let Some(layer) = self.layers.get_mut(index) {
+                    layer.color = new_color;
+                }
+            }
 
             Message::PaintTile(hex_coord) => {
                 if let Some(index) = self.layer_panel.active_layer {
@@ -133,7 +139,7 @@ impl App {
             Message::ChangeTool(new_tool) => self.active_tool = new_tool,
 
             Message::ExportPng => {
-                let bytes = export_png(&self.layers, 64.0, 80.0);
+                let bytes = export_png(&self.layers);
                 save_bytes_as(&bytes, "hexmap.png", "image/png");
             }
             Message::PaneResized(resize_event) => {
@@ -154,6 +160,8 @@ impl App {
             let inner: Element<'_, Message> = match state {
                 PaneType::Toolbar => toolbar_panel(&self.active_tool),
                 PaneType::Layers => layer_panel(&self.layer_panel, &self.layers),
+                PaneType::Colour => colour_panel(&self.layer_panel, &self.layers),
+
                 PaneType::Canvas => {
                     let hex_canvas = HexCanvas {
                         layers: &self.layers,

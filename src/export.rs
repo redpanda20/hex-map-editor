@@ -9,14 +9,20 @@ use image::{ImageBuffer, Rgba};
 
 use crate::state::{HexCoord, Layer};
 
+const RENDER_SCALE: f32 = 2.0;
+const HEX_SIZE: f32 = crate::state::HEX_SIZE * RENDER_SCALE;
+
 // ---------------------------------------------------------------------------
 // Shared geometry helper
 // ---------------------------------------------------------------------------
 
-fn hex_vertices_f(cx: f32, cy: f32, size: f32) -> [(f32, f32); 6] {
+fn hex_vertices_f(cx: f32, cy: f32) -> [(f32, f32); 6] {
     std::array::from_fn(|i| {
         let angle_rad = (60.0 * i as f32).to_radians();
-        (cx + size * angle_rad.cos(), cy + size * angle_rad.sin())
+        (
+            cx + HEX_SIZE * angle_rad.cos(),
+            cy + HEX_SIZE * angle_rad.sin(),
+        )
     })
 }
 
@@ -43,23 +49,20 @@ fn fill_polygon(buf: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, vertices: &[(f32, f32)
     for py in ymin..=ymax {
         for px in xmin..=xmax {
             if point_in_polygon(px as f32 + 0.5, py as f32 + 0.5, vertices) {
-                // Alpha-blend over existing pixel.
-                let existing = buf.get_pixel(px, py);
-                let bg = [existing[0], existing[1], existing[2], existing[3]];
-                let out = alpha_blend(bg, color);
-                buf.put_pixel(px, py, Rgba(out));
+                // TODO: Blend layers with alpha channels
+
+                buf.put_pixel(px, py, Rgba(color));
             }
         }
     }
 }
 
-fn point_in_polygon(x: f32, y: f32, verts: &[(f32, f32)]) -> bool {
-    let n = verts.len();
+fn point_in_polygon(x: f32, y: f32, verticies: &[(f32, f32)]) -> bool {
     let mut inside = false;
-    let mut j = n - 1;
-    for i in 0..n {
-        let (xi, yi) = verts[i];
-        let (xj, yj) = verts[j];
+    let mut j = verticies.len() - 1;
+    for i in 0..verticies.len() {
+        let (xi, yi) = verticies[i];
+        let (xj, yj) = verticies[j];
         if ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
             inside = !inside;
         }
@@ -68,35 +71,16 @@ fn point_in_polygon(x: f32, y: f32, verts: &[(f32, f32)]) -> bool {
     inside
 }
 
-fn alpha_blend(bg: [u8; 4], fg: [u8; 4]) -> [u8; 4] {
-    let fa = fg[3] as f32 / 255.0;
-    let ba = bg[3] as f32 / 255.0;
-    let out_a = fa + ba * (1.0 - fa);
-    if out_a == 0.0 {
-        return [0, 0, 0, 0];
-    }
-    let blend =
-        |fc: u8, bc: u8| -> u8 { ((fc as f32 * fa + bc as f32 * ba * (1.0 - fa)) / out_a) as u8 };
-    [
-        blend(fg[0], bg[0]),
-        blend(fg[1], bg[1]),
-        blend(fg[2], bg[2]),
-        (out_a * 255.0) as u8,
-    ]
-}
-
-pub fn export_png(layers: &Vec<Layer>, hex_size: f32, padding: f32) -> Vec<u8> {
-    let size = hex_size;
-
-    // Determine bounding box of all painted tiles.
+pub fn export_png(layers: &Vec<Layer>) -> Vec<u8> {
+    // Determine bounding box of all painted tiles
     let all_coords: Vec<HexCoord> = layers
         .iter()
         .filter(|l| l.visible)
         .flat_map(|l| l.tiles.iter().copied())
         .collect();
 
+    // Create placeholder image if nothing has been drawn
     if all_coords.is_empty() {
-        // Return a small placeholder image.
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(256, 256);
         let mut out = Vec::new();
         img.write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
@@ -104,48 +88,45 @@ pub fn export_png(layers: &Vec<Layer>, hex_size: f32, padding: f32) -> Vec<u8> {
         return out;
     }
 
-    let pixels: Vec<(f32, f32)> = all_coords.iter().map(|c| c.to_pixel()).collect();
+    let pixels: Vec<(f32, f32)> = all_coords.iter().map(|c| c.to_pixel(HEX_SIZE)).collect();
     let xmin = pixels
         .iter()
         .map(|(x, _)| x)
         .cloned()
-        .fold(f32::INFINITY, f32::min)
-        - size
-        - padding;
+        .reduce(f32::min)
+        .unwrap()
+        - HEX_SIZE * 2.0;
     let ymin = pixels
         .iter()
         .map(|(_, y)| y)
         .cloned()
-        .fold(f32::INFINITY, f32::min)
-        - size
-        - padding;
+        .reduce(f32::min)
+        .unwrap()
+        - HEX_SIZE * 2.0;
     let xmax = pixels
         .iter()
-        .map(|(x, _)| x)
         .cloned()
-        .fold(f32::NEG_INFINITY, f32::max)
-        + size
-        + padding;
+        .map(|(x, _)| x)
+        .reduce(f32::max)
+        .unwrap()
+        + HEX_SIZE * 2.0;
     let ymax = pixels
         .iter()
-        .map(|(_, y)| y)
         .cloned()
-        .fold(f32::NEG_INFINITY, f32::max)
-        + size
-        + padding;
+        .map(|(_, y)| y)
+        .reduce(f32::max)
+        .unwrap()
+        + HEX_SIZE * 2.0;
 
     let img_w = (xmax - xmin).ceil() as u32;
     let img_h = (ymax - ymin).ceil() as u32;
 
     let mut buf: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(img_w, img_h);
 
-    // Fill dark background.
+    // Background
     for p in buf.pixels_mut() {
         *p = Rgba([30, 32, 40, 255]);
     }
-
-    // Draw grid outlines first.
-    // (Skipped for brevity — add if desired.)
 
     // Draw each layer bottom → top.
     for layer in layers.iter() {
@@ -153,13 +134,11 @@ pub fn export_png(layers: &Vec<Layer>, hex_size: f32, padding: f32) -> Vec<u8> {
             continue;
         }
         for tile in layer.tiles.iter() {
-            let (cx, cy) = tile.to_pixel();
-            let sx = cx - xmin;
-            let sy = cy - ymin;
-            let verts: Vec<(f32, f32)> = hex_vertices_f(sx, sy, size)
-                .iter()
-                .map(|(x, y)| (*x, *y))
-                .collect();
+            let (cx, cy) = tile.to_pixel(HEX_SIZE);
+            let x = cx - xmin;
+            let y = cy - ymin;
+            let verts: Vec<(f32, f32)> =
+                hex_vertices_f(x, y).iter().map(|(x, y)| (*x, *y)).collect();
             let color = layer.color.into_rgba8();
             fill_polygon(&mut buf, &verts, color);
         }
@@ -188,39 +167,4 @@ pub fn save_bytes_as(bytes: &[u8], default_name: &str, _mime: &str) -> String {
         },
         None => "Export cancelled.".into(),
     }
-}
-
-#[cfg(target_arch = "wasm32")]
-pub fn save_bytes_as(bytes: &[u8], filename: &str, mime: &str) -> String {
-    use js_sys::{Array, Uint8Array};
-    use wasm_bindgen::JsCast;
-    use web_sys::{Blob, BlobPropertyBag, HtmlAnchorElement, Url};
-
-    let window = web_sys::window().expect("no window");
-    let document = window.document().expect("no document");
-
-    let uint8_array = Uint8Array::from(bytes);
-    let array = Array::new();
-    array.push(&uint8_array);
-
-    let mut opts = BlobPropertyBag::new();
-    opts.type_(mime);
-    let blob =
-        Blob::new_with_u8_array_sequence_and_options(&array, &opts).expect("blob creation failed");
-
-    let url = Url::create_object_url_with_blob(&blob).expect("URL creation failed");
-
-    let a: HtmlAnchorElement = document
-        .create_element("a")
-        .expect("createElement failed")
-        .dyn_into()
-        .expect("cast failed");
-
-    a.set_href(&url);
-    a.set_download(filename);
-    a.click();
-
-    Url::revoke_object_url(&url).ok();
-
-    format!("Downloading {filename}…")
 }

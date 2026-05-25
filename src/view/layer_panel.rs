@@ -1,6 +1,5 @@
 use iced::{
-    Alignment, Border, Color, Element, Length, Task,
-    border::Radius,
+    Alignment, Element, Length, Task,
     widget::{
         button, checkbox, column, container, mouse_area, row, rule, scrollable, space, text,
         text_input,
@@ -135,23 +134,13 @@ fn layer_row<'a>(
         delete_button
     ]
     .align_y(Alignment::Center)
-    .spacing(6.0);
+    .spacing(16.0);
 
     let content = container(content)
-        .padding(4.0)
-        .style(move |_| match is_active {
-            true => container::Style {
-                background: Some(iced::Background::Color(Color::from_rgba8(
-                    80, 120, 200, 0.2,
-                ))),
-                border: Border {
-                    color: Color::BLACK,
-                    width: 0.0,
-                    radius: Radius::new(2.0),
-                },
-                ..Default::default()
-            },
-            false => container::Style::default(),
+        .padding([4.0, 8.0])
+        .style(move |theme| match is_active {
+            false => container::transparent(theme),
+            true => container::background(theme.palette().primary.scale_alpha(0.2)),
         });
 
     mouse_area(content)
