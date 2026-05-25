@@ -2,9 +2,11 @@ use iced::{
     Alignment, Border, Color, Element, Length, Task,
     border::Radius,
     widget::{
-        button, checkbox, column, container, mouse_area, row, scrollable, space, text, text_input,
+        button, checkbox, column, container, mouse_area, row, rule, scrollable, space, text,
+        text_input,
     },
 };
+use iced_fonts::bootstrap;
 
 use crate::{app::Message, state::Layer};
 
@@ -79,18 +81,20 @@ pub fn layer_panel<'a>(layer_panel: &LayerPanel, layers: &Vec<Layer>) -> Element
         .collect();
 
     let scrollable_content =
-        scrollable(column(layer_rows).spacing(2.0).width(Length::Fill)).height(Length::Fill);
+        scrollable(column(layer_rows).spacing(4.0).width(Length::Fill)).height(Length::Fill);
 
-    let add_layer_button = button(text("Add Layer").size(16))
+    let add_layer_button = button(row![bootstrap::plus_square(), text("Add layer")].spacing(16))
+        .padding(8)
         .on_press(Message::AddLayer)
         .width(Length::Fill);
 
-    column![scrollable_content, add_layer_button]
+    let content = column![rule::horizontal(1), scrollable_content, add_layer_button]
         .height(Length::Fill)
         .width(Length::Fill)
-        .spacing(4.0)
-        .padding(4.0)
-        .into()
+        .spacing(8.0)
+        .padding(8.0);
+
+    container(content).style(container::bordered_box).into()
 }
 
 fn layer_row<'a>(
@@ -120,7 +124,7 @@ fn layer_row<'a>(
         (false, false) => text(layer.name.clone()).into(),
     };
 
-    let delete_button = button(text("X"))
+    let delete_button = button(bootstrap::trash())
         .style(button::danger)
         .on_press(Message::RemoveLayer(layer_index));
 

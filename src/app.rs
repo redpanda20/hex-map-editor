@@ -1,7 +1,8 @@
 use iced::{
-    Color, Element, Length, Task, Theme,
+    Color, Element, Length, Task, Theme, font,
     widget::{canvas, container, pane_grid},
 };
+use iced_fonts::BOOTSTRAP_FONT_BYTES;
 
 use crate::{
     export::{export_png, save_bytes_as},
@@ -41,6 +42,7 @@ pub enum Message {
     // Manage panels
     PaneResized(pane_grid::ResizeEvent),
 
+    FontLoaded(Result<(), font::Error>),
     ExportPng,
 }
 
@@ -56,7 +58,10 @@ impl App {
             panes,
             active_tool: Tool::default(),
         };
-        (app, Task::none())
+
+        let font_load_task = font::load(BOOTSTRAP_FONT_BYTES).map(Message::FontLoaded);
+
+        (app, Task::batch(vec![font_load_task]))
     }
 
     pub fn title(&self) -> String {
@@ -135,6 +140,10 @@ impl App {
                 let pane_grid::ResizeEvent { split, ratio } = resize_event;
                 self.panes.resize(split, ratio);
             }
+            Message::FontLoaded(result) => match result {
+                Ok(_) => eprintln!("Font loaded"),
+                Err(err) => eprintln!("Font failed to load: {err:?}"),
+            },
         }
 
         Task::none()
@@ -143,9 +152,8 @@ impl App {
     pub fn view<'a>(&'a self) -> Element<'a, Message> {
         let grid = pane_grid(&self.panes, |_id, state, _is_maximised| {
             let inner: Element<'_, Message> = match state {
-                PaneType::Toolbar => container(toolbar_panel(&self.active_tool))
-                    .style(container::bordered_box)
-                    .into(),
+                PaneType::Toolbar => toolbar_panel(&self.active_tool),
+                PaneType::Layers => layer_panel(&self.layer_panel, &self.layers),
                 PaneType::Canvas => {
                     let hex_canvas = HexCanvas {
                         layers: &self.layers,
@@ -156,9 +164,6 @@ impl App {
                         .height(Length::Fill)
                         .into()
                 }
-                PaneType::Layers => container(layer_panel(&self.layer_panel, &self.layers))
-                    .style(container::bordered_box)
-                    .into(),
             };
 
             pane_grid::Content::new(inner)

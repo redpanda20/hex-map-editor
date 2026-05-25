@@ -1,32 +1,81 @@
 use iced::{
-    Element, Length,
-    widget::{button, column, radio, row, space, text},
+    Element,
+    widget::{button, column, container, rule, space, tooltip},
 };
+use iced_fonts::bootstrap;
 
 use crate::{app::Message, state::Tool};
 
 pub fn toolbar_panel(current_tool: &Tool) -> Element<'_, Message> {
-    let paint_tool = radio("Paint", Tool::Paint, Some(*current_tool), |_| {
-        Message::ChangeTool(Tool::Paint)
-    });
-    let pan_tool = radio("Pan", Tool::Pan, Some(*current_tool), |_| {
-        Message::ChangeTool(Tool::Pan)
-    });
-    let erase_tool = radio("Erase", Tool::Erase, Some(*current_tool), |_| {
-        Message::ChangeTool(Tool::Erase)
-    });
+    let brush_tool = button(bootstrap::brush())
+        .on_press(Message::ChangeTool(Tool::Paint))
+        .style(|theme, mut status| {
+            if *current_tool == Tool::Paint {
+                status = button::Status::Disabled
+            };
+            button::background(theme, status)
+        });
+    let brush_tool = tooltip(
+        brush_tool,
+        container("Brush tool")
+            .padding(4.0)
+            .style(container::bordered_box),
+        tooltip::Position::Right,
+    );
 
-    let export_png = button(text("Export PNG"))
+    let move_tool = button(bootstrap::arrows_move())
+        .on_press(Message::ChangeTool(Tool::Pan))
+        .style(|theme, mut status| {
+            if *current_tool == Tool::Pan {
+                status = button::Status::Disabled
+            };
+            button::background(theme, status)
+        });
+    let move_tool = tooltip(
+        move_tool,
+        container("Move tool")
+            .padding(4.0)
+            .style(container::bordered_box),
+        tooltip::Position::Right,
+    );
+
+    let erase_tool = button(bootstrap::eraser_fill())
+        .on_press(Message::ChangeTool(Tool::Erase))
+        .style(|theme, mut status| {
+            if *current_tool == Tool::Erase {
+                status = button::Status::Disabled
+            };
+            button::background(theme, status)
+        });
+    let erase_tool = tooltip(
+        erase_tool,
+        container("Erase tool")
+            .padding(4.0)
+            .style(container::bordered_box),
+        tooltip::Position::Right,
+    );
+
+    let export_png = button(bootstrap::floppy_fill())
         .on_press(Message::ExportPng)
-        .style(iced::widget::button::secondary);
+        .style(button::subtle);
+    let export_png = tooltip(
+        export_png,
+        container("Export current map as a PNG")
+            .padding(4.0)
+            .style(container::bordered_box),
+        tooltip::Position::Right,
+    );
 
-    let toolbar = row![paint_tool, pan_tool, erase_tool].spacing(8.0);
+    let content = column![
+        rule::horizontal(1),
+        brush_tool,
+        move_tool,
+        erase_tool,
+        space::vertical(),
+        export_png
+    ]
+    .spacing(8.0)
+    .padding(8.0);
 
-    let export_tools = row![export_png].spacing(8.0);
-
-    column![toolbar, space::vertical(), export_tools]
-        .padding(8.0)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    container(content).style(container::bordered_box).into()
 }
