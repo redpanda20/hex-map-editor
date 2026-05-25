@@ -64,7 +64,7 @@ impl App {
     }
 
     pub fn theme(&self) -> Option<Theme> {
-        Some(Theme::Dark)
+        None
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
