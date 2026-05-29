@@ -1,12 +1,12 @@
 use iced::{
-    Color, Element, Length, Task, Theme, font,
+    Element, Length, Task, Theme, font,
     widget::{canvas, container, pane_grid},
 };
 use iced_fonts::BOOTSTRAP_FONT_BYTES;
 
 use crate::{
     export::{export_png, save_bytes_as},
-    state::{HexCoord, Layer, Tool},
+    state::{LayerMessage, Layers, Tool},
     view::{
         HexCanvas, LayerPanel, LayerPanelMessage, PaneType, colour_panel, default_pane_config,
         layer_panel, toolbar_panel,
@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub struct App {
-    layers: Vec<Layer>,
+    layers: Layers,
     active_tool: Tool,
 
     panes: pane_grid::State<PaneType>,
@@ -23,24 +23,16 @@ pub struct App {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    // Manage layers
-    AddLayer,
-    RemoveLayer(usize),
-    EditLayerName(usize, String),
-    EditLayerVisibility(usize, bool),
-    EditLayerColor(usize, Color),
-
     // Manage current tool
     ChangeTool(Tool),
 
-    // Manage tiles
-    PaintTile(HexCoord),
-    EraseTile(HexCoord),
+    // Layers
+    LayerEvent(LayerMessage),
 
-    // Sub element
+    // Layer Panel
     LayerPanelEvent(LayerPanelMessage),
 
-    // Manage panels
+    // Panel management
     PaneResized(pane_grid::ResizeEvent),
 
     FontLoaded(Result<(), font::Error>),
@@ -49,12 +41,10 @@ pub enum Message {
 
 impl App {
     pub fn new() -> (Self, Task<Message>) {
-        let layers = vec![Layer::new("Layer 1", Color::from_rgba8(245, 196, 168, 0.9))];
-
         let panes = pane_grid::State::with_configuration(default_pane_config());
 
         let app = Self {
-            layers,
+            layers: Layers::default(),
             layer_panel: LayerPanel::new(),
             panes,
             active_tool: Tool::default(),
@@ -78,58 +68,8 @@ impl App {
         println!("{message:?}");
 
         match message {
-            Message::AddLayer => {
-                let colors = [
-                    Color::from_rgba8(245, 196, 168, 0.9),
-                    Color::from_rgba8(168, 212, 176, 0.9),
-                    Color::from_rgba8(168, 200, 245, 0.9),
-                    Color::from_rgba8(196, 168, 245, 0.9),
-                    Color::from_rgba8(245, 168, 200, 0.9),
-                ];
-
-                let layer_count = self.layers.len();
-                let new_layer = Layer::new(
-                    format!("Layer {}", layer_count + 1),
-                    colors[layer_count % 5],
-                );
-                self.layers.push(new_layer);
-
-                return Task::done(LayerPanelMessage::SelectLayer(Some(layer_count)).into());
-            }
-            Message::RemoveLayer(index) => {
-                self.layers.remove(index);
-            }
-
-            Message::EditLayerVisibility(index, new_state) => {
-                if let Some(layer) = self.layers.get_mut(index) {
-                    layer.visible = new_state;
-                }
-            }
-            Message::EditLayerName(index, new_name) => {
-                if let Some(layer) = self.layers.get_mut(index) {
-                    layer.name = new_name;
-                }
-            }
-            Message::EditLayerColor(index, new_color) => {
-                if let Some(layer) = self.layers.get_mut(index) {
-                    layer.color = new_color;
-                }
-            }
-
-            Message::PaintTile(hex_coord) => {
-                if let Some(index) = self.layer_panel.active_layer {
-                    if let Some(layer) = self.layers.get_mut(index) {
-                        layer.tiles.insert(hex_coord);
-                    }
-                }
-            }
-
-            Message::EraseTile(hex_coord) => {
-                if let Some(index) = self.layer_panel.active_layer {
-                    if let Some(layer) = self.layers.get_mut(index) {
-                        layer.tiles.remove(&hex_coord);
-                    }
-                }
+            Message::LayerEvent(layers_message) => {
+                return self.layers.update(layers_message);
             }
 
             Message::LayerPanelEvent(layer_panel_message) => {
@@ -139,7 +79,7 @@ impl App {
             Message::ChangeTool(new_tool) => self.active_tool = new_tool,
 
             Message::ExportPng => {
-                let bytes = export_png(&self.layers);
+                let bytes = export_png(&self.layers.inner);
                 save_bytes_as(&bytes, "hexmap.png", "image/png");
             }
             Message::PaneResized(resize_event) => {
@@ -160,7 +100,7 @@ impl App {
             let inner: Element<'_, Message> = match state {
                 PaneType::Toolbar => toolbar_panel(&self.active_tool),
                 PaneType::Layers => layer_panel(&self.layer_panel, &self.layers),
-                PaneType::Colour => colour_panel(&self.layer_panel, &self.layers),
+                PaneType::Colour => colour_panel(&self.layers),
 
                 PaneType::Canvas => {
                     let hex_canvas = HexCanvas {

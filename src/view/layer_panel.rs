@@ -7,18 +7,17 @@ use iced::{
 };
 use iced_fonts::bootstrap;
 
-use crate::{app::Message, state::Layer};
+use crate::{
+    app::Message,
+    state::{Layer, LayerMessage, Layers},
+};
 
 pub struct LayerPanel {
-    pub active_layer: Option<usize>,
-
     pub edit_layer: Option<(usize, String)>,
 }
 
 #[derive(Debug, Clone)]
 pub enum LayerPanelMessage {
-    SelectLayer(Option<usize>),
-
     BeginLayerEdit(usize),
     LayerEdit(String),
     CommitLayerEdit,
@@ -32,20 +31,11 @@ impl From<LayerPanelMessage> for Message {
 
 impl LayerPanel {
     pub fn new() -> LayerPanel {
-        LayerPanel {
-            active_layer: Some(0),
-            edit_layer: None,
-        }
+        LayerPanel { edit_layer: None }
     }
 
     pub fn update(&mut self, message: LayerPanelMessage) -> Task<Message> {
         match message {
-            LayerPanelMessage::SelectLayer(optional_index) => {
-                if self.active_layer != optional_index {
-                    self.edit_layer = None;
-                }
-                self.active_layer = optional_index
-            }
             LayerPanelMessage::BeginLayerEdit(index) => {
                 self.edit_layer = Some((index, String::new()));
             }
@@ -57,7 +47,7 @@ impl LayerPanel {
             LayerPanelMessage::CommitLayerEdit => {
                 if let Some((index, name)) = self.edit_layer.clone() {
                     self.edit_layer = None;
-                    return Task::done(Message::EditLayerName(index, name));
+                    return Task::done(LayerMessage::ChangeLayerName(index, name).into());
                 }
             }
         }
@@ -72,11 +62,12 @@ impl Default for LayerPanel {
     }
 }
 
-pub fn layer_panel<'a>(layer_panel: &LayerPanel, layers: &Vec<Layer>) -> Element<'a, Message> {
+pub fn layer_panel<'a>(layer_panel: &LayerPanel, layers: &Layers) -> Element<'a, Message> {
     let layer_rows: Vec<Element<Message>> = layers
+        .inner
         .iter()
         .enumerate()
-        .map(|(i, layer)| layer_row(&layer_panel, &layer, i))
+        .map(|(i, layer)| layer_row(&layer_panel, &layer, i, layers.active_layer == Some(i)))
         .collect();
 
     let scrollable_content =
@@ -84,7 +75,7 @@ pub fn layer_panel<'a>(layer_panel: &LayerPanel, layers: &Vec<Layer>) -> Element
 
     let add_layer_button = button(row![bootstrap::plus_square(), text("Add layer")].spacing(16))
         .padding(8)
-        .on_press(Message::AddLayer)
+        .on_press(Message::LayerEvent(LayerMessage::AddLayer))
         .width(Length::Fill);
 
     let content = column![rule::horizontal(1), scrollable_content, add_layer_button]
@@ -100,15 +91,16 @@ fn layer_row<'a>(
     layer_panel: &LayerPanel,
     layer: &Layer,
     layer_index: usize,
+    is_active: bool,
 ) -> Element<'a, Message> {
-    let is_active = layer_panel.active_layer == Some(layer_index);
     let is_editing = match layer_panel.edit_layer {
         Some((edit_index, _)) => edit_index == layer_index,
         None => false,
     };
 
-    let visibility_toggle = checkbox(layer.visible)
-        .on_toggle(move |state| Message::EditLayerVisibility(layer_index, state));
+    let visibility_toggle = checkbox(layer.visible).on_toggle(move |state| {
+        Message::LayerEvent(LayerMessage::ChangeLayerVisibility(layer_index, state))
+    });
 
     let name: Element<'_, LayerPanelMessage> = match (is_editing, is_active) {
         (true, ..) => text_input("Layer name...", &layer_panel.edit_layer.clone().unwrap().1)
@@ -125,7 +117,7 @@ fn layer_row<'a>(
 
     let delete_button = button(bootstrap::trash())
         .style(button::danger)
-        .on_press(Message::RemoveLayer(layer_index));
+        .on_press(Message::LayerEvent(LayerMessage::RemoveLayer(layer_index)));
 
     let content = row![
         visibility_toggle,
@@ -144,6 +136,6 @@ fn layer_row<'a>(
         });
 
     mouse_area(content)
-        .on_press(LayerPanelMessage::SelectLayer(Some(layer_index)).into())
+        .on_press(LayerMessage::ChangeActiveLayer(Some(layer_index)).into())
         .into()
 }

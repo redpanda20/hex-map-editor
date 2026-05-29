@@ -8,7 +8,7 @@ use iced::{
 
 use crate::{
     app::Message,
-    state::{HEX_SIZE, HexCoord, Layer, Tool},
+    state::{HEX_SIZE, HexCoord, LayerMessage, Layers, Tool},
 };
 
 #[derive(Debug)]
@@ -39,7 +39,7 @@ impl CanvasState {
 }
 
 pub struct HexCanvas<'a> {
-    pub layers: &'a Vec<Layer>,
+    pub layers: &'a Layers,
     pub tool: &'a Tool,
 }
 
@@ -89,12 +89,16 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                     Tool::Paint => {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
-                        Some(Action::publish(Message::PaintTile(coord)))
+                        Some(Action::publish(Message::LayerEvent(
+                            LayerMessage::PaintTile(coord),
+                        )))
                     }
                     Tool::Erase => {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
-                        Some(Action::publish(Message::EraseTile(coord)))
+                        Some(Action::publish(Message::LayerEvent(
+                            LayerMessage::EraseTile(coord),
+                        )))
                     }
                 }
             }
@@ -128,12 +132,16 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                     Tool::Paint => {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
-                        Some(Action::publish(Message::PaintTile(coord)))
+                        Some(Action::publish(Message::LayerEvent(
+                            LayerMessage::PaintTile(coord),
+                        )))
                     }
                     Tool::Erase => {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
-                        Some(Action::publish(Message::EraseTile(coord)))
+                        Some(Action::publish(Message::LayerEvent(
+                            LayerMessage::EraseTile(coord),
+                        )))
                     }
                 }
             }
@@ -178,9 +186,6 @@ impl<'a> HexCanvas<'a> {
         let hex_w = HEX_SIZE * 2.0;
         let hex_h = HEX_SIZE * (3.0_f32).sqrt();
 
-        // Background
-        // frame.fill_rectangle(Point::ORIGIN, bounds.size(), Color::from_rgb8(30, 32, 40));
-
         frame.translate(Vector::new(pan.0, pan.1));
         frame.scale(zoom);
 
@@ -191,80 +196,59 @@ impl<'a> HexCanvas<'a> {
         let map_x1 = map_x0 + bounds.width * inv_zoom;
         let map_y1 = map_y0 + bounds.height * inv_zoom;
 
-        // Precalcuate path for hexagon
+        let col_min = (map_x0 / (hex_w * 0.75)).floor() as i32 - 1;
+        let col_max = (map_x1 / (hex_w * 0.75)).ceil() as i32 + 1;
+        let row_min = (map_y0 / hex_h).floor() as i32 - 1;
+        let row_max = (map_y1 / hex_h).ceil() as i32 + 1;
+
         let hex_path = self.hex_path();
 
-        for layer in self.layers.iter() {
-            if !layer.visible {
-                continue;
-            }
-            for &coord in &layer.tiles {
-                let (x, y) = coord.to_pixel(HEX_SIZE);
+        let grid_stroke = Stroke {
+            style: canvas::Style::Solid(
+                theme
+                    .extended_palette()
+                    .background
+                    .base
+                    .text
+                    .scale_alpha(0.1),
+            ),
+            width: 1.0,
+            ..Stroke::default()
+        };
 
-                if !bounds.contains(Point { x, y }) {
-                    continue;
-                }
+        let tile_stroke = Stroke {
+            style: canvas::Style::Solid(
+                theme
+                    .extended_palette()
+                    .background
+                    .base
+                    .text
+                    .scale_alpha(0.5),
+            ),
+            width: 1.0,
+            ..Stroke::default()
+        };
+
+        for col in col_min..=col_max {
+            for row in row_min..=row_max {
+                let coord = HexCoord::new(col, row);
+                let (cx, cy) = coord.to_pixel(HEX_SIZE);
+
+                let tiles_at_coord = self.layers.tiles_at_coord(coord);
+                let is_tile_empty = tiles_at_coord.is_empty();
 
                 frame.with_save(|frame| {
-                    frame.translate(Vector::new(x, y));
+                    frame.translate(Vector::new(cx, cy));
 
-                    frame.fill(
-                        &hex_path,
-                        Fill {
-                            style: canvas::Style::Solid(layer.color),
-                            rule: canvas::fill::Rule::NonZero,
-                        },
-                    );
+                    for color in tiles_at_coord {
+                        frame.fill(&hex_path, Fill::from(color));
+                    }
 
-                    frame.stroke(
-                        &hex_path,
-                        Stroke {
-                            style: canvas::Style::Solid(
-                                theme
-                                    .extended_palette()
-                                    .background
-                                    .base
-                                    .text
-                                    .scale_alpha(0.5),
-                            ),
-                            width: 0.5,
-                            ..Stroke::default()
-                        },
-                    );
+                    match is_tile_empty {
+                        true => frame.stroke(&hex_path, grid_stroke.clone()),
+                        false => frame.stroke(&hex_path, tile_stroke.clone()),
+                    }
                 });
-            }
-        }
-
-        {
-            let col_min = (map_x0 / (hex_w * 0.75)).floor() as i32 - 1;
-            let col_max = (map_x1 / (hex_w * 0.75)).ceil() as i32 + 1;
-            let row_min = (map_y0 / hex_h).floor() as i32 - 1;
-            let row_max = (map_y1 / hex_h).ceil() as i32 + 1;
-
-            for col in col_min..=col_max {
-                for row in row_min..=row_max {
-                    let coord = HexCoord::new(col, row);
-                    let (cx, cy) = coord.to_pixel(HEX_SIZE);
-
-                    frame.with_save(|frame| {
-                        frame.translate(Vector::new(cx, cy));
-                        frame.stroke(
-                            &hex_path,
-                            Stroke {
-                                style: canvas::Style::Solid(
-                                    theme
-                                        .extended_palette()
-                                        .background
-                                        .base
-                                        .text
-                                        .scale_alpha(0.1),
-                                ),
-                                width: 1.0,
-                                ..Stroke::default()
-                            },
-                        );
-                    });
-                }
             }
         }
     }
