@@ -1,11 +1,8 @@
-// Coordinate system: offset coordinates (even-q flat-top)
-
-use serde::{Deserialize, Serialize};
-
 // Scale is different in export
 pub const HEX_SIZE: f32 = 16.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// Flat topped axial grid
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HexCoord {
     pub col: i32,
     pub row: i32,
@@ -16,8 +13,6 @@ impl HexCoord {
         Self { col, row }
     }
 
-    /// Convert hex offset coord → pixel centre (flat-top hexagons).
-    /// `size` is the circumradius (centre → vertex).
     pub fn to_pixel(self, hex_size: f32) -> (f32, f32) {
         let w = hex_size * 2.0;
         let h = hex_size * (3.0_f32).sqrt();
@@ -26,7 +21,6 @@ impl HexCoord {
         (x, y)
     }
 
-    /// Snap a pixel position to the nearest hex coordinate.
     pub fn from_pixel(px: f32, py: f32, hex_size: f32) -> Self {
         // Use cube-coordinate rounding for accuracy.
         let w = hex_size * 2.0;
@@ -34,10 +28,13 @@ impl HexCoord {
 
         let col_approx = px / (w * 0.75);
         let col = col_approx.round() as i32;
-        let offset = if col % 2 != 0 { h * 0.5 } else { 0.0 };
+        let offset = match col % 2 != 0 {
+            true => h * 0.5,
+            false => 0.0,
+        };
         let row = ((py - offset) / h).round() as i32;
 
-        // Refine: check the candidate and its neighbors.
+        // TODO: Check redbubble implementation
         let candidates = [
             HexCoord::new(col, row),
             HexCoord::new(col - 1, row),

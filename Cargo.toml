@@ -1,24 +1,21 @@
 [package]
 name = "hex-map-editor"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 
 [dependencies]
 iced_fonts = { version = "0.3.0", features = ["bootstrap"] }
-image = {version = "0.25.10", default-features = false, features = ["png", "jpeg"] }
-serde = { version = "1", features = ["derive"] }
+image = {version = "0.25.10", default-features = false, features = ["png"] }
+rfd = "0.15"   # File dialogs (Linux/Windows/macOS/WASM)
 
 # Native distributions
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 iced = { version = "0.14", features = ["canvas", "tokio"] }
-rfd = "0.15"   # Native file dialogs (Linux/Windows/macOS)
 
 # Web distribution
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-iced = { version = "0.14", features = ["canvas", "wgpu"] }
-web-sys = { version = "=0.3.77", features = ["Window", "Document", "HtmlElement"] }
-wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4"
+iced = { version = "0.14", features = ["canvas", "webgl"] }
+console_error_panic_hook = "0.1"
 
 # Windows cross-compilation target
 [target.x86_64-pc-windows-gnu]
@@ -28,7 +25,3 @@ linker = "/usr/bin/x86_64-w64-mingw32-gcc"
 opt-level = "z"
 lto = true
 codegen-units = 1
-
-[profile.release-wasm]
-inherits = "release"
-opt-level = "z"

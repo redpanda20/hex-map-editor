@@ -1,15 +1,12 @@
-// src/export.rs — PNG and PDF export
-//
-// PNG export renders all visible layers to a pixel buffer using the same
-// hex geometry as the canvas, then encodes to PNG bytes.
-//
-// PDF export places filled polygons for each hex cell using printpdf.
+use iced::Task;
+use image::{EncodableLayout, ImageBuffer, Rgba};
 
-use image::{ImageBuffer, Rgba};
+use crate::{
+    app::Message,
+    state::{HexCoord, Layer},
+};
 
-use crate::state::{HexCoord, Layer};
-
-const RENDER_SCALE: f32 = 2.0;
+const RENDER_SCALE: f32 = 5.0;
 const HEX_SIZE: f32 = crate::state::HEX_SIZE * RENDER_SCALE;
 
 // ---------------------------------------------------------------------------
@@ -150,21 +147,29 @@ pub fn export_png(layers: &Vec<Layer>) -> Vec<u8> {
     out
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn save_bytes_as(bytes: &[u8], default_name: &str, _mime: &str) -> String {
-    use rfd::FileDialog;
+pub fn save_bytes_async(bytes: Vec<u8>, default_name: &str) -> Task<Message> {
+    use rfd::AsyncFileDialog;
 
-    let extension = default_name.rsplit('.').next().unwrap_or("bin");
-    let path = FileDialog::new()
-        .add_filter(extension, &[extension])
-        .set_file_name(default_name)
-        .save_file();
+    Task::future(
+        AsyncFileDialog::new()
+            .set_file_name(default_name)
+            .set_title("Export to PNG")
+            .save_file(),
+    )
+    .then(move |handle| {
+        let inner_bytes = bytes.clone();
+        match handle {
+            Some(file_handle) => {
+                Task::perform(write_future(file_handle, inner_bytes), Message::Exported)
+            }
+            None => Task::done(Message::ExportCancelled),
+        }
+    })
+}
 
-    match path {
-        Some(p) => match std::fs::write(&p, bytes) {
-            Ok(_) => format!("Saved to {}", p.display()),
-            Err(e) => format!("Save failed: {}", e),
-        },
-        None => "Export cancelled.".into(),
-    }
+async fn write_future(handle: rfd::FileHandle, bytes: Vec<u8>) -> Result<(), String> {
+    handle
+        .write(bytes.as_bytes())
+        .await
+        .map_err(|err| err.to_string())
 }

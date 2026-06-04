@@ -8,9 +8,6 @@ mod view;
 
 use app::App;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-
 pub fn main() -> iced::Result {
     #[cfg(target_arch = "wasm32")]
     console_error_panic_hook::set_once();
@@ -21,21 +18,21 @@ pub fn main() -> iced::Result {
         std::env::set_var("WAYLAND_DISPLAY", "");
     }
 
-    iced::application(App::new, App::update, App::view)
+    #[allow(unused_mut)]
+    let mut app = iced::application(App::new, App::update, App::view)
         .antialiasing(true)
         .title(App::title)
         .theme(App::theme)
-        .run()
+        .font(iced_fonts::BOOTSTRAP_FONT_BYTES);
 
-    // iced::application(App::title, App::update, App::view)
-    //     .theme(|_| iced::Theme::Dark)
-    //     .antialiasing(true)
-    //     .run_with(App::new)
-}
+    #[cfg(target_arch = "wasm32")]
+    {
+        use iced::Font;
 
-// WASM entry point
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(start)]
-pub fn wasm_main() {
-    main().expect("iced application failed");
+        app = app
+            .font(include_bytes!("../fonts/FiraSans-Regular.ttf"))
+            .default_font(Font::with_name("Fira Sans"));
+    }
+
+    app.run()
 }

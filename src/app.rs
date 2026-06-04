@@ -1,11 +1,10 @@
 use iced::{
-    Element, Length, Task, Theme, font,
+    Element, Length, Task, Theme,
     widget::{canvas, container, pane_grid},
 };
-use iced_fonts::BOOTSTRAP_FONT_BYTES;
 
 use crate::{
-    export::{export_png, save_bytes_as},
+    export::{export_png, save_bytes_async},
     state::{LayerMessage, Layers, Tool},
     view::{
         HexCanvas, LayerPanel, LayerPanelMessage, PaneType, colour_panel, default_pane_config,
@@ -35,8 +34,9 @@ pub enum Message {
     // Panel management
     PaneResized(pane_grid::ResizeEvent),
 
-    FontLoaded(Result<(), font::Error>),
     ExportPng,
+    ExportCancelled,
+    Exported(Result<(), String>),
 }
 
 impl App {
@@ -50,9 +50,7 @@ impl App {
             active_tool: Tool::default(),
         };
 
-        let font_load_task = font::load(BOOTSTRAP_FONT_BYTES).map(Message::FontLoaded);
-
-        (app, Task::batch(vec![font_load_task]))
+        (app, Task::none())
     }
 
     pub fn title(&self) -> String {
@@ -80,16 +78,18 @@ impl App {
 
             Message::ExportPng => {
                 let bytes = export_png(&self.layers.inner);
-                save_bytes_as(&bytes, "hexmap.png", "image/png");
+                return save_bytes_async(bytes, "hexmap.png");
+                // save_bytes_as(bytes, "hexmap.png", "image/png");
             }
+            Message::ExportCancelled => {}
+            Message::Exported(result) => match result {
+                Ok(_) => eprintln!("Export succeeded"),
+                Err(err) => eprintln!("Export failed: {err}"),
+            },
             Message::PaneResized(resize_event) => {
                 let pane_grid::ResizeEvent { split, ratio } = resize_event;
                 self.panes.resize(split, ratio);
             }
-            Message::FontLoaded(result) => match result {
-                Ok(_) => eprintln!("Font loaded"),
-                Err(err) => eprintln!("Font failed to load: {err:?}"),
-            },
         }
 
         Task::none()
