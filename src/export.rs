@@ -6,8 +6,7 @@ use crate::{
     state::{HexCoord, Layer},
 };
 
-const RENDER_SCALE: f32 = 5.0;
-const HEX_SIZE: f32 = crate::state::HEX_SIZE * RENDER_SCALE;
+const HEX_SIZE: f32 = 100.0;
 
 // ---------------------------------------------------------------------------
 // Shared geometry helper
@@ -85,7 +84,11 @@ pub fn export_png(layers: &Vec<Layer>) -> Vec<u8> {
         return out;
     }
 
-    let pixels: Vec<(f32, f32)> = all_coords.iter().map(|c| c.to_pixel(HEX_SIZE)).collect();
+    let pixels: Vec<(f32, f32)> = all_coords
+        .iter()
+        .map(|c| c.to_pixel(HEX_SIZE))
+        .map(|vec| (vec.x, vec.y))
+        .collect();
     let xmin = pixels
         .iter()
         .map(|(x, _)| x)
@@ -131,9 +134,9 @@ pub fn export_png(layers: &Vec<Layer>) -> Vec<u8> {
             continue;
         }
         for tile in layer.tiles.iter() {
-            let (cx, cy) = tile.to_pixel(HEX_SIZE);
-            let x = cx - xmin;
-            let y = cy - ymin;
+            let hex = tile.to_pixel(HEX_SIZE);
+            let x = hex.x - xmin;
+            let y = hex.y - ymin;
             let verts: Vec<(f32, f32)> =
                 hex_vertices_f(x, y).iter().map(|(x, y)| (*x, *y)).collect();
             let color = layer.color.into_rgba8();

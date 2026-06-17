@@ -106,6 +106,7 @@ impl App {
                     let hex_canvas = HexCanvas {
                         layers: &self.layers,
                         tool: &self.active_tool,
+                        hex_size: 16.0,
                     };
                     canvas(hex_canvas)
                         .width(Length::Fill)

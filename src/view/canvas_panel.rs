@@ -8,7 +8,7 @@ use iced::{
 
 use crate::{
     app::Message,
-    state::{HEX_SIZE, HexCoord, LayerMessage, Layers, Tool},
+    state::{HexCoord, LayerMessage, Layers, Tool},
 };
 
 #[derive(Debug)]
@@ -16,7 +16,7 @@ pub struct CanvasState {
     cache: canvas::Cache,
     dragging: bool,
     last_drag_pos: Option<Point>,
-    pan: (f32, f32),
+    translation: Vector,
     zoom: f32,
 }
 
@@ -26,7 +26,7 @@ impl Default for CanvasState {
             cache: Default::default(),
             dragging: false,
             last_drag_pos: None,
-            pan: (0.0, 0.0),
+            translation: Vector::new(0.0, 0.0),
             zoom: 1.0,
         }
     }
@@ -41,6 +41,7 @@ impl CanvasState {
 pub struct HexCanvas<'a> {
     pub layers: &'a Layers,
     pub tool: &'a Tool,
+    pub hex_size: f32,
 }
 
 impl<'a> Program<Message> for HexCanvas<'a> {
@@ -123,8 +124,8 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                         Some(last) => {
                             let dx = cursor_pos.x - last.x;
                             let dy = cursor_pos.y - last.y;
-                            state.pan.0 += dx;
-                            state.pan.1 += dy;
+                            state.translation.x += dx;
+                            state.translation.y += dy;
                             state.request_redraw();
                             Some(Action::request_redraw().and_capture())
                         }
@@ -151,7 +152,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                     mouse::ScrollDelta::Lines { x, y } => (x + y) * 20.0,
                     mouse::ScrollDelta::Pixels { x, y } => x + y,
                 };
-                state.zoom = f32::clamp(state.zoom + delta * 0.01, 0.1, 10.0);
+                state.zoom = f32::clamp(state.zoom + delta * 0.01, 0.4, 10.0);
                 state.request_redraw();
                 Some(Action::request_redraw().and_capture())
             }
@@ -181,25 +182,8 @@ impl<'a> Program<Message> for HexCanvas<'a> {
 
 impl<'a> HexCanvas<'a> {
     fn draw_map(&self, state: &CanvasState, theme: &Theme, frame: &mut Frame, bounds: Rectangle) {
-        let pan = state.pan;
-        let zoom = state.zoom;
-        let hex_w = HEX_SIZE * 2.0;
-        let hex_h = HEX_SIZE * (3.0_f32).sqrt();
-
-        frame.translate(Vector::new(pan.0, pan.1));
-        frame.scale(zoom);
-
-        // Compute visible bounds in map-space for culling
-        let inv_zoom = 1.0 / zoom;
-        let map_x0 = (-pan.0) * inv_zoom;
-        let map_y0 = (-pan.1) * inv_zoom;
-        let map_x1 = map_x0 + bounds.width * inv_zoom;
-        let map_y1 = map_y0 + bounds.height * inv_zoom;
-
-        let col_min = (map_x0 / (hex_w * 0.75)).floor() as i32 - 1;
-        let col_max = (map_x1 / (hex_w * 0.75)).ceil() as i32 + 1;
-        let row_min = (map_y0 / hex_h).floor() as i32 - 1;
-        let row_max = (map_y1 / hex_h).ceil() as i32 + 1;
+        frame.translate(state.translation);
+        frame.scale(state.zoom);
 
         let hex_path = self.hex_path();
 
@@ -229,16 +213,30 @@ impl<'a> HexCanvas<'a> {
             ..Stroke::default()
         };
 
+        // Compute hex bounds in map-space for culling
+        let inv_zoom = 1.0 / state.zoom;
+        let inv_hex_w = 1.0 / (self.hex_size * 1.5);
+        let inv_hex_h = 1.0 / (self.hex_size * (3.0_f32).sqrt());
+
+        let col_min = (-state.translation.x * inv_hex_w * inv_zoom).floor() as i32;
+        let col_max = col_min + (bounds.width * inv_hex_w * inv_zoom).ceil() as i32;
+
+        let row_min = (-state.translation.y * inv_hex_h * inv_zoom).floor() as i32;
+        let row_max = row_min + (bounds.height * inv_hex_h * inv_zoom).ceil() as i32;
+
         for col in col_min..=col_max {
             for row in row_min..=row_max {
-                let coord = HexCoord::new(col, row);
-                let (cx, cy) = coord.to_pixel(HEX_SIZE);
+                // Offset every other row to align grid with bounds
+                let row = row - col / 2;
 
-                let tiles_at_coord = self.layers.tiles_at_coord(coord);
+                let hex = HexCoord { col, row };
+                let center = hex.to_pixel(self.hex_size);
+
+                let tiles_at_coord = self.layers.tiles_at_coord(hex);
                 let is_tile_empty = tiles_at_coord.is_empty();
 
                 frame.with_save(|frame| {
-                    frame.translate(Vector::new(cx, cy));
+                    frame.translate(center);
 
                     for color in tiles_at_coord {
                         frame.fill(&hex_path, Fill::from(color));
@@ -254,20 +252,21 @@ impl<'a> HexCanvas<'a> {
     }
 
     fn screen_to_hex(&self, state: &CanvasState, screen: Point) -> HexCoord {
-        let pan = state.pan;
+        let translation = state.translation;
         let zoom = state.zoom;
 
-        let map_x = (screen.x - pan.0) / zoom;
-        let map_y = (screen.y - pan.1) / zoom;
-        HexCoord::from_pixel(map_x, map_y, HEX_SIZE)
+        let map_x = (screen.x - translation.x) / zoom;
+        let map_y = (screen.y - translation.y) / zoom;
+
+        HexCoord::from_pixel(map_x, map_y, self.hex_size)
     }
 
     fn hex_path(&self) -> Path {
         let mut builder = canvas::path::Builder::new();
         for i in 0..6 {
             let angle = std::f32::consts::PI / 180.0 * (60.0 * i as f32);
-            let px = HEX_SIZE * angle.cos();
-            let py = HEX_SIZE * angle.sin();
+            let px = self.hex_size * angle.cos();
+            let py = self.hex_size * angle.sin();
             if i == 0 {
                 builder.move_to(Point::new(px, py));
             } else {

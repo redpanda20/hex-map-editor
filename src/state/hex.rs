@@ -1,7 +1,6 @@
-// Scale is different in export
-pub const HEX_SIZE: f32 = 16.0;
+use iced::Vector;
+/// Flat topped axial grid
 
-// Flat topped axial grid
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HexCoord {
     pub col: i32,
@@ -9,52 +8,46 @@ pub struct HexCoord {
 }
 
 impl HexCoord {
-    pub fn new(col: i32, row: i32) -> Self {
-        Self { col, row }
+    pub fn to_pixel(self, hex_size: f32) -> Vector {
+        let q = self.col as f32;
+        let r = self.row as f32;
+
+        let x = hex_size * (1.5 * q);
+        let y = hex_size * ((3.0_f32.sqrt() * 0.5 * q) + (3.0_f32.sqrt() * r));
+
+        Vector { x, y }
     }
 
-    pub fn to_pixel(self, hex_size: f32) -> (f32, f32) {
-        let w = hex_size * 2.0;
-        let h = hex_size * (3.0_f32).sqrt();
-        let x = self.col as f32 * w * 0.75;
-        let y = self.row as f32 * h + if self.col % 2 != 0 { h * 0.5 } else { 0.0 };
-        (x, y)
+    pub fn from_pixel(x: f32, y: f32, hex_size: f32) -> HexCoord {
+        let q = (2.0 / 3.0 * x) / hex_size;
+        let r = (-1.0 / 3.0 * x + (3.0_f32.sqrt() / 3.0) * y) / hex_size;
+
+        // Axial to cubic coordinates
+        let cube_x = q;
+        let cube_z = r;
+        let cube_y = -cube_x - cube_z;
+
+        frac_round(cube_x, cube_z, cube_y)
+    }
+}
+
+fn frac_round(frac_q: f32, frac_r: f32, frac_s: f32) -> HexCoord {
+    let mut q = frac_q.round();
+    let mut r = frac_r.round();
+    let s = frac_s.round();
+
+    let q_diff = (q - frac_q).abs();
+    let r_diff = (r - frac_r).abs();
+    let s_diff = (s - frac_s).abs();
+
+    if q_diff > r_diff && q_diff > s_diff {
+        q = -r - s
+    } else if r_diff > s_diff {
+        r = -q - s
     }
 
-    pub fn from_pixel(px: f32, py: f32, hex_size: f32) -> Self {
-        // Use cube-coordinate rounding for accuracy.
-        let w = hex_size * 2.0;
-        let h = hex_size * (3.0_f32).sqrt();
+    let col = q as i32;
+    let row = r as i32;
 
-        let col_approx = px / (w * 0.75);
-        let col = col_approx.round() as i32;
-        let offset = match col % 2 != 0 {
-            true => h * 0.5,
-            false => 0.0,
-        };
-        let row = ((py - offset) / h).round() as i32;
-
-        // TODO: Check redbubble implementation
-        let candidates = [
-            HexCoord::new(col, row),
-            HexCoord::new(col - 1, row),
-            HexCoord::new(col + 1, row),
-            HexCoord::new(col - 1, row - 1),
-            HexCoord::new(col + 1, row - 1),
-            HexCoord::new(col - 1, row + 1),
-            HexCoord::new(col + 1, row + 1),
-        ];
-
-        candidates
-            .iter()
-            .min_by(|a, b| {
-                let (ax, ay) = a.to_pixel(hex_size);
-                let (bx, by) = b.to_pixel(hex_size);
-                let da = (ax - px).powi(2) + (ay - py).powi(2);
-                let db = (bx - px).powi(2) + (by - py).powi(2);
-                da.partial_cmp(&db).unwrap()
-            })
-            .copied()
-            .unwrap()
-    }
+    HexCoord { col, row }
 }
