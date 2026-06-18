@@ -3,8 +3,8 @@
 
 mod app;
 mod export;
+mod panels;
 mod state;
-mod view;
 
 use app::App;
 
@@ -23,6 +23,7 @@ pub fn main() -> iced::Result {
         .antialiasing(true)
         .title(App::title)
         .theme(App::theme)
+        .subscription(App::subscription)
         .font(iced_fonts::BOOTSTRAP_FONT_BYTES);
 
     #[cfg(target_arch = "wasm32")]

@@ -1,5 +1,5 @@
 use iced::{
-    Point, Rectangle, Theme, Vector, mouse,
+    Element, Length, Point, Rectangle, Theme, Vector, mouse,
     widget::{
         Action,
         canvas::{self, Event, Fill, Frame, Geometry, Path, Program, Stroke},
@@ -10,6 +10,25 @@ use crate::{
     app::Message,
     state::{HexCoord, LayerMessage, Layers, Tool},
 };
+
+pub fn canvas_panel<'a>(layers: &'a Layers, tool: &'a Tool) -> Element<'a, Message> {
+    let hex_canvas = HexCanvas {
+        layers,
+        tool,
+        hex_size: 16.0,
+    };
+
+    iced::widget::canvas(hex_canvas)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
+}
+
+pub struct HexCanvas<'a> {
+    pub layers: &'a Layers,
+    pub tool: &'a Tool,
+    pub hex_size: f32,
+}
 
 #[derive(Debug)]
 pub struct CanvasState {
@@ -36,12 +55,6 @@ impl CanvasState {
     pub fn request_redraw(&mut self) {
         self.cache.clear();
     }
-}
-
-pub struct HexCanvas<'a> {
-    pub layers: &'a Layers,
-    pub tool: &'a Tool,
-    pub hex_size: f32,
 }
 
 impl<'a> Program<Message> for HexCanvas<'a> {

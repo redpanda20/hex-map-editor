@@ -1,15 +1,15 @@
 use iced::{
-    Element, Length, Task, Theme,
-    widget::{canvas, container, pane_grid},
+    Element, Subscription, Task, Theme,
+    widget::{container, pane_grid, stack},
 };
 
 use crate::{
     export::{export_png, save_bytes_async},
-    state::{LayerMessage, Layers, Tool},
-    view::{
-        HexCanvas, LayerPanel, LayerPanelMessage, PaneType, colour_panel, default_pane_config,
-        layer_panel, toolbar_panel,
+    panels::{
+        LayerEvent, LayerManager, PaneType, ToastEvent, Toasts, canvas_panel, default_pane_config,
+        layer_details, layer_panel, toast_widget, toolbar_panel,
     },
+    state::{LayerMessage, Layers, Tool},
 };
 
 pub struct App {
@@ -17,7 +17,8 @@ pub struct App {
     active_tool: Tool,
 
     panes: pane_grid::State<PaneType>,
-    layer_panel: LayerPanel,
+    layer_panel: LayerManager,
+    toasts: Toasts,
 }
 
 #[derive(Debug, Clone)]
@@ -29,7 +30,8 @@ pub enum Message {
     LayerEvent(LayerMessage),
 
     // Layer Panel
-    LayerPanelEvent(LayerPanelMessage),
+    LayerPanelEvent(LayerEvent),
+    ToastEvent(ToastEvent),
 
     // Panel management
     PaneResized(pane_grid::ResizeEvent),
@@ -45,7 +47,8 @@ impl App {
 
         let app = Self {
             layers: Layers::default(),
-            layer_panel: LayerPanel::new(),
+            toasts: Toasts::new(),
+            layer_panel: LayerManager::new(),
             panes,
             active_tool: Tool::default(),
         };
@@ -61,9 +64,15 @@ impl App {
         None
     }
 
+    pub fn subscription(&self) -> Subscription<Message> {
+        self.toasts.subscription()
+    }
+
     pub fn update(&mut self, message: Message) -> Task<Message> {
         #[cfg(debug_assertions)]
         println!("{message:?}");
+
+        self.toasts.listen_to_events(&message);
 
         match message {
             Message::LayerEvent(layers_message) => {
@@ -72,6 +81,10 @@ impl App {
 
             Message::LayerPanelEvent(layer_panel_message) => {
                 return self.layer_panel.update(layer_panel_message);
+            }
+
+            Message::ToastEvent(toast_event) => {
+                return self.toasts.update(toast_event);
             }
 
             Message::ChangeTool(new_tool) => self.active_tool = new_tool,
@@ -100,19 +113,8 @@ impl App {
             let inner: Element<'_, Message> = match state {
                 PaneType::Toolbar => toolbar_panel(&self.active_tool),
                 PaneType::Layers => layer_panel(&self.layer_panel, &self.layers),
-                PaneType::Colour => colour_panel(&self.layers),
-
-                PaneType::Canvas => {
-                    let hex_canvas = HexCanvas {
-                        layers: &self.layers,
-                        tool: &self.active_tool,
-                        hex_size: 16.0,
-                    };
-                    canvas(hex_canvas)
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .into()
-                }
+                PaneType::Colour => layer_details(&self.layers),
+                PaneType::Canvas => canvas_panel(&self.layers, &self.active_tool),
             };
 
             pane_grid::Content::new(inner)
@@ -120,7 +122,7 @@ impl App {
         .on_resize(10, Message::PaneResized)
         .spacing(2);
 
-        container(grid)
+        container(stack!(grid, toast_widget(&self.toasts)))
             .padding(2)
             .style(|theme| container::background(theme.extended_palette().background.base.color))
             .into()

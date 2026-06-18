@@ -12,39 +12,39 @@ use crate::{
     state::{Layer, LayerMessage, Layers},
 };
 
-pub struct LayerPanel {
+pub struct LayerManager {
     pub edit_layer: Option<(usize, String)>,
 }
 
 #[derive(Debug, Clone)]
-pub enum LayerPanelMessage {
+pub enum LayerEvent {
     BeginLayerEdit(usize),
     LayerEdit(String),
     CommitLayerEdit,
 }
 
-impl From<LayerPanelMessage> for Message {
-    fn from(value: LayerPanelMessage) -> Self {
+impl From<LayerEvent> for Message {
+    fn from(value: LayerEvent) -> Self {
         Message::LayerPanelEvent(value)
     }
 }
 
-impl LayerPanel {
-    pub fn new() -> LayerPanel {
-        LayerPanel { edit_layer: None }
+impl LayerManager {
+    pub fn new() -> LayerManager {
+        LayerManager { edit_layer: None }
     }
 
-    pub fn update(&mut self, message: LayerPanelMessage) -> Task<Message> {
+    pub fn update(&mut self, message: LayerEvent) -> Task<Message> {
         match message {
-            LayerPanelMessage::BeginLayerEdit(index) => {
+            LayerEvent::BeginLayerEdit(index) => {
                 self.edit_layer = Some((index, String::new()));
             }
-            LayerPanelMessage::LayerEdit(edit_name) => {
+            LayerEvent::LayerEdit(edit_name) => {
                 if let Some((_index, name)) = self.edit_layer.as_mut() {
                     *name = edit_name;
                 }
             }
-            LayerPanelMessage::CommitLayerEdit => {
+            LayerEvent::CommitLayerEdit => {
                 if let Some((index, name)) = self.edit_layer.clone() {
                     self.edit_layer = None;
                     return Task::done(LayerMessage::ChangeLayerName(index, name).into());
@@ -56,13 +56,13 @@ impl LayerPanel {
     }
 }
 
-impl Default for LayerPanel {
+impl Default for LayerManager {
     fn default() -> Self {
         Self::new()
     }
 }
 
-pub fn layer_panel<'a>(layer_panel: &LayerPanel, layers: &Layers) -> Element<'a, Message> {
+pub fn layer_panel<'a>(layer_panel: &LayerManager, layers: &Layers) -> Element<'a, Message> {
     let layer_rows: Vec<Element<Message>> = layers
         .inner
         .iter()
@@ -88,7 +88,7 @@ pub fn layer_panel<'a>(layer_panel: &LayerPanel, layers: &Layers) -> Element<'a,
 }
 
 fn layer_row<'a>(
-    layer_panel: &LayerPanel,
+    layer_panel: &LayerManager,
     layer: &Layer,
     layer_index: usize,
     is_active: bool,
@@ -102,15 +102,15 @@ fn layer_row<'a>(
         Message::LayerEvent(LayerMessage::ChangeLayerVisibility(layer_index, state))
     });
 
-    let name: Element<'_, LayerPanelMessage> = match (is_editing, is_active) {
+    let name: Element<'_, LayerEvent> = match (is_editing, is_active) {
         (true, ..) => text_input("Layer name...", &layer_panel.edit_layer.clone().unwrap().1)
             .width(Length::FillPortion(3))
-            .on_input(LayerPanelMessage::LayerEdit)
-            .on_submit(LayerPanelMessage::CommitLayerEdit)
+            .on_input(LayerEvent::LayerEdit)
+            .on_submit(LayerEvent::CommitLayerEdit)
             .into(),
         (false, true) => button(text(layer.name.clone()))
             .style(button::secondary)
-            .on_press(LayerPanelMessage::BeginLayerEdit(layer_index))
+            .on_press(LayerEvent::BeginLayerEdit(layer_index))
             .into(),
         (false, false) => text(layer.name.clone()).into(),
     };

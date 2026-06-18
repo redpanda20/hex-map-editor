@@ -1,19 +1,23 @@
-mod canvas_panel;
-mod colour_panel;
-mod layer_panel;
-mod tool_panel;
+mod canvas;
+mod layer_details;
+mod layers;
+mod toasts;
+mod tools;
 
 use iced::widget::pane_grid;
 use iced::widget::pane_grid::Configuration;
 
-pub use canvas_panel::HexCanvas;
+pub use layers::LayerEvent;
+pub use layers::LayerManager;
 
-pub use colour_panel::colour_panel;
-pub use tool_panel::toolbar_panel;
+pub use toasts::ToastEvent;
+pub use toasts::ToastManager as Toasts;
 
-pub use layer_panel::LayerPanel;
-pub use layer_panel::LayerPanelMessage;
-pub use layer_panel::layer_panel;
+pub use canvas::canvas_panel;
+pub use layer_details::colour_panel as layer_details;
+pub use layers::layer_panel;
+pub use toasts::toast_widget;
+pub use tools::toolbar_panel;
 
 pub enum PaneType {
     Canvas,
