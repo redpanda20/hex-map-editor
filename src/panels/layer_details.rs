@@ -1,19 +1,69 @@
 use iced::{
     Color, Element, Length,
-    widget::{column, container, responsive, row, rule, slider, space, text},
+    widget::{Column, Row, button, column, container, responsive, row, rule, slider, space, text},
 };
+use iced_fonts::bootstrap;
 
 use crate::{
     app::Message,
     state::{LayerMessage, Layers},
 };
 
-pub fn colour_panel<'a>(layers: &Layers) -> Element<'a, Message> {
-    let active_layer = layers.get_active_layer();
-    let active_colour = active_layer
-        .map(|layer| layer.color)
-        .unwrap_or(Color::BLACK);
+pub fn layer_details<'a>(layers: &Layers) -> Element<'a, Message> {
+    let (name, color, visible) = match layers.get_active_layer() {
+        Some(layer) => (
+            layer.name.clone(),
+            layer.color.clone(),
+            layer.visible.clone(),
+        ),
+        None => ("No layer selected".to_string(), Color::BLACK, false),
+    };
 
+    container(
+        column![
+            rule::horizontal(1),
+            name_input(name),
+            visible_toggle(visible),
+            space::vertical(),
+            colour_panel(color),
+        ]
+        .spacing(4.0),
+    )
+    .style(container::bordered_box)
+    .padding(8.0)
+    .into()
+}
+
+fn name_input<'a>(name: String) -> Row<'a, Message> {
+    row![
+        space::horizontal(),
+        text(name).height(16.0),
+        space::horizontal()
+    ]
+    .into()
+}
+
+fn visible_toggle<'a>(visible: bool) -> Row<'a, Message> {
+    let inner = match visible {
+        true => row![
+            bootstrap::eye().style(text::secondary),
+            text("Visible").style(text::secondary)
+        ],
+        false => row![
+            bootstrap::eye_slash().style(text::secondary),
+            text("Hidden").style(text::secondary)
+        ],
+    }
+    .spacing(4.0);
+    let toggle = button(inner)
+        .style(button::text)
+        .on_press(Message::LayerEvent(
+            LayerMessage::ChangeActiveLayerVisibility,
+        ));
+    row![space::horizontal(), toggle, space::horizontal()]
+}
+
+fn colour_panel<'a>(active_colour: Color) -> Column<'a, Message> {
     let square = responsive(|size| {
         let new_size = size.ratio(1.0);
         space().width(new_size.width).height(new_size.height).into()
@@ -49,24 +99,14 @@ pub fn colour_panel<'a>(layers: &Layers) -> Element<'a, Message> {
     .step(0.01)
     .into();
 
-    let controls = column![
-        row![text("R"), red_slider].spacing(16),
-        row![text("G"), green_slider].spacing(16),
-        row![text("B"), blue_slider].spacing(16),
-        row![text("A"), alpha_slider].spacing(16)
-    ]
-    .padding([0, 8]);
-
-    let colour_editor = column![
-        rule::horizontal(1),
+    column![
         colour_preview,
-        controls,
-        space::vertical()
+        column![
+            row![text("R"), red_slider].spacing(16),
+            row![text("G"), green_slider].spacing(16),
+            row![text("B"), blue_slider].spacing(16),
+            row![text("A"), alpha_slider].spacing(16)
+        ]
     ]
-    .spacing(8)
-    .padding(8);
-
-    container(colour_editor)
-        .style(container::bordered_box)
-        .into()
+    .spacing(8.0)
 }

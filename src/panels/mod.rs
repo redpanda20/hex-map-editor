@@ -14,7 +14,7 @@ pub use toasts::ToastEvent;
 pub use toasts::ToastManager as Toasts;
 
 pub use canvas::canvas_panel;
-pub use layer_details::colour_panel as layer_details;
+pub use layer_details::layer_details;
 pub use layers::layer_panel;
 pub use toasts::toast_widget;
 pub use tools::toolbar_panel;

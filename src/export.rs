@@ -67,7 +67,7 @@ fn point_in_polygon(x: f32, y: f32, verticies: &[(f32, f32)]) -> bool {
     inside
 }
 
-pub fn export_png(layers: &Vec<Layer>) -> Vec<u8> {
+pub fn export_png(layers: &[Layer]) -> Vec<u8> {
     // Determine bounding box of all painted tiles
     let all_coords: Vec<HexCoord> = layers
         .iter()

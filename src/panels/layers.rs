@@ -1,8 +1,7 @@
 use iced::{
     Alignment, Element, Length, Task,
     widget::{
-        button, checkbox, column, container, mouse_area, row, rule, scrollable, space, text,
-        text_input,
+        button, column, container, mouse_area, row, rule, scrollable, space, text, text_input,
     },
 };
 use iced_fonts::bootstrap;
@@ -64,10 +63,10 @@ impl Default for LayerManager {
 
 pub fn layer_panel<'a>(layer_panel: &LayerManager, layers: &Layers) -> Element<'a, Message> {
     let layer_rows: Vec<Element<Message>> = layers
-        .inner
+        .get_layers()
         .iter()
         .enumerate()
-        .map(|(i, layer)| layer_row(&layer_panel, &layer, i, layers.active_layer == Some(i)))
+        .map(|(i, layer)| layer_row(&layer_panel, &layer, i, layers.is_active_layer(i)))
         .collect();
 
     let scrollable_content =
@@ -98,9 +97,15 @@ fn layer_row<'a>(
         None => false,
     };
 
-    let visibility_toggle = checkbox(layer.visible).on_toggle(move |state| {
-        Message::LayerEvent(LayerMessage::ChangeLayerVisibility(layer_index, state))
-    });
+    let visibility_toggle = button(match layer.visible {
+        true => bootstrap::eye(),
+        false => bootstrap::eye_slash(),
+    })
+    .style(button::text)
+    .on_press(Message::LayerEvent(LayerMessage::ChangeLayerVisibility(
+        layer_index,
+        !layer.visible,
+    )));
 
     let name: Element<'_, LayerEvent> = match (is_editing, is_active) {
         (true, ..) => text_input("Layer name...", &layer_panel.edit_layer.clone().unwrap().1)
@@ -126,10 +131,10 @@ fn layer_row<'a>(
         delete_button
     ]
     .align_y(Alignment::Center)
-    .spacing(16.0);
+    .spacing(4.0);
 
     let content = container(content)
-        .padding([4.0, 8.0])
+        .padding([4.0, 4.0])
         .style(move |theme| match is_active {
             false => container::transparent(theme),
             true => container::background(theme.palette().primary.scale_alpha(0.2)),

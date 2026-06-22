@@ -90,7 +90,7 @@ impl App {
             Message::ChangeTool(new_tool) => self.active_tool = new_tool,
 
             Message::ExportPng => {
-                let bytes = export_png(&self.layers.inner);
+                let bytes = export_png(&self.layers.get_layers());
                 return save_bytes_async(bytes, "hexmap.png");
                 // save_bytes_as(bytes, "hexmap.png", "image/png");
             }

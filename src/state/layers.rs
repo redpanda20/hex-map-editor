@@ -21,9 +21,9 @@ pub struct Layer {
 }
 
 pub struct Layers {
-    pub active_layer: Option<usize>,
+    active_layer: Option<usize>,
 
-    pub inner: Vec<Layer>,
+    inner: Vec<Layer>,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +34,8 @@ pub enum LayerMessage {
 
     ChangeLayerName(usize, String),
     ChangeLayerVisibility(usize, bool),
+
+    ChangeActiveLayerVisibility,
     ChangeActiveLayerColor(Color),
 
     PaintTile(HexCoord),
@@ -55,30 +57,55 @@ impl Layer {
 
 impl Default for Layers {
     fn default() -> Self {
-        let first_layer = Layer {
-            name: "Layer 1".to_string(),
-            visible: true,
-            color: DEFAULT_COLORS[0],
-            tiles: HashSet::new(),
-        };
-        Self {
+        let layer = Layer::new("Layer 1", DEFAULT_COLORS[0]);
+        Layers {
             active_layer: Some(0),
-            inner: vec![first_layer],
+            inner: vec![layer],
         }
     }
 }
 
 impl Layers {
+    fn canonicalize_name(&self, base_name: &str) -> String {
+        let mut name = format!("{base_name} 1");
+
+        for count in 0..self.inner.len() + 1 {
+            let search = self.inner.iter().filter(|layer| layer.name == name).last();
+            if search.is_none() {
+                break;
+            } else {
+                name = format!("{base_name} {}", count + 1);
+            }
+        }
+
+        name
+    }
+
     pub fn get_active_layer(&self) -> Option<&Layer> {
         self.active_layer.and_then(|index| self.inner.get(index))
+    }
+
+    pub fn get_layers(&self) -> &[Layer] {
+        &self.inner
+    }
+
+    pub fn is_active_layer(&self, index: usize) -> bool {
+        self.active_layer == Some(index)
     }
 
     pub fn tiles_at_coord(&self, hex_coord: HexCoord) -> Vec<Color> {
         self.inner
             .iter()
+            .filter(|layer| layer.visible)
             .filter(|layer| layer.tiles.contains(&hex_coord))
             .map(|layer| layer.color)
             .collect()
+    }
+
+    fn add_layer(&mut self, name: &str) {
+        let name = self.canonicalize_name(&name);
+        let color = DEFAULT_COLORS[self.inner.len() % 5];
+        self.inner.push(Layer::new(name, color));
     }
 
     pub fn update(&mut self, message: LayerMessage) -> Task<Message> {
@@ -88,10 +115,7 @@ impl Layers {
 
         match message {
             LayerMessage::AddLayer => {
-                let current_len = self.inner.len();
-                let name = format!("Layer {}", current_len + 1);
-                let color = DEFAULT_COLORS[current_len % 5];
-                self.inner.push(Layer::new(name, color));
+                self.add_layer("Layer");
             }
             LayerMessage::RemoveLayer(index) => {
                 self.inner.remove(index);
@@ -124,6 +148,11 @@ impl Layers {
             LayerMessage::EraseTile(hex_coord) => {
                 if let Some(layer) = active_layer_mut {
                     layer.tiles.remove(&hex_coord);
+                };
+            }
+            LayerMessage::ChangeActiveLayerVisibility => {
+                if let Some(layer) = active_layer_mut {
+                    layer.visible = !layer.visible;
                 };
             }
         };
