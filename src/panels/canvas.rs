@@ -1,5 +1,5 @@
 use iced::{
-    Element, Length, Point, Rectangle, Theme, Vector, mouse,
+    Element, Length, Point, Rectangle, Theme, Vector, mouse, touch,
     widget::{
         Action,
         canvas::{self, Event, Fill, Frame, Geometry, Path, Program, Stroke},
@@ -94,7 +94,8 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         };
 
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+            | Event::Touch(touch::Event::FingerPressed { .. }) => {
                 state.dragging = true;
                 state.last_drag_pos = Some(cursor_pos);
                 match self.tool {
@@ -117,13 +118,16 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                 }
             }
 
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+            | Event::Touch(touch::Event::FingerLifted { .. })
+            | Event::Touch(touch::Event::FingerLost { .. }) => {
                 state.dragging = false;
                 state.last_drag_pos = None;
                 None
             }
 
-            Event::Mouse(mouse::Event::CursorMoved { .. }) => {
+            Event::Mouse(mouse::Event::CursorMoved { .. })
+            | Event::Touch(touch::Event::FingerMoved { .. }) => {
                 if !state.dragging {
                     return None;
                 };
