@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use crate::compat::{Duration, Instant};
 
 use iced::{
     Element, Length, Subscription, Task,

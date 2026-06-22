@@ -1290,6 +1290,7 @@ dependencies = [
  "iced_fonts",
  "image",
  "rfd",
+ "wasmtimer",
 ]
 
 [[package]]
