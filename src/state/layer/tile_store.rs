@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use iced::Color;
+use iced::{Color, Rectangle};
 
 use crate::state::HexCoord;
 
@@ -24,5 +24,28 @@ impl SparseTiles {
 
     pub fn erase(&mut self, coord: HexCoord) {
         self.tiles.remove(&coord);
+    }
+
+    pub fn bounding_box(&self, hex_size: f32) -> Option<Rectangle> {
+        let mut iter = self.tiles.iter();
+        let first = iter.next()?.to_pixel(hex_size);
+
+        let (mut min_x, mut max_x) = (first.x, first.x);
+        let (mut min_y, mut max_y) = (first.y, first.y);
+
+        for coord in iter {
+            let point = coord.to_pixel(hex_size);
+            min_x = min_x.min(point.x);
+            max_x = max_x.max(point.x);
+            min_y = min_y.min(point.y);
+            max_y = max_y.max(point.y);
+        }
+
+        Some(Rectangle {
+            x: min_x,
+            y: min_y,
+            width: max_x - min_x,
+            height: max_y - min_y,
+        })
     }
 }

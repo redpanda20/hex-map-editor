@@ -1,9 +1,9 @@
-use iced::Task;
+use iced::{Padding, Rectangle, Task};
 use image::{EncodableLayout, ImageBuffer, Rgba};
 
 use crate::{
     app::Message,
-    state::{HexCoord, Layer},
+    state::{Layers, SparseTiles},
 };
 
 const HEX_SIZE: f32 = 100.0;
@@ -45,8 +45,6 @@ fn fill_polygon(buf: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, vertices: &[(f32, f32)
     for py in ymin..=ymax {
         for px in xmin..=xmax {
             if point_in_polygon(px as f32 + 0.5, py as f32 + 0.5, vertices) {
-                // TODO: Blend layers with alpha channels
-
                 buf.put_pixel(px, py, Rgba(color));
             }
         }
@@ -67,80 +65,86 @@ fn point_in_polygon(x: f32, y: f32, verticies: &[(f32, f32)]) -> bool {
     inside
 }
 
-pub fn export_png(layers: &[Layer]) -> Vec<u8> {
+/// Creates bounding box
+/// returns xmin, xmax, ymin, ymax
+fn get_bounds(source: &Layers) -> iced::Rectangle {
+    let mut xmin = f32::MAX;
+    let mut xmax = f32::MIN;
+    let mut ymin = f32::MAX;
+    let mut ymax = f32::MIN;
+
+    for layer in source.get_visible_layers() {
+        match layer {
+            crate::state::LayerInner::Tiles(sparse_tiles)
+            | crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
+                for tile in sparse_tiles.tiles.iter() {
+                    let vec = tile.to_pixel(HEX_SIZE);
+                    xmin = xmin.min(vec.x);
+                    xmax = xmax.max(vec.x);
+                    ymin = ymin.min(vec.y);
+                    ymax = ymax.max(vec.y);
+                }
+            }
+        }
+    }
+
+    iced::Rectangle {
+        x: xmin,
+        y: ymin,
+        width: xmax - xmin,
+        height: ymax - ymin,
+    }
+}
+
+pub fn export_png(layers: &Layers) -> Vec<u8> {
     // Determine bounding box of all painted tiles
-    let all_coords: Vec<HexCoord> = layers
+    let bounds = layers
+        .get_visible_layers()
         .iter()
-        .filter(|l| l.visible)
-        .flat_map(|l| l.tiles.iter().copied())
-        .collect();
+        .filter_map(|inner| match inner {
+            crate::state::LayerInner::Tiles(sparse_tiles) => sparse_tiles.bounding_box(HEX_SIZE),
+            crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
+                sparse_tiles.bounding_box(HEX_SIZE)
+            }
+        })
+        .reduce(|acc, e| Rectangle::union(&acc, &e));
 
     // Create placeholder image if nothing has been drawn
-    if all_coords.is_empty() {
+    let Some(bounds) = bounds else {
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(256, 256);
         let mut out = Vec::new();
         img.write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
             .ok();
         return out;
-    }
+    };
 
-    let pixels: Vec<(f32, f32)> = all_coords
-        .iter()
-        .map(|c| c.to_pixel(HEX_SIZE))
-        .map(|vec| (vec.x, vec.y))
-        .collect();
-    let xmin = pixels
-        .iter()
-        .map(|(x, _)| x)
-        .cloned()
-        .reduce(f32::min)
-        .unwrap()
-        - HEX_SIZE * 2.0;
-    let ymin = pixels
-        .iter()
-        .map(|(_, y)| y)
-        .cloned()
-        .reduce(f32::min)
-        .unwrap()
-        - HEX_SIZE * 2.0;
-    let xmax = pixels
-        .iter()
-        .cloned()
-        .map(|(x, _)| x)
-        .reduce(f32::max)
-        .unwrap()
-        + HEX_SIZE * 2.0;
-    let ymax = pixels
-        .iter()
-        .cloned()
-        .map(|(_, y)| y)
-        .reduce(f32::max)
-        .unwrap()
-        + HEX_SIZE * 2.0;
-
-    let img_w = (xmax - xmin).ceil() as u32;
-    let img_h = (ymax - ymin).ceil() as u32;
+    // Create image background to fit content
+    let bounds = bounds.expand(HEX_SIZE * 2.0);
+    let img_w = bounds.width.ceil() as u32;
+    let img_h = bounds.height.ceil() as u32;
 
     let mut buf: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(img_w, img_h);
 
     // Background
     for p in buf.pixels_mut() {
-        *p = Rgba([30, 32, 40, 255]);
+        *p = Rgba([255, 255, 255, 255]);
     }
 
     // Draw each layer bottom → top.
-    for layer in layers.iter() {
-        if !layer.visible {
-            continue;
-        }
-        for tile in layer.tiles.iter() {
-            let hex = tile.to_pixel(HEX_SIZE);
-            let x = hex.x - xmin;
-            let y = hex.y - ymin;
-            let verts: Vec<(f32, f32)> =
-                hex_vertices_f(x, y).iter().map(|(x, y)| (*x, *y)).collect();
-            let color = layer.color.into_rgba8();
-            fill_polygon(&mut buf, &verts, color);
+    for layer in layers.get_visible_layers() {
+        match layer {
+            crate::state::LayerInner::Tiles(sparse_tiles)
+            | crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
+                for tile in sparse_tiles.tiles.iter() {
+                    let hex = tile.to_pixel(HEX_SIZE);
+                    let x = hex.x - bounds.x;
+                    let y = hex.y - bounds.y;
+                    let verts: Vec<(f32, f32)> =
+                        hex_vertices_f(x, y).iter().map(|(x, y)| (*x, *y)).collect();
+                    let color = sparse_tiles.colour.into_rgba8();
+                    fill_polygon(&mut buf, &verts, color);
+                }
+            }
         }
     }
 

@@ -3,7 +3,7 @@
 
 mod app;
 mod compat;
-// mod export;
+mod export;
 mod panels;
 mod state;
 
