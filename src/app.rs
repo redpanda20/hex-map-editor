@@ -4,7 +4,7 @@ use iced::{
 };
 
 use crate::{
-    export::{export_png, save_bytes_async},
+    // export::{export_png, save_bytes_async},
     panels::{
         LayerEvent, LayerManager, PaneType, ToastEvent, Toasts, canvas_panel, default_pane_config,
         layer_details, layer_panel, toast_widget, toolbar_panel,
@@ -76,7 +76,7 @@ impl App {
 
         match message {
             Message::LayerEvent(layers_message) => {
-                return self.layers.update(layers_message);
+                self.layers.update(layers_message);
             }
 
             Message::LayerPanelEvent(layer_panel_message) => {
@@ -90,8 +90,9 @@ impl App {
             Message::ChangeTool(new_tool) => self.active_tool = new_tool,
 
             Message::ExportPng => {
-                let bytes = export_png(&self.layers.get_layers());
-                return save_bytes_async(bytes, "hexmap.png");
+                todo!()
+                // let bytes = export_png(&self.layers.get_layers());
+                // return save_bytes_async(bytes, "hexmap.png");
                 // save_bytes_as(bytes, "hexmap.png", "image/png");
             }
             Message::ExportCancelled => {}

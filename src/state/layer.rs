@@ -1,0 +1,164 @@
+mod tile_store;
+
+use iced::Color;
+pub use tile_store::SparseTiles;
+
+use crate::state::HexCoord;
+
+const DEFAULT_COLORS: [Color; 5] = [
+    Color::from_rgba8(245, 196, 168, 0.9),
+    Color::from_rgba8(168, 212, 176, 0.9),
+    Color::from_rgba8(168, 200, 245, 0.9),
+    Color::from_rgba8(196, 168, 245, 0.9),
+    Color::from_rgba8(245, 168, 200, 0.9),
+];
+
+pub enum LayerInner {
+    Tiles(SparseTiles),
+    InvertedTiles(SparseTiles),
+}
+
+pub struct Layer {
+    pub name: String,
+    pub visible: bool,
+
+    inner: LayerInner,
+}
+
+#[derive(Debug, Clone)]
+pub enum LayerMessage {
+    AddDefaultLayer(String),
+    RemoveLayer(usize),
+    SwapLayers(usize, usize),
+
+    SetActiveLayer(Option<usize>),
+
+    EditLayerVisibility(usize, bool),
+    EditLayerName(usize, String),
+
+    PaintHex(HexCoord),
+    EraseHex(HexCoord),
+    FillFromHex(HexCoord),
+}
+
+pub struct Layers {
+    inner: Vec<Layer>,
+    active_layer: Option<usize>,
+}
+
+impl Default for Layers {
+    fn default() -> Self {
+        let inner = LayerInner::Tiles(tile_store::SparseTiles::new(DEFAULT_COLORS[0]));
+
+        let layer = Layer {
+            name: "Layer 0".to_string(),
+            visible: true,
+            inner,
+        };
+
+        Self {
+            inner: vec![layer],
+            active_layer: Some(0),
+        }
+    }
+}
+
+impl Layers {
+    /// TODO: Check which names are in use and pick the smallest number
+    fn canonacalize_name(&self, name: String) -> String {
+        let layer_count = self.inner.len();
+        format!("{name} {layer_count}")
+    }
+
+    pub fn update(&mut self, message: LayerMessage) {
+        match message {
+            // --- Edit Layers ---
+            LayerMessage::AddDefaultLayer(name) => {
+                let colour = DEFAULT_COLORS[self.inner.len() % 5];
+                let new_layer = Layer {
+                    name: self.canonacalize_name(name),
+                    visible: true,
+                    inner: LayerInner::Tiles(SparseTiles::new(colour)),
+                };
+                self.inner.push(new_layer);
+            }
+            LayerMessage::RemoveLayer(index) => {
+                if index >= self.inner.len() {
+                    return;
+                }
+
+                self.inner.remove(index);
+            }
+            LayerMessage::SwapLayers(a, b) => {
+                if a >= self.inner.len() || b >= self.inner.len() {
+                    return;
+                }
+
+                self.inner.swap(a, b);
+            }
+            LayerMessage::SetActiveLayer(some_index) => self.active_layer = some_index,
+
+            // --- Edit layer properties ---
+            LayerMessage::EditLayerVisibility(index, new_visibility) => {
+                if let Some(layer) = self.inner.get_mut(index) {
+                    layer.visible = new_visibility
+                }
+            }
+            LayerMessage::EditLayerName(index, new_name) => {
+                if let Some(layer) = self.inner.get_mut(index) {
+                    layer.name = new_name
+                }
+            }
+
+            // --- Edit tiles ---
+            LayerMessage::PaintHex(hex_coord) => {
+                if let Some(layer) = self
+                    .active_layer
+                    .and_then(|index| self.inner.get_mut(index))
+                {
+                    match &mut layer.inner {
+                        LayerInner::Tiles(store) => store.paint(hex_coord),
+                        LayerInner::InvertedTiles(store) => store.erase(hex_coord),
+                    }
+                }
+            }
+            LayerMessage::EraseHex(hex_coord) => {
+                if let Some(layer) = self
+                    .active_layer
+                    .and_then(|index| self.inner.get_mut(index))
+                {
+                    match &mut layer.inner {
+                        LayerInner::Tiles(store) => store.erase(hex_coord),
+                        LayerInner::InvertedTiles(store) => store.paint(hex_coord),
+                    }
+                }
+            }
+
+            LayerMessage::FillFromHex(_hex_coord) => {
+                if let Some(layer) = self
+                    .active_layer
+                    .and_then(|index| self.inner.get_mut(index))
+                {
+                    // Flip current state
+
+                    let new_inner = match &layer.inner {
+                        LayerInner::Tiles(store) => LayerInner::InvertedTiles(store.clone()),
+                        LayerInner::InvertedTiles(store) => LayerInner::Tiles(store.clone()),
+                    };
+
+                    layer.inner = new_inner;
+
+                    // Bucket fill not yet implemented
+                }
+            }
+        }
+    }
+
+    pub fn get_visible_layers(&self) -> Vec<&LayerInner> {
+        self.inner
+            .iter()
+            .filter(|layer| layer.visible)
+            .map(|layer| &layer.inner)
+            .collect::<Vec<_>>()
+    }
+}

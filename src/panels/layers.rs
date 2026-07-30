@@ -46,7 +46,9 @@ impl LayerManager {
             LayerEvent::CommitLayerEdit => {
                 if let Some((index, name)) = self.edit_layer.clone() {
                     self.edit_layer = None;
-                    return Task::done(LayerMessage::ChangeLayerName(index, name).into());
+                    return Task::done(Message::LayerEvent(LayerMessage::EditLayerName(
+                        index, name,
+                    )));
                 }
             }
         }
@@ -62,28 +64,29 @@ impl Default for LayerManager {
 }
 
 pub fn layer_panel<'a>(layer_panel: &LayerManager, layers: &Layers) -> Element<'a, Message> {
-    let layer_rows: Vec<Element<Message>> = layers
-        .get_layers()
-        .iter()
-        .enumerate()
-        .map(|(i, layer)| layer_row(&layer_panel, &layer, i, layers.is_active_layer(i)))
-        .collect();
+    todo!()
+    // let layer_rows: Vec<Element<Message>> = layers
+    //     .get_layers()
+    //     .iter()
+    //     .enumerate()
+    //     .map(|(i, layer)| layer_row(&layer_panel, &layer, i, layers.is_active_layer(i)))
+    //     .collect();
 
-    let scrollable_content =
-        scrollable(column(layer_rows).spacing(4.0).width(Length::Fill)).height(Length::Fill);
+    // let scrollable_content =
+    //     scrollable(column(layer_rows).spacing(4.0).width(Length::Fill)).height(Length::Fill);
 
-    let add_layer_button = button(row![bootstrap::plus_square(), text("Add layer")].spacing(16))
-        .padding(8)
-        .on_press(Message::LayerEvent(LayerMessage::AddLayer))
-        .width(Length::Fill);
+    // let add_layer_button = button(row![bootstrap::plus_square(), text("Add layer")].spacing(16))
+    //     .padding(8)
+    //     .on_press(Message::LayerEvent(LayerMessage::AddLayer))
+    //     .width(Length::Fill);
 
-    let content = column![rule::horizontal(1), scrollable_content, add_layer_button]
-        .height(Length::Fill)
-        .width(Length::Fill)
-        .spacing(8.0)
-        .padding(8.0);
+    // let content = column![rule::horizontal(1), scrollable_content, add_layer_button]
+    //     .height(Length::Fill)
+    //     .width(Length::Fill)
+    //     .spacing(8.0)
+    //     .padding(8.0);
 
-    container(content).style(container::bordered_box).into()
+    // container(content).style(container::bordered_box).into()
 }
 
 fn layer_row<'a>(
@@ -102,7 +105,7 @@ fn layer_row<'a>(
         false => bootstrap::eye_slash(),
     })
     .style(button::text)
-    .on_press(Message::LayerEvent(LayerMessage::ChangeLayerVisibility(
+    .on_press(Message::LayerEvent(LayerMessage::EditLayerVisibility(
         layer_index,
         !layer.visible,
     )));
@@ -141,6 +144,8 @@ fn layer_row<'a>(
         });
 
     mouse_area(content)
-        .on_press(LayerMessage::ChangeActiveLayer(Some(layer_index)).into())
+        .on_press(Message::LayerEvent(LayerMessage::SetActiveLayer(Some(
+            layer_index,
+        ))))
         .into()
 }

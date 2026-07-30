@@ -8,7 +8,7 @@ use iced::{
 
 use crate::{
     app::Message,
-    state::{HexCoord, LayerMessage, Layers, Tool},
+    state::{HexCoord, LayerInner, LayerMessage, Layers, SparseTiles, Tool},
 };
 
 pub fn canvas_panel<'a>(layers: &'a Layers, tool: &'a Tool) -> Element<'a, Message> {
@@ -104,15 +104,16 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                     Tool::Paint => {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
+
                         Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::PaintTile(coord),
+                            LayerMessage::PaintHex(coord),
                         )))
                     }
                     Tool::Erase => {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
                         Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::EraseTile(coord),
+                            LayerMessage::EraseHex(coord),
                         )))
                     }
                 }
@@ -151,14 +152,14 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
                         Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::PaintTile(coord),
+                            LayerMessage::PaintHex(coord),
                         )))
                     }
                     Tool::Erase => {
                         let coord = self.screen_to_hex(state, cursor_pos);
                         state.request_redraw();
                         Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::EraseTile(coord),
+                            LayerMessage::EraseHex(coord),
                         )))
                     }
                 }
@@ -202,8 +203,6 @@ impl<'a> HexCanvas<'a> {
         frame.translate(state.translation);
         frame.scale(state.zoom);
 
-        let hex_path = self.hex_path();
-
         let grid_stroke = Stroke {
             style: canvas::Style::Solid(
                 theme
@@ -241,31 +240,43 @@ impl<'a> HexCanvas<'a> {
         let row_min = (-state.translation.y * inv_hex_h * inv_zoom).floor() as i32;
         let row_max = row_min + (bounds.height * inv_hex_h * inv_zoom).ceil() as i32;
 
-        for col in col_min..=col_max {
-            for row in row_min..=row_max {
-                // Offset every other row to align grid with bounds
-                let row = row - col / 2;
-
-                let hex = HexCoord { col, row };
-                let center = hex.to_pixel(self.hex_size);
-
-                let tiles_at_coord = self.layers.tiles_at_coord(hex);
-                let is_tile_empty = tiles_at_coord.is_empty();
-
-                frame.with_save(|frame| {
-                    frame.translate(center);
-
-                    for color in tiles_at_coord {
-                        frame.fill(&hex_path, Fill::from(color));
-                    }
-
-                    match is_tile_empty {
-                        true => frame.stroke(&hex_path, grid_stroke.clone()),
-                        false => frame.stroke(&hex_path, tile_stroke.clone()),
-                    }
-                });
+        for layer in self.layers.get_visible_layers() {
+            match layer {
+                LayerInner::Tiles(sparse_tiles) => draw_sparse(
+                    frame,
+                    sparse_tiles,
+                    self.hex_size,
+                    self.hex_path(),
+                    col_min,
+                    col_max,
+                    row_min,
+                    row_max,
+                    false,
+                ),
+                LayerInner::InvertedTiles(sparse_tiles) => draw_sparse(
+                    frame,
+                    sparse_tiles,
+                    self.hex_size,
+                    self.hex_path(),
+                    col_min,
+                    col_max,
+                    row_min,
+                    row_max,
+                    true,
+                ),
             }
         }
+
+        draw_grid_with_stroke(
+            frame,
+            self.hex_size,
+            self.hex_path(),
+            grid_stroke,
+            col_min,
+            col_max,
+            row_min,
+            row_max,
+        );
     }
 
     fn screen_to_hex(&self, state: &CanvasState, screen: Point) -> HexCoord {
@@ -292,5 +303,61 @@ impl<'a> HexCanvas<'a> {
         }
         builder.close();
         builder.build()
+    }
+}
+
+fn draw_sparse(
+    frame: &mut Frame,
+    tile_store: &SparseTiles,
+    hex_size: f32,
+    hex_path: Path,
+    col_min: i32,
+    col_max: i32,
+    row_min: i32,
+    row_max: i32,
+    invert: bool,
+) {
+    for col in col_min..=col_max {
+        for row in row_min..=row_max {
+            // Offset every other row to align grid with bounds
+            let row = row - col / 2;
+
+            let hex = HexCoord { col, row };
+            let center = hex.to_pixel(hex_size);
+
+            if tile_store.tiles.contains(&hex) ^ invert {
+                frame.with_save(|frame| {
+                    frame.translate(center);
+
+                    frame.fill(&hex_path, Fill::from(tile_store.colour));
+                });
+            }
+        }
+    }
+}
+
+fn draw_grid_with_stroke(
+    frame: &mut Frame,
+    hex_size: f32,
+    hex_path: Path,
+    stroke: Stroke,
+    col_min: i32,
+    col_max: i32,
+    row_min: i32,
+    row_max: i32,
+) {
+    for col in col_min..=col_max {
+        for row in row_min..=row_max {
+            let row = row - col / 2;
+
+            let hex = HexCoord { col, row };
+            let center = hex.to_pixel(hex_size);
+
+            frame.with_save(|frame| {
+                frame.translate(center);
+
+                frame.stroke(&hex_path, stroke);
+            });
+        }
     }
 }
