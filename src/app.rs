@@ -4,20 +4,24 @@ use iced::{
 };
 
 use crate::{
-    // export::{export_png, save_bytes_async},
     panels::{
-        LayerEvent, LayerManager, PaneType, ToastEvent, Toasts, canvas_panel, default_pane_config,
-        layer_details, layer_panel, toast_widget, toolbar_panel,
+        PaneType, ToastEvent, Toasts, canvas_panel, default_pane_config, inspector_panel,
+        layer_stack_panel, toast_widget, toolbar_panel,
     },
     state::{LayerMessage, Layers, Tool},
 };
 
+#[derive(Default, Debug)]
+pub struct EditorState {
+    pub active_layer_name: Option<String>,
+}
+
 pub struct App {
     layers: Layers,
     active_tool: Tool,
+    editor_state: EditorState,
 
     panes: pane_grid::State<PaneType>,
-    layer_panel: LayerManager,
     toasts: Toasts,
 }
 
@@ -29,11 +33,13 @@ pub enum Message {
     // Layers
     LayerEvent(LayerMessage),
 
-    // Layer Panel
-    LayerPanelEvent(LayerEvent),
     ToastEvent(ToastEvent),
 
     // Panel management
+    LayerRenameStart(String),
+    LayerRename(Option<String>),
+    LayerRenameSubmit(usize),
+
     PaneResized(pane_grid::ResizeEvent),
 
     ExportPng,
@@ -47,8 +53,8 @@ impl App {
 
         let app = Self {
             layers: Layers::default(),
+            editor_state: EditorState::default(),
             toasts: Toasts::new(),
-            layer_panel: LayerManager::new(),
             panes,
             active_tool: Tool::default(),
         };
@@ -76,11 +82,8 @@ impl App {
 
         match message {
             Message::LayerEvent(layers_message) => {
+                self.editor_state.active_layer_name = None;
                 self.layers.update(layers_message);
-            }
-
-            Message::LayerPanelEvent(layer_panel_message) => {
-                return self.layer_panel.update(layer_panel_message);
             }
 
             Message::ToastEvent(toast_event) => {
@@ -104,6 +107,18 @@ impl App {
                 let pane_grid::ResizeEvent { split, ratio } = resize_event;
                 self.panes.resize(split, ratio);
             }
+
+            Message::LayerRename(new_name) => self.editor_state.active_layer_name = new_name,
+            Message::LayerRenameStart(name) => self.editor_state.active_layer_name = Some(name),
+            Message::LayerRenameSubmit(index) => {
+                if let Some(new_name) = &self.editor_state.active_layer_name {
+                    return Task::done(Message::LayerEvent(LayerMessage::EditLayerName(
+                        index,
+                        new_name.clone(),
+                    )));
+                }
+                self.editor_state.active_layer_name = None
+            }
         }
 
         Task::none()
@@ -113,9 +128,9 @@ impl App {
         let grid = pane_grid(&self.panes, |_id, state, _is_maximised| {
             let inner: Element<'_, Message> = match state {
                 PaneType::Toolbar => toolbar_panel(&self.active_tool),
-                PaneType::Layers => layer_panel(&self.layer_panel, &self.layers),
-                PaneType::Colour => layer_details(&self.layers),
+                PaneType::LayerStack => layer_stack_panel(&self.layers),
                 PaneType::Canvas => canvas_panel(&self.layers, &self.active_tool),
+                PaneType::Inspector => inspector_panel(&self.layers, &self.editor_state),
             };
 
             pane_grid::Content::new(inner)

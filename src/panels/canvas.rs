@@ -216,19 +216,6 @@ impl<'a> HexCanvas<'a> {
             ..Stroke::default()
         };
 
-        let tile_stroke = Stroke {
-            style: canvas::Style::Solid(
-                theme
-                    .extended_palette()
-                    .background
-                    .base
-                    .text
-                    .scale_alpha(0.5),
-            ),
-            width: 1.0,
-            ..Stroke::default()
-        };
-
         // Compute hex bounds in map-space for culling
         let inv_zoom = 1.0 / state.zoom;
         let inv_hex_w = 1.0 / (self.hex_size * 1.5);

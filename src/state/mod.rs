@@ -10,8 +10,4 @@ pub use layer::LayerMessage;
 pub use layer::Layers;
 pub use layer::SparseTiles;
 
-// pub use layers::Layer;
-// pub use layers::LayerMessage;
-// pub use layers::Layers;
-
 pub use tool::Tool;

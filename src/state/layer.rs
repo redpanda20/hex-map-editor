@@ -22,7 +22,7 @@ pub struct Layer {
     pub name: String,
     pub visible: bool,
 
-    inner: LayerInner,
+    pub inner: LayerInner,
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +35,7 @@ pub enum LayerMessage {
 
     EditLayerVisibility(usize, bool),
     EditLayerName(usize, String),
+    EditLayerColour(usize, Color),
 
     PaintHex(HexCoord),
     EraseHex(HexCoord),
@@ -42,8 +43,8 @@ pub enum LayerMessage {
 }
 
 pub struct Layers {
-    inner: Vec<Layer>,
-    active_layer: Option<usize>,
+    pub inner: Vec<Layer>,
+    pub active_layer: Option<usize>,
 }
 
 impl Default for Layers {
@@ -51,7 +52,7 @@ impl Default for Layers {
         let inner = LayerInner::Tiles(tile_store::SparseTiles::new(DEFAULT_COLORS[0]));
 
         let layer = Layer {
-            name: "Layer 0".to_string(),
+            name: "Layer 1".to_string(),
             visible: true,
             inner,
         };
@@ -66,7 +67,7 @@ impl Default for Layers {
 impl Layers {
     /// TODO: Check which names are in use and pick the smallest number
     fn canonacalize_name(&self, name: String) -> String {
-        let layer_count = self.inner.len();
+        let layer_count = self.inner.len() + 1;
         format!("{name} {layer_count}")
     }
 
@@ -107,6 +108,14 @@ impl Layers {
             LayerMessage::EditLayerName(index, new_name) => {
                 if let Some(layer) = self.inner.get_mut(index) {
                     layer.name = new_name
+                }
+            }
+            LayerMessage::EditLayerColour(index, new_colour) => {
+                if let Some(layer) = self.inner.get_mut(index) {
+                    match &mut layer.inner {
+                        LayerInner::Tiles(sparse_tiles) => sparse_tiles.colour = new_colour,
+                        LayerInner::InvertedTiles(sparse_tiles) => sparse_tiles.colour = new_colour,
+                    }
                 }
             }
 
