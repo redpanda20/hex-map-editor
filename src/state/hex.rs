@@ -1,4 +1,4 @@
-use iced::Vector;
+use iced::{Rectangle, Vector};
 /// Flat topped axial grid
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -29,6 +29,33 @@ impl HexCoord {
 
         frac_round(cube_x, cube_z, cube_y)
     }
+}
+
+pub fn hexes_in_range(
+    col_min: i32,
+    col_max: i32,
+    row_min: i32,
+    row_max: i32,
+) -> impl Iterator<Item = HexCoord> {
+    (col_min..=col_max).flat_map(move |col| {
+        (row_min..=row_max).map(move |row| HexCoord {
+            col,
+            row: row - col / 2,
+        })
+    })
+}
+
+pub fn rect_to_range(rect: Rectangle, hex_size: f32) -> (i32, i32, i32, i32) {
+    let inv_hex_w = 1.0 / (hex_size * 1.5);
+    let inv_hex_h = 1.0 / (hex_size * 3.0_f32.sqrt());
+
+    let col_min = (rect.x * inv_hex_w).floor() as i32;
+    let col_max = col_min + (rect.width * inv_hex_w).ceil() as i32;
+
+    let row_min = (rect.y * inv_hex_h).floor() as i32;
+    let row_max = row_min + (rect.height * inv_hex_h).ceil() as i32;
+
+    (col_min, col_max, row_min, row_max)
 }
 
 fn frac_round(frac_q: f32, frac_r: f32, frac_s: f32) -> HexCoord {

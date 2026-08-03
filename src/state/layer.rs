@@ -18,6 +18,30 @@ pub enum LayerInner {
     InvertedTiles(SparseTiles),
 }
 
+impl LayerInner {
+    pub fn draw<T>(
+        &self,
+        target: &mut T,
+        coords: impl Iterator<Item = HexCoord>,
+        mut draw: impl FnMut(&mut T, HexCoord, Color),
+    ) {
+        for coord in coords {
+            match self {
+                LayerInner::Tiles(sparse_tiles) => {
+                    if sparse_tiles.tiles.contains(&coord) {
+                        draw(target, coord, sparse_tiles.colour)
+                    }
+                }
+                LayerInner::InvertedTiles(sparse_tiles) => {
+                    if !sparse_tiles.tiles.contains(&coord) {
+                        draw(target, coord, sparse_tiles.colour)
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub struct Layer {
     pub name: String,
     pub visible: bool,

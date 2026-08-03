@@ -8,7 +8,7 @@ use iced::{
 
 use crate::{
     app::Message,
-    state::{HexCoord, LayerInner, LayerMessage, Layers, SparseTiles, Tool},
+    state::{HexCoord, LayerMessage, Layers, Tool, hexes_in_range},
 };
 
 pub fn canvas_panel<'a>(layers: &'a Layers, tool: &'a Tool) -> Element<'a, Message> {
@@ -203,6 +203,33 @@ impl<'a> HexCanvas<'a> {
         frame.translate(state.translation);
         frame.scale(state.zoom);
 
+        // Compute hex bounds in map-space for culling
+        let inv_zoom = 1.0 / state.zoom;
+        let inv_hex_w = 1.0 / (self.hex_size * 1.5);
+        let inv_hex_h = 1.0 / (self.hex_size * (3.0_f32).sqrt());
+
+        let col_min = (-state.translation.x * inv_hex_w * inv_zoom).floor() as i32;
+        let col_max = col_min + (bounds.width * inv_hex_w * inv_zoom).ceil() as i32;
+
+        let row_min = (-state.translation.y * inv_hex_h * inv_zoom).floor() as i32;
+        let row_max = row_min + (bounds.height * inv_hex_h * inv_zoom).ceil() as i32;
+
+        let hex_path = &self.hex_path();
+
+        // Draw grid layers
+        for layer in self.layers.get_visible_layers() {
+            let coords = hexes_in_range(col_min, col_max, row_min, row_max);
+
+            layer.draw(frame, coords, |frame, hex, colour| {
+                let centre = hex.to_pixel(self.hex_size);
+                frame.with_save(|frame| {
+                    frame.translate(centre);
+                    frame.fill(hex_path, Fill::from(colour));
+                })
+            });
+        }
+
+        // Draw grid overlay
         let grid_stroke = Stroke {
             style: canvas::Style::Solid(
                 theme
@@ -216,54 +243,14 @@ impl<'a> HexCanvas<'a> {
             ..Stroke::default()
         };
 
-        // Compute hex bounds in map-space for culling
-        let inv_zoom = 1.0 / state.zoom;
-        let inv_hex_w = 1.0 / (self.hex_size * 1.5);
-        let inv_hex_h = 1.0 / (self.hex_size * (3.0_f32).sqrt());
-
-        let col_min = (-state.translation.x * inv_hex_w * inv_zoom).floor() as i32;
-        let col_max = col_min + (bounds.width * inv_hex_w * inv_zoom).ceil() as i32;
-
-        let row_min = (-state.translation.y * inv_hex_h * inv_zoom).floor() as i32;
-        let row_max = row_min + (bounds.height * inv_hex_h * inv_zoom).ceil() as i32;
-
-        for layer in self.layers.get_visible_layers() {
-            match layer {
-                LayerInner::Tiles(sparse_tiles) => draw_sparse(
-                    frame,
-                    sparse_tiles,
-                    self.hex_size,
-                    self.hex_path(),
-                    col_min,
-                    col_max,
-                    row_min,
-                    row_max,
-                    false,
-                ),
-                LayerInner::InvertedTiles(sparse_tiles) => draw_sparse(
-                    frame,
-                    sparse_tiles,
-                    self.hex_size,
-                    self.hex_path(),
-                    col_min,
-                    col_max,
-                    row_min,
-                    row_max,
-                    true,
-                ),
-            }
+        let coords = hexes_in_range(col_min, col_max, row_min, row_max);
+        for hex in coords {
+            let centre = hex.to_pixel(self.hex_size);
+            frame.with_save(|frame| {
+                frame.translate(centre);
+                frame.stroke(&hex_path, grid_stroke);
+            })
         }
-
-        draw_grid_with_stroke(
-            frame,
-            self.hex_size,
-            self.hex_path(),
-            grid_stroke,
-            col_min,
-            col_max,
-            row_min,
-            row_max,
-        );
     }
 
     fn screen_to_hex(&self, state: &CanvasState, screen: Point) -> HexCoord {
@@ -290,61 +277,5 @@ impl<'a> HexCanvas<'a> {
         }
         builder.close();
         builder.build()
-    }
-}
-
-fn draw_sparse(
-    frame: &mut Frame,
-    tile_store: &SparseTiles,
-    hex_size: f32,
-    hex_path: Path,
-    col_min: i32,
-    col_max: i32,
-    row_min: i32,
-    row_max: i32,
-    invert: bool,
-) {
-    for col in col_min..=col_max {
-        for row in row_min..=row_max {
-            // Offset every other row to align grid with bounds
-            let row = row - col / 2;
-
-            let hex = HexCoord { col, row };
-            let center = hex.to_pixel(hex_size);
-
-            if tile_store.tiles.contains(&hex) ^ invert {
-                frame.with_save(|frame| {
-                    frame.translate(center);
-
-                    frame.fill(&hex_path, Fill::from(tile_store.colour));
-                });
-            }
-        }
-    }
-}
-
-fn draw_grid_with_stroke(
-    frame: &mut Frame,
-    hex_size: f32,
-    hex_path: Path,
-    stroke: Stroke,
-    col_min: i32,
-    col_max: i32,
-    row_min: i32,
-    row_max: i32,
-) {
-    for col in col_min..=col_max {
-        for row in row_min..=row_max {
-            let row = row - col / 2;
-
-            let hex = HexCoord { col, row };
-            let center = hex.to_pixel(hex_size);
-
-            frame.with_save(|frame| {
-                frame.translate(center);
-
-                frame.stroke(&hex_path, stroke);
-            });
-        }
     }
 }

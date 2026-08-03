@@ -1,9 +1,9 @@
-use iced::{Padding, Rectangle, Task};
+use iced::{Rectangle, Task};
 use image::{EncodableLayout, ImageBuffer, Rgba};
 
 use crate::{
     app::Message,
-    state::{Layers, SparseTiles},
+    state::{HexCoord, Layers, hexes_in_range, rect_to_range},
 };
 
 const HEX_SIZE: f32 = 100.0;
@@ -65,37 +65,6 @@ fn point_in_polygon(x: f32, y: f32, verticies: &[(f32, f32)]) -> bool {
     inside
 }
 
-/// Creates bounding box
-/// returns xmin, xmax, ymin, ymax
-fn get_bounds(source: &Layers) -> iced::Rectangle {
-    let mut xmin = f32::MAX;
-    let mut xmax = f32::MIN;
-    let mut ymin = f32::MAX;
-    let mut ymax = f32::MIN;
-
-    for layer in source.get_visible_layers() {
-        match layer {
-            crate::state::LayerInner::Tiles(sparse_tiles)
-            | crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
-                for tile in sparse_tiles.tiles.iter() {
-                    let vec = tile.to_pixel(HEX_SIZE);
-                    xmin = xmin.min(vec.x);
-                    xmax = xmax.max(vec.x);
-                    ymin = ymin.min(vec.y);
-                    ymax = ymax.max(vec.y);
-                }
-            }
-        }
-    }
-
-    iced::Rectangle {
-        x: xmin,
-        y: ymin,
-        width: xmax - xmin,
-        height: ymax - ymin,
-    }
-}
-
 pub fn export_png(layers: &Layers) -> Vec<u8> {
     // Determine bounding box of all painted tiles
     let bounds = layers
@@ -130,22 +99,19 @@ pub fn export_png(layers: &Layers) -> Vec<u8> {
         *p = Rgba([255, 255, 255, 255]);
     }
 
-    // Draw each layer bottom → top.
+    // Draw all layers
+
     for layer in layers.get_visible_layers() {
-        match layer {
-            crate::state::LayerInner::Tiles(sparse_tiles)
-            | crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
-                for tile in sparse_tiles.tiles.iter() {
-                    let hex = tile.to_pixel(HEX_SIZE);
-                    let x = hex.x - bounds.x;
-                    let y = hex.y - bounds.y;
-                    let verts: Vec<(f32, f32)> =
-                        hex_vertices_f(x, y).iter().map(|(x, y)| (*x, *y)).collect();
-                    let color = sparse_tiles.colour.into_rgba8();
-                    fill_polygon(&mut buf, &verts, color);
-                }
-            }
-        }
+        let (col_min, col_max, row_min, row_max) = rect_to_range(bounds, HEX_SIZE);
+        let coords = hexes_in_range(col_min, col_max, row_min, row_max);
+        layer.draw(&mut buf, coords, |mut buf, tile, colour| {
+            let hex = tile.to_pixel(HEX_SIZE);
+            let x = hex.x - bounds.x;
+            let y = hex.y - bounds.y;
+            let verts: Vec<(f32, f32)> =
+                hex_vertices_f(x, y).iter().map(|(x, y)| (*x, *y)).collect();
+            fill_polygon(&mut buf, &verts, colour.into_rgba8());
+        });
     }
 
     let mut out = Vec::new();
