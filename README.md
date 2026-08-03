@@ -14,6 +14,7 @@ I have found drawing out maps by hand for my games to be tedious, and that other
   - [X] Hide / Rename / Remove
   - [X] Re-colourable with pleasing defaults
   - [X] Partial transparency
+  - [ ] Proc-gen. layers 
 - Data management
   - [X] Export to PNG
   - [ ] Export to SVG & PDF
