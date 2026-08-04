@@ -8,8 +8,8 @@ I have found drawing out maps by hand for my games to be tedious, and that other
 ## Features
 - Tools
   - [X] Draw / Erase tools
+  - [X] Paint bucket tool
   - [ ] Resizeable tools
-  - [ ] Paint bucket tool
 - Layers
   - [X] Hide / Rename / Remove
   - [X] Re-colourable with pleasing defaults

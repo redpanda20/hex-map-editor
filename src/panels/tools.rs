@@ -55,6 +55,22 @@ pub fn toolbar_panel(current_tool: &Tool) -> Element<'_, Message> {
         tooltip::Position::Right,
     );
 
+    let paint_tool = button(bootstrap::paint_bucket())
+        .on_press(Message::ChangeTool(Tool::Fill))
+        .style(|theme, mut status| {
+            if *current_tool == Tool::Fill {
+                status = button::Status::Disabled
+            };
+            button::background(theme, status)
+        });
+    let paint_tool = tooltip(
+        paint_tool,
+        container("Bucket fill tool")
+            .padding(4.0)
+            .style(container::bordered_box),
+        tooltip::Position::Right,
+    );
+
     let export_png = button(bootstrap::floppy_fill())
         .on_press(Message::ExportPng)
         .style(button::subtle);
@@ -71,6 +87,7 @@ pub fn toolbar_panel(current_tool: &Tool) -> Element<'_, Message> {
         brush_tool,
         move_tool,
         erase_tool,
+        paint_tool,
         space::vertical(),
         export_png
     ]

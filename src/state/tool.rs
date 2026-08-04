@@ -3,6 +3,7 @@ pub enum Tool {
     Paint,
     Erase,
     Pan,
+    Fill,
 }
 
 impl Default for Tool {

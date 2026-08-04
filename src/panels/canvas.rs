@@ -116,6 +116,13 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                             LayerMessage::EraseHex(coord),
                         )))
                     }
+                    Tool::Fill => {
+                        let coord = self.screen_to_hex(state, cursor_pos);
+                        state.request_redraw();
+                        Some(Action::publish(Message::LayerEvent(
+                            LayerMessage::FillFromHex(coord),
+                        )))
+                    }
                 }
             }
 
@@ -162,6 +169,13 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                             LayerMessage::EraseHex(coord),
                         )))
                     }
+                    Tool::Fill => {
+                        let coord = self.screen_to_hex(state, cursor_pos);
+                        state.request_redraw();
+                        Some(Action::publish(Message::LayerEvent(
+                            LayerMessage::FillFromHex(coord),
+                        )))
+                    }
                 }
             }
 
@@ -194,6 +208,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
             Tool::Pan => mouse::Interaction::Grab,
             Tool::Paint => mouse::Interaction::Crosshair,
             Tool::Erase => mouse::Interaction::Crosshair,
+            Tool::Fill => mouse::Interaction::Crosshair,
         }
     }
 }

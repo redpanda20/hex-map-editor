@@ -3,7 +3,7 @@ mod layer;
 mod tool;
 
 pub use hex::HexCoord;
-pub use hex::{hexes_in_range, rect_to_range};
+pub use hex::{HexBounds, flood_fill, hexes_in_range, rect_to_range};
 
 pub use layer::Layer;
 pub use layer::LayerInner;

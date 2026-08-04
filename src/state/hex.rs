@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use iced::{Rectangle, Vector};
 /// Flat topped axial grid
 
@@ -8,6 +10,15 @@ pub struct HexCoord {
 }
 
 impl HexCoord {
+    const NEIGHBOR_OFFSETS: [(i32, i32); 6] = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)];
+
+    pub fn neighbors(self) -> [HexCoord; 6] {
+        Self::NEIGHBOR_OFFSETS.map(|(dc, dr)| HexCoord {
+            col: self.col + dc,
+            row: self.row + dr,
+        })
+    }
+
     pub fn to_pixel(self, hex_size: f32) -> Vector {
         let q = self.col as f32;
         let r = self.row as f32;
@@ -28,6 +39,23 @@ impl HexCoord {
         let cube_y = -cube_x - cube_z;
 
         frac_round(cube_x, cube_z, cube_y)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HexBounds {
+    pub col_min: i32,
+    pub col_max: i32,
+    pub row_min: i32,
+    pub row_max: i32,
+}
+
+impl HexBounds {
+    pub fn contains(&self, coord: HexCoord) -> bool {
+        coord.col >= self.col_min
+            && coord.col <= self.col_max
+            && coord.row >= self.row_min
+            && coord.row <= self.row_max
     }
 }
 
@@ -77,4 +105,40 @@ fn frac_round(frac_q: f32, frac_r: f32, frac_s: f32) -> HexCoord {
     let row = r as i32;
 
     HexCoord { col, row }
+}
+
+/// Cap in case user has created a map too large to performantly process
+const FLOOD_FILL_TILE_CAP: usize = 5_000;
+
+/// Flood-fills the connected region of hexes sharing `start`'s painted state (painted or empty), constrained to `bounds`.
+///
+/// Returns `None` if the region is effectively unbounded.
+/// This is the case when the fill reaches the bounds or exceeds the tile cap
+pub fn flood_fill(
+    start: HexCoord,
+    tiles: &HashSet<HexCoord>,
+    bounds: HexBounds,
+) -> Option<HashSet<HexCoord>> {
+    let target_state = tiles.contains(&start);
+
+    let mut visited = HashSet::new();
+    let mut stack = vec![start];
+
+    while let Some(coord) = stack.pop() {
+        if visited.contains(&coord) {
+            continue;
+        }
+        if !bounds.contains(coord) || visited.len() > FLOOD_FILL_TILE_CAP {
+            return None;
+        }
+        visited.insert(coord);
+
+        for neighbor in coord.neighbors() {
+            if !visited.contains(&neighbor) && tiles.contains(&neighbor) == target_state {
+                stack.push(neighbor);
+            }
+        }
+    }
+
+    Some(visited)
 }

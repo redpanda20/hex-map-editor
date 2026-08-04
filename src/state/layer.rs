@@ -3,7 +3,7 @@ mod tile_store;
 use iced::Color;
 pub use tile_store::SparseTiles;
 
-use crate::state::HexCoord;
+use crate::state::{HexCoord, flood_fill};
 
 const DEFAULT_COLORS: [Color; 5] = [
     Color::from_rgba8(245, 196, 168, 0.9),
@@ -167,21 +167,45 @@ impl Layers {
                 }
             }
 
-            LayerMessage::FillFromHex(_hex_coord) => {
+            LayerMessage::FillFromHex(hex_coord) => {
                 if let Some(layer) = self
                     .active_layer
                     .and_then(|index| self.inner.get_mut(index))
                 {
-                    // Flip current state
-
-                    let new_inner = match &layer.inner {
-                        LayerInner::Tiles(store) => LayerInner::InvertedTiles(store.clone()),
-                        LayerInner::InvertedTiles(store) => LayerInner::Tiles(store.clone()),
+                    let store = match &layer.inner {
+                        LayerInner::Tiles(store) => store,
+                        LayerInner::InvertedTiles(store) => store,
                     };
 
-                    layer.inner = new_inner;
+                    // If the layer is empty, short circuit and invert
+                    let Some(bounds) = store.hex_bounds() else {
+                        layer.inner = match &layer.inner {
+                            LayerInner::Tiles(store) => LayerInner::InvertedTiles(store.clone()),
+                            LayerInner::InvertedTiles(store) => LayerInner::Tiles(store.clone()),
+                        };
+                        return;
+                    };
 
-                    // Bucket fill not yet implemented
+                    match flood_fill(hex_coord, &store.tiles, bounds) {
+                        Some(region) => match &mut layer.inner {
+                            LayerInner::Tiles(store) => {
+                                region.into_iter().for_each(|c| store.paint(c))
+                            }
+                            LayerInner::InvertedTiles(store) => {
+                                region.into_iter().for_each(|c| store.erase(c))
+                            }
+                        },
+                        None => {
+                            layer.inner = match &layer.inner {
+                                LayerInner::Tiles(store) => {
+                                    LayerInner::InvertedTiles(store.clone())
+                                }
+                                LayerInner::InvertedTiles(store) => {
+                                    LayerInner::Tiles(store.clone())
+                                }
+                            };
+                        }
+                    }
                 }
             }
         }
