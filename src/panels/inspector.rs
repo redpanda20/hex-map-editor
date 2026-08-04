@@ -1,7 +1,8 @@
 use iced::{
     Color, Element, Length, alignment,
     widget::{
-        Column, Row, button, column, container, responsive, row, slider, space, text, text_input,
+        Column, Row, button, column, container, responsive, row, rule, slider, space, text,
+        text_input,
     },
 };
 use iced_fonts::bootstrap;
@@ -12,36 +13,49 @@ use crate::{
 };
 
 pub fn inspector_panel<'a>(layers: &Layers, editor_state: &EditorState) -> Element<'a, Message> {
-    if let Some(layer_id) = layers.active_layer {
-        if let Some(Layer {
-            name,
-            visible,
-            inner,
-        }) = layers.inner.get(layer_id)
-        {
-            let starting_name = name;
-            let name = &editor_state.active_layer_name;
-
-            let content = match inner {
-                crate::state::LayerInner::Tiles(sparse_tiles) => {
-                    sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
-                }
-                crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
-                    sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
-                }
-            };
-
-            return container(content)
-                .style(container::bordered_box)
-                .padding(8.0)
-                .into();
-        }
-    }
-
-    container(column![text("No active layer"), space::vertical()])
+    // Check for active content
+    let Some((layer_id, layer)) = layers
+        .active_layer
+        .and_then(|id| layers.inner.get(id).map(|layer| (id, layer)))
+    else {
+        return container(
+            column![rule::horizontal(1), text("No active content")]
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .spacing(8.0)
+                .padding(8.0),
+        )
         .style(container::bordered_box)
-        .padding(8.0)
-        .into()
+        .into();
+    };
+
+    let Layer {
+        name,
+        visible,
+        inner,
+    } = layer;
+
+    let starting_name = name;
+    let name = &editor_state.active_layer_name;
+
+    let content = match inner {
+        crate::state::LayerInner::Tiles(sparse_tiles) => {
+            sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
+        }
+        crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
+            sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
+        }
+    };
+
+    container(
+        column![rule::horizontal(1), content]
+            .height(Length::Fill)
+            .width(Length::Fill)
+            .spacing(8.0)
+            .padding(8.0),
+    )
+    .style(container::bordered_box)
+    .into()
 }
 
 fn sparse_tile_details<'a>(
@@ -71,8 +85,8 @@ fn name_input<'a>(
     } else {
         button(
             row![
-                bootstrap::pencil_fill().style(text::secondary),
-                text(starting_name.clone()).height(24.0)
+                bootstrap::input_cursor().style(text::secondary),
+                text(starting_name.clone()).height(20.0)
             ]
             .spacing(4.0)
             .align_y(alignment::Vertical::Center),
