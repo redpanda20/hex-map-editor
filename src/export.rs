@@ -3,7 +3,7 @@ use image::{EncodableLayout, ImageBuffer, Rgba};
 
 use crate::{
     app::Message,
-    state::{HexCoord, Layers, hexes_in_range, rect_to_range},
+    state::{Layers, hexes_in_range, rect_to_range},
 };
 
 const HEX_SIZE: f32 = 100.0;

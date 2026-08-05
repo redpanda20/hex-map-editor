@@ -98,32 +98,17 @@ impl<'a> Program<Message> for HexCanvas<'a> {
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
                 state.dragging = true;
                 state.last_drag_pos = Some(cursor_pos);
-                match self.tool {
-                    Tool::Pan => Some(Action::capture()),
+                let coord = self.screen_to_hex(state, cursor_pos);
 
-                    Tool::Paint => {
-                        let coord = self.screen_to_hex(state, cursor_pos);
-                        state.request_redraw();
+                let message = match self.tool {
+                    Tool::Paint => Message::LayerEvent(LayerMessage::PaintHex(coord)),
+                    Tool::Erase => Message::LayerEvent(LayerMessage::EraseHex(coord)),
+                    Tool::Pan => return Some(Action::capture()),
+                    Tool::Fill => Message::LayerEvent(LayerMessage::FillFromHex(coord)),
+                };
 
-                        Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::PaintHex(coord),
-                        )))
-                    }
-                    Tool::Erase => {
-                        let coord = self.screen_to_hex(state, cursor_pos);
-                        state.request_redraw();
-                        Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::EraseHex(coord),
-                        )))
-                    }
-                    Tool::Fill => {
-                        let coord = self.screen_to_hex(state, cursor_pos);
-                        state.request_redraw();
-                        Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::FillFromHex(coord),
-                        )))
-                    }
-                }
+                state.request_redraw();
+                Some(Action::publish(message).and_capture())
             }
 
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
@@ -143,40 +128,27 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                 let last = state.last_drag_pos;
                 state.last_drag_pos = Some(cursor_pos);
 
-                match self.tool {
+                let coord = self.screen_to_hex(state, cursor_pos);
+
+                let message = match self.tool {
+                    Tool::Paint => Message::LayerEvent(LayerMessage::PaintHex(coord)),
+                    Tool::Erase => Message::LayerEvent(LayerMessage::EraseHex(coord)),
+                    // Bucket fill is explicitly disabled while dragging
+                    // This is to avoid triggering epilieptic seizures
+                    Tool::Fill => return None,
                     Tool::Pan => match last {
-                        None => None,
+                        None => return None,
                         Some(last) => {
-                            let dx = cursor_pos.x - last.x;
-                            let dy = cursor_pos.y - last.y;
-                            state.translation.x += dx;
-                            state.translation.y += dy;
+                            state.translation.x += cursor_pos.x - last.x;
+                            state.translation.y += cursor_pos.y - last.y;
                             state.request_redraw();
-                            Some(Action::request_redraw().and_capture())
+                            return Some(Action::request_redraw().and_capture());
                         }
                     },
-                    Tool::Paint => {
-                        let coord = self.screen_to_hex(state, cursor_pos);
-                        state.request_redraw();
-                        Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::PaintHex(coord),
-                        )))
-                    }
-                    Tool::Erase => {
-                        let coord = self.screen_to_hex(state, cursor_pos);
-                        state.request_redraw();
-                        Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::EraseHex(coord),
-                        )))
-                    }
-                    Tool::Fill => {
-                        let coord = self.screen_to_hex(state, cursor_pos);
-                        state.request_redraw();
-                        Some(Action::publish(Message::LayerEvent(
-                            LayerMessage::FillFromHex(coord),
-                        )))
-                    }
-                }
+                };
+
+                state.request_redraw();
+                Some(Action::publish(message).and_capture())
             }
 
             Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
