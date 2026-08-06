@@ -57,6 +57,28 @@ impl HexBounds {
             && coord.row >= self.row_min
             && coord.row <= self.row_max
     }
+
+    pub fn from_hexes(source: impl IntoIterator<Item = HexCoord>) -> Option<HexBounds> {
+        let mut iter = source.into_iter();
+        let first = iter.next()?;
+
+        let (mut col_min, mut col_max) = (first.col, first.col);
+        let (mut row_min, mut row_max) = (first.row, first.row);
+
+        for coord in iter {
+            col_min = col_min.min(coord.col);
+            col_max = col_max.max(coord.col);
+            row_min = row_min.min(coord.row);
+            row_max = row_max.max(coord.row);
+        }
+
+        Some(HexBounds {
+            col_min,
+            col_max,
+            row_min,
+            row_max,
+        })
+    }
 }
 
 pub fn hexes_in_range(

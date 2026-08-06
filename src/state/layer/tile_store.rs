@@ -50,25 +50,6 @@ impl SparseTiles {
     }
 
     pub fn hex_bounds(&self) -> Option<HexBounds> {
-        let mut iter = self.tiles.iter();
-        let first = iter.next()?;
-
-        let (mut col_min, mut col_max) = (first.col, first.col);
-        let (mut row_min, mut row_max) = (first.row, first.row);
-
-        for coord in iter {
-            col_min = col_min.min(coord.col);
-            col_max = col_max.max(coord.col);
-
-            row_min = row_min.min(coord.row);
-            row_max = row_max.max(coord.row);
-        }
-
-        Some(HexBounds {
-            col_min,
-            col_max,
-            row_min,
-            row_max,
-        })
+        HexBounds::from_hexes(self.tiles.clone())
     }
 }
