@@ -19,19 +19,19 @@ impl HexCoord {
         })
     }
 
-    pub fn to_pixel(self, hex_size: f32) -> Vector {
+    pub fn to_cartesian(self) -> Vector {
         let q = self.col as f32;
         let r = self.row as f32;
 
-        let x = hex_size * (1.5 * q);
-        let y = hex_size * ((3.0_f32.sqrt() * 0.5 * q) + (3.0_f32.sqrt() * r));
+        let x = 1.5 * q;
+        let y = (3.0_f32.sqrt() * 0.5 * q) + (3.0_f32.sqrt() * r);
 
         Vector { x, y }
     }
 
-    pub fn from_pixel(x: f32, y: f32, hex_size: f32) -> HexCoord {
-        let q = (2.0 / 3.0 * x) / hex_size;
-        let r = (-1.0 / 3.0 * x + (3.0_f32.sqrt() / 3.0) * y) / hex_size;
+    pub fn from_cartesian(vec: Vector) -> HexCoord {
+        let q = 2.0 / 3.0 * vec.x;
+        let r = -1.0 / 3.0 * vec.x + (3.0_f32.sqrt() / 3.0) * vec.y;
 
         // Axial to cubic coordinates
         let cube_x = q;

@@ -208,7 +208,7 @@ impl<'a> HexCanvas<'a> {
             let coords = hexes_in_range(col_min, col_max, row_min, row_max);
 
             layer.draw(frame, coords, |frame, hex, colour| {
-                let centre = hex.to_pixel(self.hex_size);
+                let centre = hex.to_cartesian() * self.hex_size;
                 frame.with_save(|frame| {
                     frame.translate(centre);
                     frame.fill(hex_path, Fill::from(colour));
@@ -232,7 +232,7 @@ impl<'a> HexCanvas<'a> {
 
         let coords = hexes_in_range(col_min, col_max, row_min, row_max);
         for hex in coords {
-            let centre = hex.to_pixel(self.hex_size);
+            let centre = hex.to_cartesian() * self.hex_size;
             frame.with_save(|frame| {
                 frame.translate(centre);
                 frame.stroke(&hex_path, grid_stroke);
@@ -244,10 +244,11 @@ impl<'a> HexCanvas<'a> {
         let translation = state.translation;
         let zoom = state.zoom;
 
-        let map_x = (screen.x - translation.x) / zoom;
-        let map_y = (screen.y - translation.y) / zoom;
+        let x = (screen.x - translation.x) / zoom;
+        let y = (screen.y - translation.y) / zoom;
+        let map_vec = Vector { x, y };
 
-        HexCoord::from_pixel(map_x, map_y, self.hex_size)
+        HexCoord::from_cartesian(map_vec / self.hex_size)
     }
 
     fn hex_path(&self) -> Path {

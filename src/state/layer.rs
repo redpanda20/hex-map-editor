@@ -1,3 +1,4 @@
+mod noise;
 mod tile_store;
 
 use iced::Color;
@@ -28,13 +29,13 @@ impl LayerInner {
         for coord in coords {
             match self {
                 LayerInner::Tiles(sparse_tiles) => {
-                    if sparse_tiles.tiles.contains(&coord) {
-                        draw(target, coord, sparse_tiles.colour)
+                    if sparse_tiles.exists_at(&coord) {
+                        draw(target, coord, sparse_tiles.colour_at(&coord))
                     }
                 }
                 LayerInner::InvertedTiles(sparse_tiles) => {
-                    if !sparse_tiles.tiles.contains(&coord) {
-                        draw(target, coord, sparse_tiles.colour)
+                    if !sparse_tiles.exists_at(&coord) {
+                        draw(target, coord, sparse_tiles.colour_at(&coord))
                     }
                 }
             }
@@ -137,8 +138,10 @@ impl Layers {
             LayerMessage::EditLayerColour(index, new_colour) => {
                 if let Some(layer) = self.inner.get_mut(index) {
                     match &mut layer.inner {
-                        LayerInner::Tiles(sparse_tiles) => sparse_tiles.colour = new_colour,
-                        LayerInner::InvertedTiles(sparse_tiles) => sparse_tiles.colour = new_colour,
+                        LayerInner::Tiles(sparse_tiles) => sparse_tiles.set_colour(new_colour),
+                        LayerInner::InvertedTiles(sparse_tiles) => {
+                            sparse_tiles.set_colour(new_colour)
+                        }
                     }
                 }
             }
@@ -178,7 +181,7 @@ impl Layers {
                     };
 
                     // If the layer is empty, short circuit and invert
-                    let Some(bounds) = store.hex_bounds() else {
+                    let Some(bounds) = store.get_bounds() else {
                         layer.inner = match &layer.inner {
                             LayerInner::Tiles(store) => LayerInner::InvertedTiles(store.clone()),
                             LayerInner::InvertedTiles(store) => LayerInner::Tiles(store.clone()),
@@ -186,7 +189,7 @@ impl Layers {
                         return;
                     };
 
-                    match flood_fill(hex_coord, &store.tiles, bounds) {
+                    match flood_fill(hex_coord, &store.get_all_tiles(), bounds) {
                         Some(region) => match &mut layer.inner {
                             LayerInner::Tiles(store) => {
                                 region.into_iter().for_each(|c| store.paint(c))

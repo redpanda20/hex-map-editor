@@ -68,7 +68,7 @@ fn sparse_tile_details<'a>(
     column![
         name_input(layer_id, starting_name, name),
         visible_toggle(layer_id, visible),
-        colour_panel(layer_id, tiles.colour)
+        colour_panel(layer_id, tiles.get_colour())
     ]
 }
 

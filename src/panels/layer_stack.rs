@@ -95,7 +95,7 @@ fn visible_toggle<'a>(layer_id: usize, visible: &bool) -> Button<'a, Message> {
 }
 
 fn preview_tiles<'a>(inner: &'a SparseTiles) -> Element<'a, Message> {
-    let mut solid_colour = inner.colour;
+    let mut solid_colour = inner.get_colour();
     solid_colour.a = 1.0;
 
     container(space())

@@ -105,7 +105,7 @@ pub fn export_png(layers: &Layers) -> Vec<u8> {
         let (col_min, col_max, row_min, row_max) = rect_to_range(bounds, HEX_SIZE);
         let coords = hexes_in_range(col_min, col_max, row_min, row_max);
         layer.draw(&mut buf, coords, |mut buf, tile, colour| {
-            let hex = tile.to_pixel(HEX_SIZE);
+            let hex = tile.to_cartesian() * HEX_SIZE;
             let x = hex.x - bounds.x;
             let y = hex.y - bounds.y;
             let verts: Vec<(f32, f32)> =

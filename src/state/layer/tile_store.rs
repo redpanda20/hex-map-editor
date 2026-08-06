@@ -6,8 +6,8 @@ use crate::state::{HexBounds, HexCoord};
 
 #[derive(Debug, Clone)]
 pub struct SparseTiles {
-    pub tiles: HashSet<HexCoord>,
-    pub colour: Color,
+    tiles: HashSet<HexCoord>,
+    colour: Color,
 }
 
 impl SparseTiles {
@@ -16,6 +16,14 @@ impl SparseTiles {
             tiles: HashSet::new(),
             colour,
         }
+    }
+
+    pub fn get_colour(&self) -> Color {
+        self.colour
+    }
+
+    pub fn set_colour(&mut self, colour: Color) {
+        self.colour = colour
     }
 
     pub fn paint(&mut self, coord: HexCoord) {
@@ -28,13 +36,13 @@ impl SparseTiles {
 
     pub fn bounding_box(&self, hex_size: f32) -> Option<Rectangle> {
         let mut iter = self.tiles.iter();
-        let first = iter.next()?.to_pixel(hex_size);
+        let first = iter.next()?.to_cartesian() * hex_size;
 
         let (mut min_x, mut max_x) = (first.x, first.x);
         let (mut min_y, mut max_y) = (first.y, first.y);
 
         for coord in iter {
-            let point = coord.to_pixel(hex_size);
+            let point = coord.to_cartesian() * hex_size;
             min_x = min_x.min(point.x);
             max_x = max_x.max(point.x);
             min_y = min_y.min(point.y);
@@ -49,7 +57,20 @@ impl SparseTiles {
         })
     }
 
-    pub fn hex_bounds(&self) -> Option<HexBounds> {
+    // Used for flood fill
+    pub fn get_all_tiles(&self) -> &HashSet<HexCoord> {
+        &self.tiles
+    }
+
+    pub fn exists_at(&self, coord: &HexCoord) -> bool {
+        self.tiles.contains(&coord)
+    }
+
+    pub fn colour_at(&self, _coord: &HexCoord) -> Color {
+        self.colour
+    }
+
+    pub fn get_bounds(&self) -> Option<HexBounds> {
         HexBounds::from_hexes(self.tiles.clone())
     }
 }
