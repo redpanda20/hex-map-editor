@@ -6,7 +6,7 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::Message,
-    state::{Layer, LayerInner, LayerMessage, Layers, SparseTiles},
+    state::{Layer, LayerInner, LayerMessage, Layers, PerlinNoiseLayer, SparseTiles},
 };
 
 pub fn layer_stack_panel<'a>(layers: &'a Layers) -> Element<'a, Message> {
@@ -56,6 +56,7 @@ fn layer_preview<'a>(
     let layer_preview = match inner {
         LayerInner::Tiles(sparse_tiles) => preview_tiles(sparse_tiles),
         LayerInner::InvertedTiles(sparse_tiles) => preview_tiles(sparse_tiles),
+        LayerInner::Perlin(perlin_noise_layer) => preview_noise(perlin_noise_layer),
     };
 
     let content = container(
@@ -103,6 +104,10 @@ fn preview_tiles<'a>(inner: &'a SparseTiles) -> Element<'a, Message> {
         .width(Length::Fixed(24.0))
         .style(move |_theme| container::background(solid_colour))
         .into()
+}
+
+fn preview_noise<'a>(inner: &'a PerlinNoiseLayer) -> Element<'a, Message> {
+    text!("Noise").into()
 }
 
 fn delete_button<'a>(layer_id: usize) -> Button<'a, Message> {

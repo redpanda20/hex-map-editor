@@ -9,6 +9,7 @@ pub use layer::Layer;
 pub use layer::LayerInner;
 pub use layer::LayerMessage;
 pub use layer::Layers;
+pub use layer::PerlinNoiseLayer;
 pub use layer::SparseTiles;
 
 pub use tool::Tool;

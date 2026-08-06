@@ -45,6 +45,7 @@ pub fn inspector_panel<'a>(layers: &Layers, editor_state: &EditorState) -> Eleme
         crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
             sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
         }
+        crate::state::LayerInner::Perlin(perlin_noise_layer) => todo!(),
     };
 
     container(

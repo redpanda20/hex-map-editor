@@ -75,6 +75,7 @@ pub fn export_png(layers: &Layers) -> Vec<u8> {
             crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
                 sparse_tiles.bounding_box(HEX_SIZE)
             }
+            crate::state::LayerInner::Perlin(perlin_noise_layer) => None,
         })
         .reduce(|acc, e| Rectangle::union(&acc, &e));
 

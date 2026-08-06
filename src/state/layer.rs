@@ -2,6 +2,7 @@ mod noise;
 mod tile_store;
 
 use iced::Color;
+pub use noise::PerlinNoiseLayer;
 pub use tile_store::SparseTiles;
 
 use crate::state::{HexCoord, flood_fill};
@@ -17,6 +18,7 @@ const DEFAULT_COLORS: [Color; 5] = [
 pub enum LayerInner {
     Tiles(SparseTiles),
     InvertedTiles(SparseTiles),
+    Perlin(noise::PerlinNoiseLayer),
 }
 
 impl LayerInner {
@@ -36,6 +38,11 @@ impl LayerInner {
                 LayerInner::InvertedTiles(sparse_tiles) => {
                     if !sparse_tiles.exists_at(&coord) {
                         draw(target, coord, sparse_tiles.colour_at(&coord))
+                    }
+                }
+                LayerInner::Perlin(perlin_noise_layer) => {
+                    if perlin_noise_layer.exists_at(&coord) {
+                        draw(target, coord, perlin_noise_layer.colour_at(&coord))
                     }
                 }
             }
@@ -82,8 +89,14 @@ impl Default for Layers {
             inner,
         };
 
+        let perlin = Layer {
+            name: "Perlin Noise 1".to_string(),
+            visible: true,
+            inner: LayerInner::Perlin(PerlinNoiseLayer::new(15112001)),
+        };
+
         Self {
-            inner: vec![layer],
+            inner: vec![layer, perlin],
             active_layer: Some(0),
         }
     }
@@ -142,6 +155,7 @@ impl Layers {
                         LayerInner::InvertedTiles(sparse_tiles) => {
                             sparse_tiles.set_colour(new_colour)
                         }
+                        LayerInner::Perlin(perlin_noise_layer) => todo!(),
                     }
                 }
             }
@@ -155,6 +169,8 @@ impl Layers {
                     match &mut layer.inner {
                         LayerInner::Tiles(store) => store.paint(hex_coord),
                         LayerInner::InvertedTiles(store) => store.erase(hex_coord),
+                        // Noise layer cannot be drawn to
+                        LayerInner::Perlin(perlin_noise_layer) => (),
                     }
                 }
             }
@@ -166,6 +182,8 @@ impl Layers {
                     match &mut layer.inner {
                         LayerInner::Tiles(store) => store.erase(hex_coord),
                         LayerInner::InvertedTiles(store) => store.paint(hex_coord),
+                        // Noise layer cannot be drawn changed
+                        LayerInner::Perlin(perlin_noise_layer) => (),
                     }
                 }
             }
@@ -178,6 +196,7 @@ impl Layers {
                     let store = match &layer.inner {
                         LayerInner::Tiles(store) => store,
                         LayerInner::InvertedTiles(store) => store,
+                        LayerInner::Perlin(_) => return,
                     };
 
                     // If the layer is empty, short circuit and invert
@@ -185,6 +204,7 @@ impl Layers {
                         layer.inner = match &layer.inner {
                             LayerInner::Tiles(store) => LayerInner::InvertedTiles(store.clone()),
                             LayerInner::InvertedTiles(store) => LayerInner::Tiles(store.clone()),
+                            LayerInner::Perlin(_) => return,
                         };
                         return;
                     };
@@ -197,6 +217,7 @@ impl Layers {
                             LayerInner::InvertedTiles(store) => {
                                 region.into_iter().for_each(|c| store.erase(c))
                             }
+                            LayerInner::Perlin(_) => return,
                         },
                         None => {
                             layer.inner = match &layer.inner {
@@ -206,6 +227,7 @@ impl Layers {
                                 LayerInner::InvertedTiles(store) => {
                                     LayerInner::Tiles(store.clone())
                                 }
+                                LayerInner::Perlin(_) => return,
                             };
                         }
                     }

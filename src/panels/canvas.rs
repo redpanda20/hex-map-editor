@@ -205,7 +205,8 @@ impl<'a> HexCanvas<'a> {
 
         // Draw grid layers
         for layer in self.layers.get_visible_layers() {
-            let coords = hexes_in_range(col_min, col_max, row_min, row_max);
+            // Column / Row maximum increased to full cover screen
+            let coords = hexes_in_range(col_min, col_max + 1, row_min, row_max + 1);
 
             layer.draw(frame, coords, |frame, hex, colour| {
                 let centre = hex.to_cartesian() * self.hex_size;

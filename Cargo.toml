@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 iced_fonts = { version = "0.3.0", features = ["bootstrap"] }
 image = {version = "0.25.10", default-features = false, features = ["png"] }
+rand = "0.10.2"
 rfd = "0.15"   # File dialogs (Linux/Windows/macOS/WASM)
 
 # Native distributions
