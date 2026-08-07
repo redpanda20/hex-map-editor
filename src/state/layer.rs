@@ -99,6 +99,8 @@ pub enum LayerMessage {
 pub struct Layers {
     pub inner: Vec<Layer>,
     pub active_layer: Option<usize>,
+
+    revision: u64,
 }
 
 impl Default for Layers {
@@ -114,6 +116,7 @@ impl Default for Layers {
         Self {
             inner: vec![layer],
             active_layer: Some(0),
+            revision: 0,
         }
     }
 }
@@ -125,7 +128,17 @@ impl Layers {
         format!("{name} {layer_count}")
     }
 
+    /// A counter incremented when the state of Layers changes.
+    /// Used by consumers to invalidate out of date caches
+    ///
+    /// TODO: Only update on meangiful content changes
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
     pub fn update(&mut self, message: LayerMessage) {
+        self.revision = self.revision.wrapping_add(1);
+
         match message {
             // --- Edit Layers ---
             LayerMessage::AddLayer(name, layer_type) => {

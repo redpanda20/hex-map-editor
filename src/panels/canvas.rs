@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use iced::{
     Element, Length, Point, Rectangle, Theme, Vector, mouse, touch,
     widget::{
@@ -33,6 +35,10 @@ pub struct HexCanvas<'a> {
 #[derive(Debug)]
 pub struct CanvasState {
     cache: canvas::Cache,
+    // Tracks the `Layers` revision that `cache` was last drawn from. Wrapped
+    // in a `Cell` so it can be updated from `Program::draw`, which only
+    // hands us a `&CanvasState` (see `HexCanvas::draw`).
+    cached_layers_revision: Cell<u64>,
     dragging: bool,
     last_drag_pos: Option<Point>,
     translation: Vector,
@@ -43,17 +49,12 @@ impl Default for CanvasState {
     fn default() -> Self {
         Self {
             cache: Default::default(),
+            cached_layers_revision: Cell::new(0),
             dragging: false,
             last_drag_pos: None,
             translation: Vector::new(0.0, 0.0),
             zoom: 1.0,
         }
-    }
-}
-
-impl CanvasState {
-    pub fn request_redraw(&mut self) {
-        self.cache.clear();
     }
 }
 
@@ -68,6 +69,13 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
+        // Invalidate render cache if the state of Layers has changed.
+        let current_revision = self.layers.revision();
+        if state.cached_layers_revision.get() != current_revision {
+            state.cache.clear();
+            state.cached_layers_revision.set(current_revision);
+        }
+
         let geometry = state.cache.draw(renderer, bounds.size(), |frame| {
             self.draw_map(state, theme, frame, bounds);
         });
@@ -107,7 +115,6 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                     Tool::Fill => Message::LayerEvent(LayerMessage::FillFromHex(coord)),
                 };
 
-                state.request_redraw();
                 Some(Action::publish(message).and_capture())
             }
 
@@ -141,13 +148,11 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                         Some(last) => {
                             state.translation.x += cursor_pos.x - last.x;
                             state.translation.y += cursor_pos.y - last.y;
-                            state.request_redraw();
                             return Some(Action::request_redraw().and_capture());
                         }
                     },
                 };
 
-                state.request_redraw();
                 Some(Action::publish(message).and_capture())
             }
 
@@ -157,7 +162,6 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                     mouse::ScrollDelta::Pixels { x, y } => x + y,
                 };
                 state.zoom = f32::clamp(state.zoom + delta * 0.01, 0.4, 10.0);
-                state.request_redraw();
                 Some(Action::request_redraw().and_capture())
             }
 
