@@ -9,7 +9,7 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::{EditorState, Message},
-    state::{Layer, LayerMessage, Layers, SparseTiles},
+    state::{Layer, LayerMessage, Layers, PerlinNoiseLayer, SparseTiles},
 };
 
 pub fn inspector_panel<'a>(layers: &Layers, editor_state: &EditorState) -> Element<'a, Message> {
@@ -45,7 +45,9 @@ pub fn inspector_panel<'a>(layers: &Layers, editor_state: &EditorState) -> Eleme
         crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
             sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
         }
-        crate::state::LayerInner::Perlin(perlin_noise_layer) => todo!(),
+        crate::state::LayerInner::Perlin(content) => {
+            perlin_noise_details(layer_id, starting_name, name, visible, content)
+        }
     };
 
     container(
@@ -73,31 +75,93 @@ fn sparse_tile_details<'a>(
     ]
 }
 
+fn perlin_noise_details<'a>(
+    layer_id: usize,
+    starting_name: &String,
+    name: &Option<String>,
+    visible: &bool,
+    content: &PerlinNoiseLayer,
+) -> Column<'a, Message> {
+    let PerlinNoiseLayer {
+        seed,
+        scale,
+        threshold,
+        ..
+    } = content;
+    let seed_controls = row![
+        button(bootstrap::arrow_clockwise())
+            .style(button::text)
+            .on_press_with(move || {
+                let new_seed = rand::random();
+                Message::LayerEvent(LayerMessage::EditLayerSeed(layer_id, new_seed))
+            }),
+        text(seed)
+    ]
+    .spacing(4.0)
+    .align_y(alignment::Vertical::Center);
+
+    let inverse_scale = 1.0 / scale;
+    let scale_controls = row![
+        text!("{inverse_scale:.2}").style(text::secondary),
+        slider(1.0..=10.0, inverse_scale, move |value| {
+            Message::LayerEvent(LayerMessage::EditLayerScale(layer_id, 1.0 / value))
+        })
+    ]
+    .spacing(8.0)
+    .align_y(alignment::Vertical::Center);
+
+    let threshold_controls = row![
+        text!("{threshold:.2} / 1.00").style(text::secondary),
+        slider(0.0..=100.0, threshold * 100.0, move |value| {
+            Message::LayerEvent(LayerMessage::EditLayerThreshold(layer_id, value / 100.0))
+        })
+    ]
+    .spacing(8.0)
+    .align_y(alignment::Vertical::Center);
+    column![
+        name_input(layer_id, starting_name, name),
+        visible_toggle(layer_id, visible),
+        text("Noise seed:"),
+        seed_controls,
+        text("Noise scale:"),
+        scale_controls,
+        text("Noise threshold:"),
+        threshold_controls
+    ]
+}
+
 fn name_input<'a>(
     layer_id: usize,
     starting_name: &String,
     name: &Option<String>,
 ) -> Row<'a, Message> {
-    let title: Element<'a, Message> = if let Some(name) = name {
-        text_input("Layer name...", &name)
-            .on_input(|s| Message::LayerRename(Some(s)))
-            .on_submit(Message::LayerRenameSubmit(layer_id))
-            .into()
+    if let Some(name) = name {
+        row![
+            bootstrap::input_cursor().style(text::secondary),
+            text_input("Layer name...", &name)
+                .on_input(|s| Message::LayerRename(Some(s)))
+                .on_submit(Message::LayerRenameSubmit(layer_id))
+                .width(Length::Fill)
+                .align_x(alignment::Horizontal::Center)
+        ]
+        .spacing(4.0)
+        .align_y(alignment::Vertical::Center)
     } else {
-        button(
-            row![
-                bootstrap::input_cursor().style(text::secondary),
-                text(starting_name.clone()).height(20.0)
-            ]
-            .spacing(4.0)
-            .align_y(alignment::Vertical::Center),
-        )
-        .on_press(Message::LayerRenameStart(starting_name.clone()))
-        .style(button::text)
-        .into()
-    };
-
-    row![space::horizontal(), title, space::horizontal()].into()
+        row![
+            space::horizontal(),
+            button(
+                row![
+                    bootstrap::input_cursor().style(text::secondary),
+                    text(starting_name.clone()).height(20.0)
+                ]
+                .spacing(4.0)
+                .align_y(alignment::Vertical::Center),
+            )
+            .on_press(Message::LayerRenameStart(starting_name.clone()))
+            .style(button::text),
+            space::horizontal()
+        ]
+    }
 }
 
 fn visible_toggle<'a>(layer_id: usize, visible: &bool) -> Row<'a, Message> {
@@ -133,7 +197,7 @@ fn colour_panel<'a>(layer_id: usize, active_colour: Color) -> Column<'a, Message
     let Color { r, g, b, a } = active_colour;
 
     let red_slider: Element<'_, Message> = slider(0.0..=1.0, r, move |value| {
-        Message::LayerEvent(LayerMessage::EditLayerColour(
+        Message::LayerEvent(LayerMessage::EditLayerFistColour(
             layer_id,
             Color { r: value, g, b, a },
         ))
@@ -142,7 +206,7 @@ fn colour_panel<'a>(layer_id: usize, active_colour: Color) -> Column<'a, Message
     .into();
 
     let green_slider: Element<'_, Message> = slider(0.0..=1.0, g, move |value| {
-        Message::LayerEvent(LayerMessage::EditLayerColour(
+        Message::LayerEvent(LayerMessage::EditLayerFistColour(
             layer_id,
             Color { r, g: value, b, a },
         ))
@@ -151,7 +215,7 @@ fn colour_panel<'a>(layer_id: usize, active_colour: Color) -> Column<'a, Message
     .into();
 
     let blue_slider: Element<'_, Message> = slider(0.0..=1.0, b, move |value| {
-        Message::LayerEvent(LayerMessage::EditLayerColour(
+        Message::LayerEvent(LayerMessage::EditLayerFistColour(
             layer_id,
             Color { r, g, b: value, a },
         ))
@@ -160,7 +224,7 @@ fn colour_panel<'a>(layer_id: usize, active_colour: Color) -> Column<'a, Message
     .into();
 
     let alpha_slider: Element<'_, Message> = slider(0.0..=1.0, a, move |value| {
-        Message::LayerEvent(LayerMessage::EditLayerColour(
+        Message::LayerEvent(LayerMessage::EditLayerFistColour(
             layer_id,
             Color { r, g, b, a: value },
         ))

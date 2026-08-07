@@ -75,7 +75,7 @@ pub fn export_png(layers: &Layers) -> Vec<u8> {
             crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
                 sparse_tiles.bounding_box(HEX_SIZE)
             }
-            crate::state::LayerInner::Perlin(perlin_noise_layer) => None,
+            crate::state::LayerInner::Perlin(_) => None,
         })
         .reduce(|acc, e| Rectangle::union(&acc, &e));
 
@@ -101,7 +101,6 @@ pub fn export_png(layers: &Layers) -> Vec<u8> {
     }
 
     // Draw all layers
-
     for layer in layers.get_visible_layers() {
         let (col_min, col_max, row_min, row_max) = rect_to_range(bounds, HEX_SIZE);
         let coords = hexes_in_range(col_min, col_max, row_min, row_max);

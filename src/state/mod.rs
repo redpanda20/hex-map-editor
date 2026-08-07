@@ -8,6 +8,7 @@ pub use hex::{HexBounds, flood_fill, hexes_in_range, rect_to_range};
 pub use layer::Layer;
 pub use layer::LayerInner;
 pub use layer::LayerMessage;
+pub use layer::LayerType;
 pub use layer::Layers;
 pub use layer::PerlinNoiseLayer;
 pub use layer::SparseTiles;

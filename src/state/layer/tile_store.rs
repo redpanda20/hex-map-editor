@@ -34,6 +34,10 @@ impl SparseTiles {
         self.tiles.remove(&coord);
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.tiles.is_empty()
+    }
+
     pub fn bounding_box(&self, hex_size: f32) -> Option<Rectangle> {
         let mut iter = self.tiles.iter();
         let first = iter.next()?.to_cartesian() * hex_size;

@@ -1,15 +1,21 @@
 use iced::{
     Element, Length, alignment,
-    widget::{Button, button, column, container, mouse_area, row, rule, scrollable, space, text},
+    widget::{
+        Button, button, column, container, mouse_area, pick_list, row, rule, scrollable, space,
+        text,
+    },
 };
 use iced_fonts::bootstrap;
 
 use crate::{
-    app::Message,
-    state::{Layer, LayerInner, LayerMessage, Layers, PerlinNoiseLayer, SparseTiles},
+    app::{EditorState, Message},
+    state::{Layer, LayerInner, LayerMessage, LayerType, Layers, PerlinNoiseLayer, SparseTiles},
 };
 
-pub fn layer_stack_panel<'a>(layers: &'a Layers) -> Element<'a, Message> {
+pub fn layer_stack_panel<'a>(
+    layers: &'a Layers,
+    editor_state: &EditorState,
+) -> Element<'a, Message> {
     let active_layer = layers.active_layer;
 
     let content = scrollable(
@@ -25,14 +31,27 @@ pub fn layer_stack_panel<'a>(layers: &'a Layers) -> Element<'a, Message> {
     )
     .height(Length::Fill);
 
-    let add_layer_button = button("Add Layer")
-        .width(Length::Fill)
-        .on_press(Message::LayerEvent(LayerMessage::AddDefaultLayer(
-            "Layer".to_string(),
-        )));
+    let add_layer_button = button(
+        row![bootstrap::plus_lg(), text("Add layer")]
+            .spacing(4.0)
+            .align_y(alignment::Vertical::Center),
+    )
+    .width(Length::Fill)
+    .on_press(Message::LayerEvent(LayerMessage::AddLayer(
+        "Layer".to_string(),
+        editor_state.active_layer_type,
+    )));
+
+    let add_layer_list = pick_list(
+        [LayerType::Tiles, LayerType::PerlinNoise],
+        Some(editor_state.active_layer_type),
+        Message::ChangeLayerType,
+    );
+
+    let add_layer = row![add_layer_button, add_layer_list].spacing(8.0);
 
     container(
-        column![rule::horizontal(1), content, add_layer_button]
+        column![rule::horizontal(1), content, add_layer]
             .height(Length::Fill)
             .width(Length::Fill)
             .spacing(8.0)
@@ -55,7 +74,7 @@ fn layer_preview<'a>(
 
     let layer_preview = match inner {
         LayerInner::Tiles(sparse_tiles) => preview_tiles(sparse_tiles),
-        LayerInner::InvertedTiles(sparse_tiles) => preview_tiles(sparse_tiles),
+        LayerInner::InvertedTiles(sparse_tiles) => preview_invert_tiles(sparse_tiles),
         LayerInner::Perlin(perlin_noise_layer) => preview_noise(perlin_noise_layer),
     };
 
@@ -99,15 +118,23 @@ fn preview_tiles<'a>(inner: &'a SparseTiles) -> Element<'a, Message> {
     let mut solid_colour = inner.get_colour();
     solid_colour.a = 1.0;
 
-    container(space())
-        .height(Length::Fixed(24.0))
-        .width(Length::Fixed(24.0))
-        .style(move |_theme| container::background(solid_colour))
-        .into()
+    match inner.is_empty() {
+        true => bootstrap::hexagon(),
+        false => bootstrap::hexagon_half(),
+    }
+    .color(solid_colour)
+    .into()
 }
 
-fn preview_noise<'a>(inner: &'a PerlinNoiseLayer) -> Element<'a, Message> {
-    text!("Noise").into()
+fn preview_invert_tiles<'a>(inner: &'a SparseTiles) -> Element<'a, Message> {
+    let mut solid_colour = inner.get_colour();
+    solid_colour.a = 1.0;
+
+    bootstrap::hexagon_fill().color(solid_colour).into()
+}
+
+fn preview_noise<'a>(_inner: &'a PerlinNoiseLayer) -> Element<'a, Message> {
+    bootstrap::sliderstwo().into()
 }
 
 fn delete_button<'a>(layer_id: usize) -> Button<'a, Message> {

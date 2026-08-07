@@ -9,12 +9,13 @@ use crate::{
         PaneType, ToastEvent, Toasts, canvas_panel, default_pane_config, inspector_panel,
         layer_stack_panel, toast_widget, toolbar_panel,
     },
-    state::{LayerMessage, Layers, Tool},
+    state::{LayerMessage, LayerType, Layers, Tool},
 };
 
 #[derive(Default, Debug)]
 pub struct EditorState {
     pub active_layer_name: Option<String>,
+    pub active_layer_type: LayerType,
 }
 
 pub struct App {
@@ -40,6 +41,7 @@ pub enum Message {
     LayerRenameStart(String),
     LayerRename(Option<String>),
     LayerRenameSubmit(usize),
+    ChangeLayerType(LayerType),
 
     PaneResized(pane_grid::ResizeEvent),
 
@@ -118,6 +120,9 @@ impl App {
                 }
                 self.editor_state.active_layer_name = None
             }
+            Message::ChangeLayerType(layer_type) => {
+                self.editor_state.active_layer_type = layer_type
+            }
         }
 
         Task::none()
@@ -127,7 +132,7 @@ impl App {
         let grid = pane_grid(&self.panes, |_id, state, _is_maximised| {
             let inner: Element<'_, Message> = match state {
                 PaneType::Toolbar => toolbar_panel(&self.active_tool),
-                PaneType::LayerStack => layer_stack_panel(&self.layers),
+                PaneType::LayerStack => layer_stack_panel(&self.layers, &self.editor_state),
                 PaneType::Canvas => canvas_panel(&self.layers, &self.active_tool),
                 PaneType::Inspector => inspector_panel(&self.layers, &self.editor_state),
             };

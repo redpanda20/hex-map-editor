@@ -15,6 +15,25 @@ const DEFAULT_COLORS: [Color; 5] = [
     Color::from_rgba8(245, 168, 200, 0.9),
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LayerType {
+    Tiles,
+    PerlinNoise,
+}
+impl Default for LayerType {
+    fn default() -> Self {
+        LayerType::Tiles
+    }
+}
+impl ToString for LayerType {
+    fn to_string(&self) -> String {
+        match self {
+            LayerType::Tiles => "Tile".to_string(),
+            LayerType::PerlinNoise => "Noise".to_string(),
+        }
+    }
+}
+
 pub enum LayerInner {
     Tiles(SparseTiles),
     InvertedTiles(SparseTiles),
@@ -59,7 +78,7 @@ pub struct Layer {
 
 #[derive(Debug, Clone)]
 pub enum LayerMessage {
-    AddDefaultLayer(String),
+    AddLayer(String, LayerType),
     RemoveLayer(usize),
     SwapLayers(usize, usize),
 
@@ -67,7 +86,10 @@ pub enum LayerMessage {
 
     EditLayerVisibility(usize, bool),
     EditLayerName(usize, String),
-    EditLayerColour(usize, Color),
+    EditLayerFistColour(usize, Color),
+    EditLayerSeed(usize, u64),
+    EditLayerScale(usize, f32),
+    EditLayerThreshold(usize, f32),
 
     PaintHex(HexCoord),
     EraseHex(HexCoord),
@@ -89,14 +111,8 @@ impl Default for Layers {
             inner,
         };
 
-        let perlin = Layer {
-            name: "Perlin Noise 1".to_string(),
-            visible: true,
-            inner: LayerInner::Perlin(PerlinNoiseLayer::new(15112001)),
-        };
-
         Self {
-            inner: vec![layer, perlin],
+            inner: vec![layer],
             active_layer: Some(0),
         }
     }
@@ -112,15 +128,27 @@ impl Layers {
     pub fn update(&mut self, message: LayerMessage) {
         match message {
             // --- Edit Layers ---
-            LayerMessage::AddDefaultLayer(name) => {
-                let colour = DEFAULT_COLORS[self.inner.len() % 5];
-                let new_layer = Layer {
-                    name: self.canonacalize_name(name),
-                    visible: true,
-                    inner: LayerInner::Tiles(SparseTiles::new(colour)),
+            LayerMessage::AddLayer(name, layer_type) => {
+                let name = self.canonacalize_name(name);
+                let visible = true;
+                let inner = match layer_type {
+                    LayerType::Tiles => {
+                        let colour = DEFAULT_COLORS[self.inner.len() % 5];
+                        LayerInner::Tiles(SparseTiles::new(colour))
+                    }
+                    LayerType::PerlinNoise => {
+                        let seed = rand::random();
+                        LayerInner::Perlin(PerlinNoiseLayer::new(seed))
+                    }
                 };
-                self.inner.push(new_layer);
+
+                self.inner.push(Layer {
+                    name,
+                    visible,
+                    inner,
+                });
             }
+
             LayerMessage::RemoveLayer(index) => {
                 if index >= self.inner.len() {
                     return;
@@ -148,14 +176,45 @@ impl Layers {
                     layer.name = new_name
                 }
             }
-            LayerMessage::EditLayerColour(index, new_colour) => {
+            LayerMessage::EditLayerFistColour(index, new_colour) => {
                 if let Some(layer) = self.inner.get_mut(index) {
                     match &mut layer.inner {
                         LayerInner::Tiles(sparse_tiles) => sparse_tiles.set_colour(new_colour),
                         LayerInner::InvertedTiles(sparse_tiles) => {
                             sparse_tiles.set_colour(new_colour)
                         }
-                        LayerInner::Perlin(perlin_noise_layer) => todo!(),
+                        LayerInner::Perlin(_) => todo!(),
+                    }
+                }
+            }
+            // --- Edit Layer Properties (Proc gen) ---
+            LayerMessage::EditLayerSeed(index, new_seed) => {
+                if let Some(layer) = self.inner.get_mut(index) {
+                    match &mut layer.inner {
+                        LayerInner::Tiles(_) | LayerInner::InvertedTiles(_) => (),
+                        LayerInner::Perlin(perlin_noise_layer) => {
+                            perlin_noise_layer.set_seed(new_seed)
+                        }
+                    }
+                }
+            }
+            LayerMessage::EditLayerScale(index, new_scale) => {
+                if let Some(layer) = self.inner.get_mut(index) {
+                    match &mut layer.inner {
+                        LayerInner::Tiles(_) | LayerInner::InvertedTiles(_) => (),
+                        LayerInner::Perlin(perlin_noise_layer) => {
+                            perlin_noise_layer.set_scale(new_scale);
+                        }
+                    }
+                }
+            }
+            LayerMessage::EditLayerThreshold(index, new_threshold) => {
+                if let Some(layer) = self.inner.get_mut(index) {
+                    match &mut layer.inner {
+                        LayerInner::Tiles(_) | LayerInner::InvertedTiles(_) => (),
+                        LayerInner::Perlin(perlin_noise_layer) => {
+                            perlin_noise_layer.set_threshold(new_threshold);
+                        }
                     }
                 }
             }
@@ -170,7 +229,7 @@ impl Layers {
                         LayerInner::Tiles(store) => store.paint(hex_coord),
                         LayerInner::InvertedTiles(store) => store.erase(hex_coord),
                         // Noise layer cannot be drawn to
-                        LayerInner::Perlin(perlin_noise_layer) => (),
+                        LayerInner::Perlin(_) => (),
                     }
                 }
             }
@@ -183,7 +242,7 @@ impl Layers {
                         LayerInner::Tiles(store) => store.erase(hex_coord),
                         LayerInner::InvertedTiles(store) => store.paint(hex_coord),
                         // Noise layer cannot be drawn changed
-                        LayerInner::Perlin(perlin_noise_layer) => (),
+                        LayerInner::Perlin(_) => (),
                     }
                 }
             }

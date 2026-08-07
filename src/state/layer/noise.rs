@@ -13,11 +13,11 @@ enum NoiseOctaves {
 const TABLE_SIZE: usize = 64;
 
 pub struct PerlinNoiseLayer {
-    _seed: u64,
+    pub seed: u64,
     gradient_table: [Vector; TABLE_SIZE],
-    threshold: f32,
+    pub threshold: f32,
 
-    _scale: f32,
+    pub scale: f32,
     _octaves: NoiseOctaves,
 }
 
@@ -32,10 +32,10 @@ impl PerlinNoiseLayer {
         });
 
         Self {
-            _seed: seed,
+            seed,
             gradient_table,
-            threshold: 0.0,
-            _scale: 1.0,
+            threshold: 1.0,
+            scale: 5.0,
             _octaves: NoiseOctaves::One,
         }
     }
@@ -43,6 +43,8 @@ impl PerlinNoiseLayer {
     /// Samples perlin noise at a given x,y coordinate
     /// Returns a float the range [-1, 1]
     fn sample(&self, x: f32, y: f32) -> f32 {
+        let (x, y) = (x * self.scale, y * self.scale);
+
         let (x0, y0) = (x.floor(), y.floor());
         let (x1, y1) = (x0 + 1.0, y0 + 1.0);
         let (u, v) = (x - x0, y - y0);
@@ -96,17 +98,44 @@ fn dot(lhs: Vector, rhs: Vector) -> f32 {
 
 impl PerlinNoiseLayer {
     pub fn exists_at(&self, location: &HexCoord) -> bool {
-        true
+        let Vector { x, y } = location.to_cartesian();
+        let sample = self.sample(x, y);
+        let normalized = sample * 0.5 + 0.5;
+        normalized >= self.threshold
     }
 
     pub fn colour_at(&self, location: &HexCoord) -> Color {
         let Vector { x, y } = location.to_cartesian();
         let sample = self.sample(x, y);
         let normalized = sample * 0.5 + 0.5;
-        Color::from_linear_rgba(normalized, normalized, normalized, 1.0)
+        Color::from_rgb(normalized, normalized, normalized)
     }
 
     pub fn get_bounds(&self) -> Option<HexBounds> {
         None
+    }
+}
+
+impl PerlinNoiseLayer {
+    pub fn set_seed(&mut self, seed: u64) {
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let gradient_table: [Vector; TABLE_SIZE] = std::array::from_fn(|_| {
+            let x = rng.random::<f32>() * 2.0 - 1.0;
+            let y = rng.random::<f32>() * 2.0 - 1.0;
+            let size = (x * x + y * y).sqrt();
+            Vector::new(x / size, y / size)
+        });
+
+        self.seed = seed;
+        self.gradient_table = gradient_table
+    }
+
+    pub fn set_scale(&mut self, scale: f32) {
+        self.scale = scale
+    }
+
+    /// Expects a threshold between 0 and 1 inclusive
+    pub fn set_threshold(&mut self, threshold: f32) {
+        self.threshold = threshold
     }
 }
