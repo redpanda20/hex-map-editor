@@ -18,6 +18,7 @@ iced = { version = "0.14", features = ["canvas", "tokio"] }
 iced = { version = "0.14", features = ["canvas", "webgl"] }
 console_error_panic_hook = "0.1"
 wasmtimer = "0.4.3"
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
 
 # Windows cross-compilation target
 [target.x86_64-pc-windows-gnu]
