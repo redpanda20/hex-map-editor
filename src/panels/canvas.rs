@@ -148,6 +148,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                         Some(last) => {
                             state.translation.x += cursor_pos.x - last.x;
                             state.translation.y += cursor_pos.y - last.y;
+                            state.cache.clear();
                             return Some(Action::request_redraw().and_capture());
                         }
                     },
