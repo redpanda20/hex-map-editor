@@ -1,5 +1,5 @@
 use iced::{
-    Color, Element, Length, alignment,
+    Color, Element, Length, alignment, padding,
     widget::{
         Column, Row, button, column, container, responsive, row, rule, slider, space, text,
         text_input,
@@ -86,6 +86,7 @@ fn perlin_noise_details<'a>(
         seed,
         scale,
         threshold,
+        octaves,
         ..
     } = content;
     let seed_controls = row![
@@ -95,7 +96,7 @@ fn perlin_noise_details<'a>(
                 let new_seed = rand::random();
                 Message::LayerEvent(LayerMessage::EditLayerSeed(layer_id, new_seed))
             }),
-        text(seed)
+        text(seed).style(text::secondary)
     ]
     .spacing(4.0)
     .align_y(alignment::Vertical::Center);
@@ -103,7 +104,7 @@ fn perlin_noise_details<'a>(
     let inverse_scale = 1.0 / scale;
     let scale_controls = row![
         text!("{inverse_scale:.2}").style(text::secondary),
-        slider(1.0..=10.0, inverse_scale, move |value| {
+        slider(1.0..=20.0, inverse_scale, move |value| {
             Message::LayerEvent(LayerMessage::EditLayerScale(layer_id, 1.0 / value))
         })
     ]
@@ -118,15 +119,52 @@ fn perlin_noise_details<'a>(
     ]
     .spacing(8.0)
     .align_y(alignment::Vertical::Center);
+
+    let (octave_count, persistence) = match octaves {
+        crate::state::NoiseOctaves::One => (1, 0.0),
+        crate::state::NoiseOctaves::Many { count, persistence } => (*count as i32, *persistence),
+    };
+    let mut octave_controls = column![];
+
+    octave_controls = octave_controls.push(text("Count:"));
+    octave_controls = octave_controls.push(
+        row![
+            text!("{octave_count}").style(text::secondary),
+            slider(1..=8, octave_count, move |value| {
+                Message::LayerEvent(LayerMessage::EditLayerOctaves(layer_id, value as usize))
+            })
+        ]
+        .spacing(8.0)
+        .align_y(alignment::Vertical::Center),
+    );
+
+    if octave_count > 1 {
+        octave_controls = octave_controls.push(text("Persistence:"));
+        octave_controls = octave_controls.push(
+            row![
+                text!("{persistence:.2} / 1.00").style(text::secondary),
+                slider(1.0..=10.0, persistence * 10.0, move |value| {
+                    Message::LayerEvent(LayerMessage::EditLayerPersistence(layer_id, value / 10.0))
+                })
+            ]
+            .spacing(8.0)
+            .align_y(alignment::Vertical::Center),
+        );
+    }
+
     column![
         name_input(layer_id, starting_name, name),
         visible_toggle(layer_id, visible),
-        text("Noise seed:"),
+        text("Noise"),
+        rule::horizontal(1),
+        text("Seed:"),
         seed_controls,
-        text("Noise scale:"),
+        text("Scale:"),
         scale_controls,
-        text("Noise threshold:"),
-        threshold_controls
+        text("Threshold:"),
+        threshold_controls,
+        column![text("Octaves:"), rule::horizontal(1), octave_controls,]
+            .padding(padding::top(16.0))
     ]
 }
 

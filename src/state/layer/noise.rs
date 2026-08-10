@@ -5,7 +5,7 @@ use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use crate::state::{HexBounds, HexCoord};
 
-enum NoiseOctaves {
+pub enum NoiseOctaves {
     One,
     Many { count: usize, persistence: f32 },
 }
@@ -15,10 +15,10 @@ const TABLE_SIZE: usize = 64;
 pub struct PerlinNoiseLayer {
     pub seed: u64,
     gradient_table: [Vector; TABLE_SIZE],
-    pub threshold: f32,
 
+    pub threshold: f32,
     pub scale: f32,
-    _octaves: NoiseOctaves,
+    pub octaves: NoiseOctaves,
 }
 
 impl PerlinNoiseLayer {
@@ -34,16 +34,44 @@ impl PerlinNoiseLayer {
         Self {
             seed,
             gradient_table,
-            threshold: 1.0,
-            scale: 5.0,
-            _octaves: NoiseOctaves::One,
+            threshold: 0.0,
+            scale: 0.2,
+            octaves: NoiseOctaves::One,
         }
     }
 
-    /// Samples perlin noise at a given x,y coordinate
-    /// Returns a float the range [-1, 1]
     fn sample(&self, x: f32, y: f32) -> f32 {
-        let (x, y) = (x * self.scale, y * self.scale);
+        match self.octaves {
+            NoiseOctaves::One => self.sample_octave(x, y, 1.0),
+            NoiseOctaves::Many { count, persistence } => {
+                let mut total = 0.0;
+                let mut frequency = 1.0;
+                let mut amplitude = 1.0;
+                let mut max_amplitude = 0.0;
+
+                for _ in 0..count {
+                    total += self.sample_octave(x, y, frequency) * amplitude;
+                    max_amplitude += amplitude;
+
+                    amplitude *= persistence;
+                    frequency *= 2.0;
+                }
+
+                if max_amplitude > 0.0 {
+                    total / max_amplitude
+                } else {
+                    total
+                }
+            }
+        }
+    }
+
+    /// Samples a single octavte of perlin noise
+    /// (x, y)      Coordinates of the sample
+    /// frequency   Multiplier of the fundamental frequency
+    /// Returns a float the range [-1, 1]
+    fn sample_octave(&self, x: f32, y: f32, frequency: f32) -> f32 {
+        let (x, y) = (x * self.scale * frequency, y * self.scale * frequency);
 
         let (x0, y0) = (x.floor(), y.floor());
         let (x1, y1) = (x0 + 1.0, y0 + 1.0);
@@ -137,5 +165,13 @@ impl PerlinNoiseLayer {
     /// Expects a threshold between 0 and 1 inclusive
     pub fn set_threshold(&mut self, threshold: f32) {
         self.threshold = threshold
+    }
+
+    pub fn set_single_octave(&mut self) {
+        self.octaves = NoiseOctaves::One
+    }
+
+    pub fn set_octaves(&mut self, count: usize, persistence: f32) {
+        self.octaves = NoiseOctaves::Many { count, persistence }
     }
 }

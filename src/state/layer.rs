@@ -1,11 +1,10 @@
-mod noise;
+pub mod noise;
 mod tile_store;
 
 use iced::Color;
-pub use noise::PerlinNoiseLayer;
 pub use tile_store::SparseTiles;
 
-use crate::state::{HexCoord, flood_fill};
+use crate::state::{HexCoord, PerlinNoiseLayer, flood_fill};
 
 const DEFAULT_COLORS: [Color; 5] = [
     Color::from_rgba8(245, 196, 168, 0.9),
@@ -90,6 +89,8 @@ pub enum LayerMessage {
     EditLayerSeed(usize, u64),
     EditLayerScale(usize, f32),
     EditLayerThreshold(usize, f32),
+    EditLayerOctaves(usize, usize),
+    EditLayerPersistence(usize, f32),
 
     PaintHex(HexCoord),
     EraseHex(HexCoord),
@@ -201,34 +202,71 @@ impl Layers {
                 }
             }
             // --- Edit Layer Properties (Proc gen) ---
-            LayerMessage::EditLayerSeed(index, new_seed) => {
-                if let Some(layer) = self.inner.get_mut(index) {
-                    match &mut layer.inner {
-                        LayerInner::Tiles(_) | LayerInner::InvertedTiles(_) => (),
-                        LayerInner::Perlin(perlin_noise_layer) => {
-                            perlin_noise_layer.set_seed(new_seed)
-                        }
+            LayerMessage::EditLayerSeed(index, seed) => match self.inner.get_mut(index) {
+                Some(Layer {
+                    name: _,
+                    visible: _,
+                    inner: LayerInner::Perlin(perlin_noise_layer),
+                }) => {
+                    perlin_noise_layer.set_seed(seed);
+                }
+                _ => (),
+            },
+            LayerMessage::EditLayerScale(index, scale) => match self.inner.get_mut(index) {
+                Some(Layer {
+                    name: _,
+                    visible: _,
+                    inner: LayerInner::Perlin(perlin_noise_layer),
+                }) => {
+                    perlin_noise_layer.set_scale(scale);
+                }
+                _ => (),
+            },
+            LayerMessage::EditLayerThreshold(index, threshold) => match self.inner.get_mut(index) {
+                Some(Layer {
+                    name: _,
+                    visible: _,
+                    inner: LayerInner::Perlin(perlin_noise_layer),
+                }) => {
+                    perlin_noise_layer.set_threshold(threshold);
+                }
+                _ => (),
+            },
+            LayerMessage::EditLayerOctaves(index, count) => match self.inner.get_mut(index) {
+                Some(Layer {
+                    name: _,
+                    visible: _,
+                    inner: LayerInner::Perlin(perlin_noise_layer),
+                }) => {
+                    let current_persistence = match &mut perlin_noise_layer.octaves {
+                        noise::NoiseOctaves::One => None,
+                        noise::NoiseOctaves::Many {
+                            count: _,
+                            persistence,
+                        } => Some(*persistence),
+                    };
+                    if count == 1 {
+                        perlin_noise_layer.set_single_octave();
+                    } else {
+                        perlin_noise_layer.set_octaves(count, current_persistence.unwrap_or(0.5));
                     }
                 }
-            }
-            LayerMessage::EditLayerScale(index, new_scale) => {
-                if let Some(layer) = self.inner.get_mut(index) {
-                    match &mut layer.inner {
-                        LayerInner::Tiles(_) | LayerInner::InvertedTiles(_) => (),
-                        LayerInner::Perlin(perlin_noise_layer) => {
-                            perlin_noise_layer.set_scale(new_scale);
-                        }
-                    }
-                }
-            }
-            LayerMessage::EditLayerThreshold(index, new_threshold) => {
-                if let Some(layer) = self.inner.get_mut(index) {
-                    match &mut layer.inner {
-                        LayerInner::Tiles(_) | LayerInner::InvertedTiles(_) => (),
-                        LayerInner::Perlin(perlin_noise_layer) => {
-                            perlin_noise_layer.set_threshold(new_threshold);
-                        }
-                    }
+                _ => (),
+            },
+            LayerMessage::EditLayerPersistence(index, new_persistence) => {
+                match self.inner.get_mut(index) {
+                    Some(Layer {
+                        name: _,
+                        visible: _,
+                        inner: LayerInner::Perlin(perlin_noise_layer),
+                    }) => match &mut perlin_noise_layer.octaves {
+                        noise::NoiseOctaves::One => (),
+                        noise::NoiseOctaves::Many {
+                            count: _,
+                            persistence,
+                        } => *persistence = new_persistence,
+                    },
+                    _ => (),
                 }
             }
 

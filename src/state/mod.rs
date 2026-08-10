@@ -10,7 +10,8 @@ pub use layer::LayerInner;
 pub use layer::LayerMessage;
 pub use layer::LayerType;
 pub use layer::Layers;
-pub use layer::PerlinNoiseLayer;
 pub use layer::SparseTiles;
+
+pub use layer::noise::{NoiseOctaves, PerlinNoiseLayer};
 
 pub use tool::Tool;
