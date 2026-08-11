@@ -9,6 +9,7 @@ use crate::{
         PaneType, ToastEvent, Toasts, canvas_panel, default_pane_config, inspector_panel,
         layer_stack_panel, toast_widget, toolbar_panel,
     },
+    persistence::{Document, load_project_async, save_project_async},
     state::{LayerMessage, LayerType, Layers, Tool},
 };
 
@@ -48,6 +49,14 @@ pub enum Message {
     ExportPng,
     ExportCancelled,
     Exported(Result<(), String>),
+
+    SaveProject,
+    ProjectSaveCancelled,
+    ProjectSaved(Result<(), String>),
+
+    LoadProject,
+    ProjectLoadCancelled,
+    ProjectLoaded(Result<Document, String>),
 }
 
 impl App {
@@ -99,10 +108,33 @@ impl App {
                 let bytes = export_png(&self.layers);
                 return save_bytes_async(bytes, "hexmap.png");
             }
-            Message::ExportCancelled => {}
+            Message::ExportCancelled => {
+                eprintln!("Export cancelled");
+            }
             Message::Exported(result) => match result {
                 Ok(_) => eprintln!("Export succeeded"),
                 Err(err) => eprintln!("Export failed: {err}"),
+            },
+
+            Message::SaveProject => return save_project_async(&self.layers),
+            Message::ProjectSaveCancelled => {
+                eprintln!("Project save cancelled");
+            }
+            Message::ProjectSaved(result) => match result {
+                Ok(_) => eprintln!("Save succeeded"),
+                Err(err) => eprintln!("Save failed: {err}"),
+            },
+
+            Message::LoadProject => return load_project_async(),
+            Message::ProjectLoadCancelled => {
+                eprintln!("Project load cancelled");
+            }
+            Message::ProjectLoaded(result) => match result {
+                Ok(document) => {
+                    self.layers = Layers::from(document);
+                    self.editor_state = EditorState::default();
+                }
+                Err(err) => eprintln!("Load failed: {err}"),
             },
             Message::PaneResized(resize_event) => {
                 let pane_grid::ResizeEvent { split, ratio } = resize_event;

@@ -18,6 +18,10 @@ impl SparseTiles {
         }
     }
 
+    pub fn new_from_existing(colour: Color, tiles: HashSet<HexCoord>) -> Self {
+        SparseTiles { tiles, colour }
+    }
+
     pub fn get_colour(&self) -> Color {
         self.colour
     }

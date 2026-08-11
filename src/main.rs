@@ -5,6 +5,7 @@ mod app;
 mod compat;
 mod export;
 mod panels;
+mod persistence;
 mod state;
 
 use app::App;

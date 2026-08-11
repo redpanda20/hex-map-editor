@@ -111,6 +111,36 @@ impl ToastManager {
                 "Export Complete".to_string(),
                 "Map exported successfully.".to_string(),
             ),
+
+            Message::SaveProject => {
+                self.add_toast("Saving".to_string(), "Saving project...".to_string())
+            }
+            Message::ProjectSaveCancelled => self.add_toast(
+                "Save Cancelled".to_string(),
+                "Save cancelled by user.".to_string(),
+            ),
+            Message::ProjectSaved(Ok(_)) => self.add_toast(
+                "Save Complete".to_string(),
+                "Project saved successfully.".to_string(),
+            ),
+            Message::ProjectSaved(Err(err)) => {
+                self.add_toast("Save Failed".to_string(), err.clone())
+            }
+
+            Message::LoadProject => {
+                self.add_toast("Opening".to_string(), "Opening project...".to_string())
+            }
+            Message::ProjectLoadCancelled => self.add_toast(
+                "Open Cancelled".to_string(),
+                "Open cancelled by user.".to_string(),
+            ),
+            Message::ProjectLoaded(Ok(_)) => self.add_toast(
+                "Project Loaded".to_string(),
+                "Project loaded successfully.".to_string(),
+            ),
+            Message::ProjectLoaded(Err(err)) => {
+                self.add_toast("Open Failed".to_string(), err.clone())
+            }
             _ => (),
         }
     }

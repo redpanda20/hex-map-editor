@@ -123,6 +123,14 @@ impl Default for Layers {
 }
 
 impl Layers {
+    pub fn replace_layers(inner: Vec<Layer>) -> Self {
+        Self {
+            inner,
+            active_layer: None,
+            revision: 1,
+        }
+    }
+
     /// TODO: Check which names are in use and pick the smallest number
     fn canonacalize_name(&self, name: String) -> String {
         let layer_count = self.inner.len() + 1;
