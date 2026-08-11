@@ -9,7 +9,7 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::{EditorState, Message},
-    state::{Layer, LayerInner, LayerMessage, LayerType, Scene, PerlinNoiseLayer, SparseTiles},
+    domain::{Layer, LayerInner, LayerMessage, LayerType, PerlinNoiseLayer, Scene, SparseTiles},
 };
 
 pub fn layer_stack_panel<'a>(

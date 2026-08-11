@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use iced::{Color, Rectangle};
 
-use crate::state::{HexBounds, HexCoord};
+use crate::domain::{HexBounds, HexCoord};
 
 #[derive(Debug, Clone)]
 pub struct SparseTiles {

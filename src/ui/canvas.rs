@@ -10,7 +10,7 @@ use iced::{
 
 use crate::{
     app::Message,
-    state::{HexCoord, LayerMessage, Scene, Tool, hexes_in_range},
+    domain::{HexCoord, LayerMessage, Scene, Tool, hexes_in_range},
 };
 
 pub fn canvas_panel<'a>(layers: &'a Scene, tool: &'a Tool) -> Element<'a, Message> {

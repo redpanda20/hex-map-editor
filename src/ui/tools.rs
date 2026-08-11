@@ -4,7 +4,7 @@ use iced::{
 };
 use iced_fonts::bootstrap;
 
-use crate::{app::Message, state::Tool};
+use crate::{app::Message, domain::Tool};
 
 pub fn toolbar_panel(current_tool: &Tool) -> Element<'_, Message> {
     let brush_tool = button(bootstrap::brush())

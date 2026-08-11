@@ -4,7 +4,7 @@ mod tile_store;
 use iced::Color;
 pub use tile_store::SparseTiles;
 
-use crate::state::{HexCoord, PerlinNoiseLayer, flood_fill};
+use crate::domain::{HexCoord, PerlinNoiseLayer, flood_fill};
 
 const DEFAULT_COLORS: [Color; 5] = [
     Color::from_rgba8(245, 196, 168, 0.9),

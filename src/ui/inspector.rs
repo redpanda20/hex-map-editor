@@ -9,7 +9,7 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::{EditorState, Message},
-    state::{Layer, LayerMessage, Scene, PerlinNoiseLayer, SparseTiles},
+    domain::{Layer, LayerMessage, PerlinNoiseLayer, Scene, SparseTiles},
 };
 
 pub fn inspector_panel<'a>(layers: &Scene, editor_state: &EditorState) -> Element<'a, Message> {
@@ -39,13 +39,13 @@ pub fn inspector_panel<'a>(layers: &Scene, editor_state: &EditorState) -> Elemen
     let name = &editor_state.active_layer_name;
 
     let content = match inner {
-        crate::state::LayerInner::Tiles(sparse_tiles) => {
+        crate::domain::LayerInner::Tiles(sparse_tiles) => {
             sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
         }
-        crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
+        crate::domain::LayerInner::InvertedTiles(sparse_tiles) => {
             sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
         }
-        crate::state::LayerInner::Perlin(content) => {
+        crate::domain::LayerInner::Perlin(content) => {
             perlin_noise_details(layer_id, starting_name, name, visible, content)
         }
     };
@@ -121,8 +121,8 @@ fn perlin_noise_details<'a>(
     .align_y(alignment::Vertical::Center);
 
     let (octave_count, persistence) = match octaves {
-        crate::state::NoiseOctaves::One => (1, 0.0),
-        crate::state::NoiseOctaves::Many { count, persistence } => (*count as i32, *persistence),
+        crate::domain::NoiseOctaves::One => (1, 0.0),
+        crate::domain::NoiseOctaves::Many { count, persistence } => (*count as i32, *persistence),
     };
     let mut octave_controls = column![];
 

@@ -3,7 +3,7 @@ use image::EncodableLayout;
 use rfd::AsyncFileDialog;
 
 use crate::app::Message;
-use crate::state::Scene;
+use crate::domain::Scene;
 
 use super::schema::{self, LoadError, SceneV1};
 
@@ -37,11 +37,24 @@ pub fn save_project_async(layers: &Scene) -> Task<Message> {
     })
 }
 
-async fn write_future(handle: rfd::FileHandle, bytes: Vec<u8>) -> Result<(), String> {
-    handle
-        .write(bytes.as_bytes())
-        .await
-        .map_err(|err| err.to_string())
+pub fn save_bytes_async(bytes: Vec<u8>, default_name: &str) -> Task<Message> {
+    use rfd::AsyncFileDialog;
+
+    Task::future(
+        AsyncFileDialog::new()
+            .set_file_name(default_name)
+            .set_title("Export to PNG")
+            .save_file(),
+    )
+    .then(move |handle| {
+        let inner_bytes = bytes.clone();
+        match handle {
+            Some(file_handle) => {
+                Task::perform(write_future(file_handle, inner_bytes), Message::Exported)
+            }
+            None => Task::done(Message::ExportCancelled),
+        }
+    })
 }
 
 /// Opens a load dialog and parses the chosen file into a save document.
@@ -61,4 +74,11 @@ pub fn load_project_async() -> Task<Message> {
 async fn read_future(handle: rfd::FileHandle) -> Result<SceneV1, String> {
     let bytes = handle.read().await;
     schema::deserialize(&bytes).map_err(|err: LoadError| err.to_string())
+}
+
+async fn write_future(handle: rfd::FileHandle, bytes: Vec<u8>) -> Result<(), String> {
+    handle
+        .write(bytes.as_bytes())
+        .await
+        .map_err(|err| err.to_string())
 }

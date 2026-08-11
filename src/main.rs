@@ -2,11 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
-mod compat;
-mod export;
-mod panels;
-mod persistence;
-mod state;
+pub mod domain;
+pub mod infrastructure;
+pub mod ui;
 
 use app::App;
 

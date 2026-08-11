@@ -1,5 +1,3 @@
-use crate::compat::{Duration, Instant};
-
 use iced::{
     Element, Length, Subscription, Task,
     widget::{button, column, container, row, space, text, tooltip},
@@ -7,6 +5,7 @@ use iced::{
 use iced_fonts::bootstrap;
 
 use crate::app::Message;
+use crate::infrastructure::{Duration, Instant};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 

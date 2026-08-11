@@ -4,13 +4,14 @@ use iced::{
 };
 
 use crate::{
-    export::{export_png, save_bytes_async},
-    panels::{
+    domain::{LayerMessage, LayerType, Scene, Tool},
+    infrastructure::{
+        SceneV1, export_png, load_project_async, save_bytes_async, save_project_async,
+    },
+    ui::{
         PaneType, ToastEvent, Toasts, canvas_panel, default_pane_config, inspector_panel,
         layer_stack_panel, toast_widget, toolbar_panel,
     },
-    persistence::{SceneV1, load_project_async, save_project_async},
-    state::{LayerMessage, LayerType, Scene, Tool},
 };
 
 #[derive(Default, Debug)]

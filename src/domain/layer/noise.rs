@@ -3,7 +3,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use iced::{Color, Vector};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
-use crate::state::{HexBounds, HexCoord};
+use crate::domain::{HexBounds, HexCoord};
 
 pub enum NoiseOctaves {
     One,
