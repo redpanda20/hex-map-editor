@@ -9,8 +9,8 @@ use crate::{
         PaneType, ToastEvent, Toasts, canvas_panel, default_pane_config, inspector_panel,
         layer_stack_panel, toast_widget, toolbar_panel,
     },
-    persistence::{Document, load_project_async, save_project_async},
-    state::{LayerMessage, LayerType, Layers, Tool},
+    persistence::{SceneV1, load_project_async, save_project_async},
+    state::{LayerMessage, LayerType, Scene, Tool},
 };
 
 #[derive(Default, Debug)]
@@ -20,7 +20,7 @@ pub struct EditorState {
 }
 
 pub struct App {
-    layers: Layers,
+    layers: Scene,
     active_tool: Tool,
     editor_state: EditorState,
 
@@ -56,7 +56,7 @@ pub enum Message {
 
     LoadProject,
     ProjectLoadCancelled,
-    ProjectLoaded(Result<Document, String>),
+    ProjectLoaded(Result<SceneV1, String>),
 }
 
 impl App {
@@ -64,7 +64,7 @@ impl App {
         let panes = pane_grid::State::with_configuration(default_pane_config());
 
         let app = Self {
-            layers: Layers::default(),
+            layers: Scene::default(),
             editor_state: EditorState::default(),
             toasts: Toasts::new(),
             panes,
@@ -131,7 +131,7 @@ impl App {
             }
             Message::ProjectLoaded(result) => match result {
                 Ok(document) => {
-                    self.layers = Layers::from(document);
+                    self.layers = Scene::from(document);
                     self.editor_state = EditorState::default();
                 }
                 Err(err) => eprintln!("Load failed: {err}"),

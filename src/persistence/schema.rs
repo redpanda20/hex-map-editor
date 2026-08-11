@@ -16,7 +16,7 @@ const FORMAT_ID: &str = "hex-map-editor";
 
 /// Bump whenever `Document` changes
 pub const CURRENT_VERSION: u32 = 1;
-pub type Document = DocumentV1;
+pub type SceneV1 = DocumentV1;
 
 /// The envelope written to disk
 ///
@@ -63,7 +63,7 @@ impl From<serde_json::Error> for LoadError {
 }
 
 /// Serializes the given document into the on-disk envelope format.
-pub fn serialize(document: &Document) -> serde_json::Result<Vec<u8>> {
+pub fn serialize(document: &SceneV1) -> serde_json::Result<Vec<u8>> {
     let envelope = Envelope {
         format: FORMAT_ID.to_string(),
         version: CURRENT_VERSION,
@@ -73,7 +73,7 @@ pub fn serialize(document: &Document) -> serde_json::Result<Vec<u8>> {
 }
 
 /// Parses bytes from disk into the latest [`Document`]
-pub fn deserialize(bytes: &[u8]) -> Result<Document, LoadError> {
+pub fn deserialize(bytes: &[u8]) -> Result<SceneV1, LoadError> {
     let envelope: Envelope =
         serde_json::from_slice(bytes).map_err(|_| LoadError::NotAProjectFile)?;
 
@@ -85,7 +85,7 @@ pub fn deserialize(bytes: &[u8]) -> Result<Document, LoadError> {
 }
 
 /// Migrates a payload of the given `version` up to [`Document`] (`CURRENT_VERSION`).
-fn migrate_to_latest(version: u32, data: Value) -> Result<Document, LoadError> {
+fn migrate_to_latest(version: u32, data: Value) -> Result<SceneV1, LoadError> {
     match version {
         1 => Ok(serde_json::from_value::<DocumentV1>(data)?),
 

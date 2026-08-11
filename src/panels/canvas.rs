@@ -10,10 +10,10 @@ use iced::{
 
 use crate::{
     app::Message,
-    state::{HexCoord, LayerMessage, Layers, Tool, hexes_in_range},
+    state::{HexCoord, LayerMessage, Scene, Tool, hexes_in_range},
 };
 
-pub fn canvas_panel<'a>(layers: &'a Layers, tool: &'a Tool) -> Element<'a, Message> {
+pub fn canvas_panel<'a>(layers: &'a Scene, tool: &'a Tool) -> Element<'a, Message> {
     let hex_canvas = HexCanvas {
         layers,
         tool,
@@ -27,7 +27,7 @@ pub fn canvas_panel<'a>(layers: &'a Layers, tool: &'a Tool) -> Element<'a, Messa
 }
 
 pub struct HexCanvas<'a> {
-    pub layers: &'a Layers,
+    pub layers: &'a Scene,
     pub tool: &'a Tool,
     pub hex_size: f32,
 }

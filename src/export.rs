@@ -3,7 +3,7 @@ use image::{EncodableLayout, ImageBuffer, Rgba};
 
 use crate::{
     app::Message,
-    state::{Layers, hexes_in_range, rect_to_range},
+    state::{Scene, hexes_in_range, rect_to_range},
 };
 
 const HEX_SIZE: f32 = 100.0;
@@ -65,7 +65,7 @@ fn point_in_polygon(x: f32, y: f32, verticies: &[(f32, f32)]) -> bool {
     inside
 }
 
-pub fn export_png(layers: &Layers) -> Vec<u8> {
+pub fn export_png(layers: &Scene) -> Vec<u8> {
     // Determine bounding box of all painted tiles
     let bounds = layers
         .get_visible_layers()

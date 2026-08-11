@@ -97,14 +97,14 @@ pub enum LayerMessage {
     FillFromHex(HexCoord),
 }
 
-pub struct Layers {
+pub struct Scene {
     pub inner: Vec<Layer>,
     pub active_layer: Option<usize>,
 
     revision: u64,
 }
 
-impl Default for Layers {
+impl Default for Scene {
     fn default() -> Self {
         let inner = LayerInner::Tiles(tile_store::SparseTiles::new(DEFAULT_COLORS[0]));
 
@@ -122,7 +122,7 @@ impl Default for Layers {
     }
 }
 
-impl Layers {
+impl Scene {
     pub fn replace_layers(inner: Vec<Layer>) -> Self {
         Self {
             inner,

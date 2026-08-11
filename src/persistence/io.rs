@@ -3,16 +3,16 @@ use image::EncodableLayout;
 use rfd::AsyncFileDialog;
 
 use crate::app::Message;
-use crate::state::Layers;
+use crate::state::Scene;
 
-use super::schema::{self, Document, LoadError};
+use super::schema::{self, LoadError, SceneV1};
 
 const DEFAULT_FILE_NAME: &str = "map.hexmap";
 const FILE_EXTENSIONS: &[&str] = &["hexmap"];
 
 /// Opens a save dialog and writes the current layers to the chosen file.
-pub fn save_project_async(layers: &Layers) -> Task<Message> {
-    let document = Document::from(layers);
+pub fn save_project_async(layers: &Scene) -> Task<Message> {
+    let document = SceneV1::from(layers);
 
     let bytes = match schema::serialize(&document) {
         Ok(bytes) => bytes,
@@ -58,7 +58,7 @@ pub fn load_project_async() -> Task<Message> {
     })
 }
 
-async fn read_future(handle: rfd::FileHandle) -> Result<Document, String> {
+async fn read_future(handle: rfd::FileHandle) -> Result<SceneV1, String> {
     let bytes = handle.read().await;
     schema::deserialize(&bytes).map_err(|err: LoadError| err.to_string())
 }

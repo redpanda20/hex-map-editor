@@ -9,11 +9,11 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::{EditorState, Message},
-    state::{Layer, LayerInner, LayerMessage, LayerType, Layers, PerlinNoiseLayer, SparseTiles},
+    state::{Layer, LayerInner, LayerMessage, LayerType, Scene, PerlinNoiseLayer, SparseTiles},
 };
 
 pub fn layer_stack_panel<'a>(
-    layers: &'a Layers,
+    layers: &'a Scene,
     editor_state: &EditorState,
 ) -> Element<'a, Message> {
     let active_layer = layers.active_layer;

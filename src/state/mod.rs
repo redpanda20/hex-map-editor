@@ -9,7 +9,7 @@ pub use layer::Layer;
 pub use layer::LayerInner;
 pub use layer::LayerMessage;
 pub use layer::LayerType;
-pub use layer::Layers;
+pub use layer::Scene;
 pub use layer::SparseTiles;
 
 pub use layer::noise::{NoiseOctaves, PerlinNoiseLayer};

@@ -2,9 +2,9 @@ use std::collections::HashSet;
 
 use iced::Color;
 
-use crate::state::{Layer, LayerInner, Layers, NoiseOctaves, PerlinNoiseLayer, SparseTiles};
+use crate::state::{Layer, LayerInner, NoiseOctaves, PerlinNoiseLayer, Scene, SparseTiles};
 
-use super::schema::{ColourV1, Document, HexCoordV1, LayerKindV1, LayerV1, NoiseOctavesV1};
+use super::schema::{ColourV1, HexCoordV1, LayerKindV1, LayerV1, NoiseOctavesV1, SceneV1};
 use crate::state::HexCoord;
 
 // ---------------------------------------------------------------------------
@@ -153,18 +153,18 @@ impl From<LayerV1> for Layer {
 // Document <-> Layers
 // ---------------------------------------------------------------------------
 
-impl From<&Layers> for Document {
-    fn from(layers: &Layers) -> Self {
-        Document {
+impl From<&Scene> for SceneV1 {
+    fn from(layers: &Scene) -> Self {
+        SceneV1 {
             layers: layers.inner.iter().map(Into::into).collect(),
             active_layer: layers.active_layer,
         }
     }
 }
 
-impl From<Document> for Layers {
-    fn from(document: Document) -> Self {
+impl From<SceneV1> for Scene {
+    fn from(document: SceneV1) -> Self {
         let inner = document.layers.into_iter().map(Into::into).collect();
-        Layers::replace_layers(inner)
+        Scene::replace_layers(inner)
     }
 }

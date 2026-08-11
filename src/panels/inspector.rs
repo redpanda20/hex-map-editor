@@ -9,10 +9,10 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::{EditorState, Message},
-    state::{Layer, LayerMessage, Layers, PerlinNoiseLayer, SparseTiles},
+    state::{Layer, LayerMessage, Scene, PerlinNoiseLayer, SparseTiles},
 };
 
-pub fn inspector_panel<'a>(layers: &Layers, editor_state: &EditorState) -> Element<'a, Message> {
+pub fn inspector_panel<'a>(layers: &Scene, editor_state: &EditorState) -> Element<'a, Message> {
     // Check for active content
     let Some((layer_id, layer)) = layers
         .active_layer
