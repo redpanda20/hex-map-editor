@@ -16,9 +16,9 @@ I have found drawing out maps by hand for my games to be tedious, and that other
   - [X] Partial transparency
   - [ ] Proc-gen. layers 
 - Data management
+  - [X] Save/Load scenes
   - [X] Export to PNG
   - [ ] Export to SVG & PDF
-  - [ ] Map saving
   - [ ] Incremental saves
 
 
