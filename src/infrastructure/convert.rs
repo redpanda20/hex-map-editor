@@ -165,6 +165,6 @@ impl From<&Scene> for SceneV1 {
 impl From<SceneV1> for Scene {
     fn from(document: SceneV1) -> Self {
         let inner = document.layers.into_iter().map(Into::into).collect();
-        Scene::replace_layers(inner)
+        Scene::from_layers(inner)
     }
 }

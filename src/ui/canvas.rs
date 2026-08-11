@@ -10,13 +10,12 @@ use iced::{
 
 use crate::{
     app::Message,
-    domain::{HexCoord, LayerMessage, Scene, Tool, hexes_in_range},
+    domain::{HexCoord, Scene, SceneCommand, Tool, hexes_in_range},
 };
 
-pub fn canvas_panel<'a>(layers: &'a Scene, tool: &'a Tool) -> Element<'a, Message> {
+pub fn canvas_panel<'a>(scene: &'a Scene) -> Element<'a, Message> {
     let hex_canvas = HexCanvas {
-        layers,
-        tool,
+        scene,
         hex_size: 16.0,
     };
 
@@ -27,8 +26,7 @@ pub fn canvas_panel<'a>(layers: &'a Scene, tool: &'a Tool) -> Element<'a, Messag
 }
 
 pub struct HexCanvas<'a> {
-    pub layers: &'a Scene,
-    pub tool: &'a Tool,
+    pub scene: &'a Scene,
     pub hex_size: f32,
 }
 
@@ -70,7 +68,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
         // Invalidate render cache if the state of Layers has changed.
-        let current_revision = self.layers.revision();
+        let current_revision = self.scene.revision();
         if state.cached_layers_revision.get() != current_revision {
             state.cache.clear();
             state.cached_layers_revision.set(current_revision);
@@ -108,11 +106,11 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                 state.last_drag_pos = Some(cursor_pos);
                 let coord = self.screen_to_hex(state, cursor_pos);
 
-                let message = match self.tool {
-                    Tool::Paint => Message::LayerEvent(LayerMessage::PaintHex(coord)),
-                    Tool::Erase => Message::LayerEvent(LayerMessage::EraseHex(coord)),
+                let message = match self.scene.tool {
+                    Tool::Paint => Message::Scene(SceneCommand::PaintHex(coord)),
+                    Tool::Erase => Message::Scene(SceneCommand::EraseHex(coord)),
                     Tool::Pan => return Some(Action::capture()),
-                    Tool::Fill => Message::LayerEvent(LayerMessage::FillFromHex(coord)),
+                    Tool::Fill => Message::Scene(SceneCommand::FillFromHex(coord)),
                 };
 
                 Some(Action::publish(message).and_capture())
@@ -137,9 +135,9 @@ impl<'a> Program<Message> for HexCanvas<'a> {
 
                 let coord = self.screen_to_hex(state, cursor_pos);
 
-                let message = match self.tool {
-                    Tool::Paint => Message::LayerEvent(LayerMessage::PaintHex(coord)),
-                    Tool::Erase => Message::LayerEvent(LayerMessage::EraseHex(coord)),
+                let message = match self.scene.tool {
+                    Tool::Paint => Message::Scene(SceneCommand::PaintHex(coord)),
+                    Tool::Erase => Message::Scene(SceneCommand::EraseHex(coord)),
                     // Bucket fill is explicitly disabled while dragging
                     // This is to avoid triggering epilieptic seizures
                     Tool::Fill => return None,
@@ -180,7 +178,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
             return mouse::Interaction::Idle;
         }
 
-        match self.tool {
+        match self.scene.tool {
             Tool::Pan if state.dragging => mouse::Interaction::Grabbing,
             Tool::Pan => mouse::Interaction::Grab,
             Tool::Paint => mouse::Interaction::Crosshair,
@@ -209,7 +207,7 @@ impl<'a> HexCanvas<'a> {
         let hex_path = &self.hex_path();
 
         // Draw grid layers
-        for layer in self.layers.get_visible_layers() {
+        for layer in self.scene.get_visible_layers() {
             // Column / Row maximum increased to full cover screen
             let coords = hexes_in_range(col_min, col_max + 1, row_min, row_max + 1);
 

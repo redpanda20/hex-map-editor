@@ -1,17 +1,16 @@
 mod hex;
 mod layer;
+mod scene;
 mod tool;
 
-pub use hex::HexCoord;
-pub use hex::{HexBounds, flood_fill, hexes_in_range, rect_to_range};
+pub use hex::{HexBounds, HexCoord};
+pub use hex::{flood_fill, hexes_in_range, rect_to_range};
 
-pub use layer::Layer;
-pub use layer::LayerInner;
-pub use layer::LayerMessage;
-pub use layer::LayerType;
-pub use layer::Scene;
-pub use layer::SparseTiles;
+pub use layer::{Layer, LayerInner, LayerType};
+
+pub use scene::{Scene, SceneCommand};
 
 pub use layer::noise::{NoiseOctaves, PerlinNoiseLayer};
+pub use layer::tile_store::SparseTiles;
 
 pub use tool::Tool;

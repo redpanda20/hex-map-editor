@@ -17,17 +17,17 @@ struct Toast {
 }
 
 #[derive(Debug, Clone)]
-pub enum ToastEvent {
+pub enum ToastMessage {
     RemoveToast(usize),
     Tick(Instant),
 }
 
-pub struct ToastManager {
+pub struct Toasts {
     toasts: Vec<Toast>,
     timeout: Duration,
 }
 
-impl ToastManager {
+impl Toasts {
     pub fn new() -> Self {
         Self {
             toasts: Vec::new(),
@@ -45,19 +45,19 @@ impl ToastManager {
     pub fn subscription(&self) -> Subscription<Message> {
         if let Some(earliest) = self.toasts.iter().min_by_key(|toast| toast.lifetime) {
             iced::time::every(earliest.lifetime - Instant::now())
-                .map(|instant| ToastEvent::Tick(instant))
+                .map(|instant| ToastMessage::Tick(instant))
                 .map(Message::ToastEvent)
         } else {
             Subscription::none()
         }
     }
 
-    pub fn update(&mut self, toast_event: ToastEvent) -> Task<Message> {
+    pub fn update(&mut self, toast_event: ToastMessage) -> Task<Message> {
         match toast_event {
-            ToastEvent::RemoveToast(index) => {
+            ToastMessage::RemoveToast(index) => {
                 self.toasts.remove(index);
             }
-            ToastEvent::Tick(instant) => {
+            ToastMessage::Tick(instant) => {
                 self.toasts.retain(|toast| toast.lifetime > instant);
             }
         };
@@ -65,8 +65,8 @@ impl ToastManager {
         Task::none()
     }
 
-    pub fn view(&self) -> Element<'_, ToastEvent> {
-        let toasts: Vec<Element<'_, ToastEvent>> = self
+    pub fn view(&self) -> Element<'_, ToastMessage> {
+        let toasts: Vec<Element<'_, ToastMessage>> = self
             .toasts
             .iter()
             .enumerate()
@@ -75,7 +75,7 @@ impl ToastManager {
                     container(row![
                         text(toast.title.as_str()),
                         space::horizontal(),
-                        button(bootstrap::x_lg()).on_press(ToastEvent::RemoveToast(index))
+                        button(bootstrap::x_lg()).on_press(ToastMessage::RemoveToast(index))
                     ])
                     .padding(4.0)
                     .style(container::rounded_box)
@@ -151,8 +151,4 @@ impl ToastManager {
             lifetime: Instant::now() + self.timeout,
         });
     }
-}
-
-pub fn toast_widget(toasts: &ToastManager) -> Element<'_, Message> {
-    toasts.view().map(Message::ToastEvent)
 }
