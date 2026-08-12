@@ -7,6 +7,7 @@ use iced_fonts::bootstrap;
 use crate::{
     app::Message,
     domain::{Scene, SceneCommand, Tool},
+    infrastructure::IoProcess,
 };
 
 #[derive(Debug, Clone)]
@@ -90,8 +91,9 @@ impl Toolbar {
             tooltip::Position::Right,
         );
 
-        let save_scene = button(bootstrap::floppy_fill()).style(button::subtle);
-        // .on_press(Message::SaveProject);
+        let save_scene = button(bootstrap::floppy_fill())
+            .style(button::subtle)
+            .on_press(Message::Save(IoProcess::Start));
         let save_scene = tooltip(
             save_scene,
             container("Save scene to file")
@@ -99,8 +101,9 @@ impl Toolbar {
                 .style(container::bordered_box),
             tooltip::Position::Right,
         );
-        let load_scene = button(bootstrap::folder_fill()).style(button::subtle);
-        // .on_press(Message::LoadProject);
+        let load_scene = button(bootstrap::folder_fill())
+            .style(button::subtle)
+            .on_press(Message::Load(IoProcess::Start));
         let load_scene = tooltip(
             load_scene,
             container("Load scene from file")
@@ -109,8 +112,8 @@ impl Toolbar {
             tooltip::Position::Right,
         );
 
-        let export_png = button(bootstrap::file_earmark_image());
-        // .on_press(Message::ExportPng);
+        let export_png = button(bootstrap::file_earmark_image())
+            .on_press(Message::Export(IoProcess::Start));
         let export_png = tooltip(
             export_png,
             container("Export scene as a PNG")
