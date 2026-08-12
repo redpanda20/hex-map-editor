@@ -33,6 +33,8 @@ pub enum SceneCommand {
     PaintHex(HexCoord),
     EraseHex(HexCoord),
     FillFromHex(HexCoord),
+
+    ChangeTool(Tool),
 }
 
 pub struct Scene {
@@ -88,6 +90,9 @@ impl Scene {
         self.revision = self.revision.wrapping_add(1);
 
         match message {
+            // --- Edit tools ---
+            SceneCommand::ChangeTool(tool) => self.tool = tool,
+
             // --- Edit Layers ---
             SceneCommand::AddLayer(name, layer_type) => {
                 let name = self.canonacalize_name(name);

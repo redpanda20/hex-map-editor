@@ -1,9 +1,6 @@
 use iced::{Element, widget::pane_grid};
 
-use crate::{
-    app::{App, Message},
-    ui::{canvas_panel, inspector, inspector_panel, layer_stack_panel, toolbar_panel},
-};
+use crate::{app::Message, domain::Scene};
 
 pub enum PaneKind {
     Canvas,
@@ -12,7 +9,7 @@ pub enum PaneKind {
     LayerStack,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum PanesMessage {
     PaneResized(pane_grid::ResizeEvent),
 }
@@ -37,17 +34,21 @@ impl Panes {
         }
     }
 
+    // view: impl Fn(&'a App) -> Element<'a, Message>
     pub fn view<'a>(
         &'a self,
-        canvas: Element<'a, Message>,
-        inspector: Element<'a, Message>,
+        scene: &'a Scene,
+        canvas: impl Fn(&'a Scene) -> Element<'a, Message>,
+        inspector: impl Fn(&'a Scene) -> Element<'a, Message>,
+        layers: impl Fn(&'a Scene) -> Element<'a, Message>,
+        toolbar: impl Fn(&'a Scene) -> Element<'a, Message>,
     ) -> Element<'a, Message> {
         pane_grid(&self.state, |_id, state, _is_maximised| {
             let inner: Element<'_, Message> = match state {
-                PaneKind::Toolbar => toolbar_panel(),
-                PaneKind::LayerStack => layer_stack_panel(),
-                PaneKind::Canvas => canvas,
-                PaneKind::Inspector => inspector,
+                PaneKind::Toolbar => toolbar(&scene),
+                PaneKind::LayerStack => layers(&scene),
+                PaneKind::Canvas => canvas(&scene),
+                PaneKind::Inspector => inspector(&scene),
             };
 
             pane_grid::Content::new(inner)

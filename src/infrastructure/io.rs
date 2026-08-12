@@ -4,6 +4,7 @@ use rfd::AsyncFileDialog;
 
 use crate::app::Message;
 use crate::domain::Scene;
+use crate::infrastructure::IoProcess;
 
 use super::schema::{self, LoadError, SceneV1};
 
@@ -16,7 +17,7 @@ pub fn save_project_async(layers: &Scene) -> Task<Message> {
 
     let bytes = match schema::serialize(&document) {
         Ok(bytes) => bytes,
-        Err(err) => return Task::done(Message::ProjectSaved(Err(err.to_string()))),
+        Err(err) => return Task::done(Message::Save(IoProcess::Finished(Err(err.to_string())))),
     };
 
     Task::future(
@@ -29,10 +30,10 @@ pub fn save_project_async(layers: &Scene) -> Task<Message> {
     .then(move |handle| {
         let bytes = bytes.clone();
         match handle {
-            Some(file_handle) => {
-                Task::perform(write_future(file_handle, bytes), Message::ProjectSaved)
-            }
-            None => Task::done(Message::ProjectSaveCancelled),
+            Some(file_handle) => Task::perform(write_future(file_handle, bytes), |content| {
+                Message::Save(IoProcess::Finished(content))
+            }),
+            None => Task::done(Message::Save(IoProcess::Cancelled)),
         }
     })
 }
@@ -49,10 +50,10 @@ pub fn save_bytes_async(bytes: Vec<u8>, default_name: &str) -> Task<Message> {
     .then(move |handle| {
         let inner_bytes = bytes.clone();
         match handle {
-            Some(file_handle) => {
-                Task::perform(write_future(file_handle, inner_bytes), Message::Exported)
-            }
-            None => Task::done(Message::ExportCancelled),
+            Some(file_handle) => Task::perform(write_future(file_handle, inner_bytes), |content| {
+                Message::Export(IoProcess::Finished(content))
+            }),
+            None => Task::done(Message::Export(IoProcess::Cancelled)),
         }
     })
 }
@@ -66,8 +67,10 @@ pub fn load_project_async() -> Task<Message> {
             .pick_file(),
     )
     .then(|handle| match handle {
-        Some(file_handle) => Task::perform(read_future(file_handle), Message::ProjectLoaded),
-        None => Task::done(Message::ProjectLoadCancelled),
+        Some(file_handle) => Task::perform(read_future(file_handle), |content| {
+            Message::Load(IoProcess::Finished(content))
+        }),
+        None => Task::done(Message::Load(IoProcess::Cancelled)),
     })
 }
 

@@ -4,8 +4,8 @@ use iced::{
 };
 use iced_fonts::bootstrap;
 
-use crate::app::Message;
 use crate::infrastructure::{Duration, Instant};
+use crate::{app::Message, infrastructure::IoProcess};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -46,7 +46,7 @@ impl Toasts {
         if let Some(earliest) = self.toasts.iter().min_by_key(|toast| toast.lifetime) {
             iced::time::every(earliest.lifetime - Instant::now())
                 .map(|instant| ToastMessage::Tick(instant))
-                .map(Message::ToastEvent)
+                .map(Message::Toasts)
         } else {
             Subscription::none()
         }
@@ -98,46 +98,46 @@ impl Toasts {
 
     pub fn listen_to_events(&mut self, message: &Message) {
         match message {
-            Message::ExportPng => self.add_toast(
+            Message::Export(IoProcess::Start) => self.add_toast(
                 "Exporting".to_string(),
                 "Exporting map to PNG...".to_string(),
             ),
-            Message::ExportCancelled => self.add_toast(
+            Message::Export(IoProcess::Cancelled) => self.add_toast(
                 "Export Cancelled".to_string(),
                 "Export cancelled by user.".to_string(),
             ),
-            Message::Exported(_) => self.add_toast(
+            Message::Export(IoProcess::Finished(Ok(_))) => self.add_toast(
                 "Export Complete".to_string(),
                 "Map exported successfully.".to_string(),
             ),
-
-            Message::SaveProject => {
+            // TODO: Evaluate if Finished(Err) is needed
+            Message::Save(IoProcess::Start) => {
                 self.add_toast("Saving".to_string(), "Saving project...".to_string())
             }
-            Message::ProjectSaveCancelled => self.add_toast(
+            Message::Save(IoProcess::Cancelled) => self.add_toast(
                 "Save Cancelled".to_string(),
                 "Save cancelled by user.".to_string(),
             ),
-            Message::ProjectSaved(Ok(_)) => self.add_toast(
+            Message::Save(IoProcess::Finished(Ok(_))) => self.add_toast(
                 "Save Complete".to_string(),
                 "Project saved successfully.".to_string(),
             ),
-            Message::ProjectSaved(Err(err)) => {
+            Message::Save(IoProcess::Finished(Err(err))) => {
                 self.add_toast("Save Failed".to_string(), err.clone())
             }
 
-            Message::LoadProject => {
+            Message::Load(IoProcess::Start) => {
                 self.add_toast("Opening".to_string(), "Opening project...".to_string())
             }
-            Message::ProjectLoadCancelled => self.add_toast(
+            Message::Load(IoProcess::Cancelled) => self.add_toast(
                 "Open Cancelled".to_string(),
                 "Open cancelled by user.".to_string(),
             ),
-            Message::ProjectLoaded(Ok(_)) => self.add_toast(
+            Message::Load(IoProcess::Finished(Ok(_))) => self.add_toast(
                 "Project Loaded".to_string(),
                 "Project loaded successfully.".to_string(),
             ),
-            Message::ProjectLoaded(Err(err)) => {
+            Message::Load(IoProcess::Finished(Err(err))) => {
                 self.add_toast("Open Failed".to_string(), err.clone())
             }
             _ => (),

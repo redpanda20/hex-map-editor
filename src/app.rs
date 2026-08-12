@@ -4,22 +4,15 @@ use iced::{
 };
 
 use crate::{
-    domain::{LayerMessage, LayerType, Scene, SceneCommand, Tool},
+    domain::{Scene, SceneCommand},
     infrastructure::{
-        SceneV1, export_png, load_project_async, save_bytes_async, save_project_async,
+        IoProcess, SceneV1, export_png, load_project_async, save_bytes_async, save_project_async,
     },
     ui::{
-        Inspector, InspectorMessage, PaneType, Panes, PanesMessage, ToastMessage, Toasts,
-        canvas_panel, default_pane_config, inspector_panel, layer_stack_panel, toast_widget,
-        toolbar_panel,
+        Inspector, InspectorMessage, Layers, LayersMessage, Panes, PanesMessage, ToastMessage,
+        Toasts, Toolbar, ToolbarMessage, canvas_panel,
     },
 };
-
-#[derive(Default, Debug)]
-pub struct EditorState {
-    pub active_layer_name: Option<String>,
-    pub active_layer_type: LayerType,
-}
 
 pub struct App {
     pub scene: Scene,
@@ -37,17 +30,22 @@ pub enum Message {
     Panes(PanesMessage),
     Toasts(ToastMessage),
     Inspector(InspectorMessage),
+    Layers(LayersMessage),
+    Toolbar(ToolbarMessage),
 
     Scene(SceneCommand),
+
+    Load(IoProcess<SceneV1>),
+    Save(IoProcess<()>),
+    Export(IoProcess<()>),
 }
 
 impl App {
     pub fn new() -> (Self, Task<Message>) {
         let app = Self {
             scene: Scene::new(),
-            canvas: todo!(),
-            toolbar: todo!(),
-            layers: todo!(),
+            toolbar: Toolbar::new(),
+            layers: Layers::new(),
             inspector: Inspector::new(),
             toasts: Toasts::new(),
             panes: Panes::new(),
@@ -78,32 +76,57 @@ impl App {
             Message::Panes(message) => self.panes.update(message),
             Message::Toasts(message) => return self.toasts.update(message),
             Message::Inspector(message) => return self.inspector.update(message),
+            Message::Layers(message) => return self.layers.update(message),
+            Message::Toolbar(message) => return self.toolbar.update(message),
 
             Message::Scene(command) => self.scene.update(command),
+
+            Message::Export(IoProcess::Start) => {
+                let bytes = export_png(&self.scene);
+                return save_bytes_async(bytes, "hexmap.png");
+            }
+            Message::Export(IoProcess::Cancelled) => {
+                eprintln!("Export cancelled");
+            }
+            Message::Export(IoProcess::Finished(result)) => match result {
+                Ok(_) => eprintln!("Export succeeded"),
+                Err(err) => eprintln!("Export failed: {err}"),
+            },
+
+            Message::Save(IoProcess::Start) => return save_project_async(&self.scene),
+            Message::Save(IoProcess::Cancelled) => {
+                eprintln!("Project save cancelled");
+            }
+            Message::Save(IoProcess::Finished(result)) => match result {
+                Ok(_) => eprintln!("Project save succeeded"),
+                Err(err) => eprintln!("Project save failed: {err}"),
+            },
+
+            Message::Load(IoProcess::Start) => return load_project_async(),
+            Message::Load(IoProcess::Cancelled) => {
+                eprintln!("Project load cancelled");
+            }
+            Message::Load(IoProcess::Finished(result)) => match result {
+                Ok(document) => {
+                    self.scene = Scene::from(document);
+                }
+                Err(err) => eprintln!("Project save failed: {err}"),
+            },
         }
 
         Task::none()
     }
 
     pub fn view<'a>(&'a self) -> Element<'a, Message> {
-        let canvas = canvas_panel(&self.scene);
-        let inspector = self.inspector.view(&self.scene);
+        let inspector = |scene| self.inspector.view(scene);
+        let layers = |scene| self.layers.view(scene);
+        let toolbar = |scene| self.toolbar.view(scene);
 
-        let grid = self.panes.view(canvas, inspector);
+        let grid = self
+            .panes
+            .view(&self.scene, canvas_panel, inspector, layers, toolbar);
+
         let toasts = self.toasts.view().map(Message::Toasts);
-        // let grid = pane_grid(&self.panes, |_id, state, _is_maximised| {
-
-        //     let inner: Element<'_, Message> = match state {
-        //         PaneType::Toolbar => toolbar_panel(&self.active_tool),
-        //         PaneType::LayerStack => layer_stack_panel(&self.layers, &self.editor_state),
-        //         PaneType::Canvas => canvas_panel(&self.layers, &self.active_tool),
-        //         PaneType::Inspector => inspector_panel(&self.layers, &self.editor_state),
-        //     };
-
-        //     pane_grid::Content::new(inner)
-        // })
-        // .on_resize(10, Message::PaneResized)
-        // .spacing(2);
 
         container(stack!(grid, toasts))
             .padding(2)
