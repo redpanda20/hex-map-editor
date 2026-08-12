@@ -1,12 +1,11 @@
-use crate::compat::{Duration, Instant};
-
 use iced::{
     Element, Length, Subscription, Task,
     widget::{button, column, container, row, space, text, tooltip},
 };
 use iced_fonts::bootstrap;
 
-use crate::app::Message;
+use crate::infrastructure::{Duration, Instant};
+use crate::{app::Message, infrastructure::IoProcess};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -18,17 +17,17 @@ struct Toast {
 }
 
 #[derive(Debug, Clone)]
-pub enum ToastEvent {
+pub enum ToastMessage {
     RemoveToast(usize),
     Tick(Instant),
 }
 
-pub struct ToastManager {
+pub struct Toasts {
     toasts: Vec<Toast>,
     timeout: Duration,
 }
 
-impl ToastManager {
+impl Toasts {
     pub fn new() -> Self {
         Self {
             toasts: Vec::new(),
@@ -46,19 +45,19 @@ impl ToastManager {
     pub fn subscription(&self) -> Subscription<Message> {
         if let Some(earliest) = self.toasts.iter().min_by_key(|toast| toast.lifetime) {
             iced::time::every(earliest.lifetime - Instant::now())
-                .map(|instant| ToastEvent::Tick(instant))
-                .map(Message::ToastEvent)
+                .map(|instant| ToastMessage::Tick(instant))
+                .map(Message::Toasts)
         } else {
             Subscription::none()
         }
     }
 
-    pub fn update(&mut self, toast_event: ToastEvent) -> Task<Message> {
+    pub fn update(&mut self, toast_event: ToastMessage) -> Task<Message> {
         match toast_event {
-            ToastEvent::RemoveToast(index) => {
+            ToastMessage::RemoveToast(index) => {
                 self.toasts.remove(index);
             }
-            ToastEvent::Tick(instant) => {
+            ToastMessage::Tick(instant) => {
                 self.toasts.retain(|toast| toast.lifetime > instant);
             }
         };
@@ -66,8 +65,8 @@ impl ToastManager {
         Task::none()
     }
 
-    pub fn view(&self) -> Element<'_, ToastEvent> {
-        let toasts: Vec<Element<'_, ToastEvent>> = self
+    pub fn view(&self) -> Element<'_, ToastMessage> {
+        let toasts: Vec<Element<'_, ToastMessage>> = self
             .toasts
             .iter()
             .enumerate()
@@ -76,7 +75,7 @@ impl ToastManager {
                     container(row![
                         text(toast.title.as_str()),
                         space::horizontal(),
-                        button(bootstrap::x_lg()).on_press(ToastEvent::RemoveToast(index))
+                        button(bootstrap::x_lg()).on_press(ToastMessage::RemoveToast(index))
                     ])
                     .padding(4.0)
                     .style(container::rounded_box)
@@ -99,46 +98,46 @@ impl ToastManager {
 
     pub fn listen_to_events(&mut self, message: &Message) {
         match message {
-            Message::ExportPng => self.add_toast(
+            Message::Export(IoProcess::Start) => self.add_toast(
                 "Exporting".to_string(),
                 "Exporting map to PNG...".to_string(),
             ),
-            Message::ExportCancelled => self.add_toast(
+            Message::Export(IoProcess::Cancelled) => self.add_toast(
                 "Export Cancelled".to_string(),
                 "Export cancelled by user.".to_string(),
             ),
-            Message::Exported(_) => self.add_toast(
+            Message::Export(IoProcess::Finished(Ok(_))) => self.add_toast(
                 "Export Complete".to_string(),
                 "Map exported successfully.".to_string(),
             ),
-
-            Message::SaveProject => {
+            // TODO: Evaluate if Finished(Err) is needed
+            Message::Save(IoProcess::Start) => {
                 self.add_toast("Saving".to_string(), "Saving project...".to_string())
             }
-            Message::ProjectSaveCancelled => self.add_toast(
+            Message::Save(IoProcess::Cancelled) => self.add_toast(
                 "Save Cancelled".to_string(),
                 "Save cancelled by user.".to_string(),
             ),
-            Message::ProjectSaved(Ok(_)) => self.add_toast(
+            Message::Save(IoProcess::Finished(Ok(_))) => self.add_toast(
                 "Save Complete".to_string(),
                 "Project saved successfully.".to_string(),
             ),
-            Message::ProjectSaved(Err(err)) => {
+            Message::Save(IoProcess::Finished(Err(err))) => {
                 self.add_toast("Save Failed".to_string(), err.clone())
             }
 
-            Message::LoadProject => {
+            Message::Load(IoProcess::Start) => {
                 self.add_toast("Opening".to_string(), "Opening project...".to_string())
             }
-            Message::ProjectLoadCancelled => self.add_toast(
+            Message::Load(IoProcess::Cancelled) => self.add_toast(
                 "Open Cancelled".to_string(),
                 "Open cancelled by user.".to_string(),
             ),
-            Message::ProjectLoaded(Ok(_)) => self.add_toast(
+            Message::Load(IoProcess::Finished(Ok(_))) => self.add_toast(
                 "Project Loaded".to_string(),
                 "Project loaded successfully.".to_string(),
             ),
-            Message::ProjectLoaded(Err(err)) => {
+            Message::Load(IoProcess::Finished(Err(err))) => {
                 self.add_toast("Open Failed".to_string(), err.clone())
             }
             _ => (),
@@ -152,8 +151,4 @@ impl ToastManager {
             lifetime: Instant::now() + self.timeout,
         });
     }
-}
-
-pub fn toast_widget(toasts: &ToastManager) -> Element<'_, Message> {
-    toasts.view().map(Message::ToastEvent)
 }

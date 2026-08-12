@@ -2,10 +2,10 @@ use std::collections::HashSet;
 
 use iced::Color;
 
-use crate::state::{Layer, LayerInner, NoiseOctaves, PerlinNoiseLayer, Scene, SparseTiles};
+use crate::domain::{Layer, LayerInner, NoiseOctaves, PerlinNoiseLayer, Scene, SparseTiles};
 
 use super::schema::{ColourV1, HexCoordV1, LayerKindV1, LayerV1, NoiseOctavesV1, SceneV1};
-use crate::state::HexCoord;
+use crate::domain::HexCoord;
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -165,6 +165,6 @@ impl From<&Scene> for SceneV1 {
 impl From<SceneV1> for Scene {
     fn from(document: SceneV1) -> Self {
         let inner = document.layers.into_iter().map(Into::into).collect();
-        Scene::replace_layers(inner)
+        Scene::from_layers(inner)
     }
 }

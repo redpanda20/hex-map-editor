@@ -1,10 +1,9 @@
-pub mod noise;
-mod tile_store;
-
 use iced::Color;
-pub use tile_store::SparseTiles;
 
-use crate::state::{HexCoord, PerlinNoiseLayer, flood_fill};
+use crate::domain::{
+    HexCoord, Layer, LayerInner, LayerType, PerlinNoiseLayer, SparseTiles, Tool, flood_fill,
+    layer::{noise, tile_store},
+};
 
 const DEFAULT_COLORS: [Color; 5] = [
     Color::from_rgba8(245, 196, 168, 0.9),
@@ -14,69 +13,8 @@ const DEFAULT_COLORS: [Color; 5] = [
     Color::from_rgba8(245, 168, 200, 0.9),
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LayerType {
-    Tiles,
-    PerlinNoise,
-}
-impl Default for LayerType {
-    fn default() -> Self {
-        LayerType::Tiles
-    }
-}
-impl ToString for LayerType {
-    fn to_string(&self) -> String {
-        match self {
-            LayerType::Tiles => "Tile".to_string(),
-            LayerType::PerlinNoise => "Noise".to_string(),
-        }
-    }
-}
-
-pub enum LayerInner {
-    Tiles(SparseTiles),
-    InvertedTiles(SparseTiles),
-    Perlin(noise::PerlinNoiseLayer),
-}
-
-impl LayerInner {
-    pub fn draw<T>(
-        &self,
-        target: &mut T,
-        coords: impl Iterator<Item = HexCoord>,
-        mut draw: impl FnMut(&mut T, HexCoord, Color),
-    ) {
-        for coord in coords {
-            match self {
-                LayerInner::Tiles(sparse_tiles) => {
-                    if sparse_tiles.exists_at(&coord) {
-                        draw(target, coord, sparse_tiles.colour_at(&coord))
-                    }
-                }
-                LayerInner::InvertedTiles(sparse_tiles) => {
-                    if !sparse_tiles.exists_at(&coord) {
-                        draw(target, coord, sparse_tiles.colour_at(&coord))
-                    }
-                }
-                LayerInner::Perlin(perlin_noise_layer) => {
-                    if perlin_noise_layer.exists_at(&coord) {
-                        draw(target, coord, perlin_noise_layer.colour_at(&coord))
-                    }
-                }
-            }
-        }
-    }
-}
-
-pub struct Layer {
-    pub name: String,
-    pub visible: bool,
-
-    pub inner: LayerInner,
-}
-
 #[derive(Debug, Clone)]
-pub enum LayerMessage {
+pub enum SceneCommand {
     AddLayer(String, LayerType),
     RemoveLayer(usize),
     SwapLayers(usize, usize),
@@ -95,17 +33,20 @@ pub enum LayerMessage {
     PaintHex(HexCoord),
     EraseHex(HexCoord),
     FillFromHex(HexCoord),
+
+    ChangeTool(Tool),
 }
 
 pub struct Scene {
     pub inner: Vec<Layer>,
     pub active_layer: Option<usize>,
+    pub tool: Tool,
 
     revision: u64,
 }
 
-impl Default for Scene {
-    fn default() -> Self {
+impl Scene {
+    pub fn new() -> Self {
         let inner = LayerInner::Tiles(tile_store::SparseTiles::new(DEFAULT_COLORS[0]));
 
         let layer = Layer {
@@ -117,16 +58,16 @@ impl Default for Scene {
         Self {
             inner: vec![layer],
             active_layer: Some(0),
+            tool: Tool::default(),
             revision: 0,
         }
     }
-}
 
-impl Scene {
-    pub fn replace_layers(inner: Vec<Layer>) -> Self {
+    pub fn from_layers(inner: Vec<Layer>) -> Self {
         Self {
             inner,
             active_layer: None,
+            tool: Tool::default(),
             revision: 1,
         }
     }
@@ -145,12 +86,15 @@ impl Scene {
         self.revision
     }
 
-    pub fn update(&mut self, message: LayerMessage) {
+    pub fn update(&mut self, message: SceneCommand) {
         self.revision = self.revision.wrapping_add(1);
 
         match message {
+            // --- Edit tools ---
+            SceneCommand::ChangeTool(tool) => self.tool = tool,
+
             // --- Edit Layers ---
-            LayerMessage::AddLayer(name, layer_type) => {
+            SceneCommand::AddLayer(name, layer_type) => {
                 let name = self.canonacalize_name(name);
                 let visible = true;
                 let inner = match layer_type {
@@ -171,34 +115,34 @@ impl Scene {
                 });
             }
 
-            LayerMessage::RemoveLayer(index) => {
+            SceneCommand::RemoveLayer(index) => {
                 if index >= self.inner.len() {
                     return;
                 }
 
                 self.inner.remove(index);
             }
-            LayerMessage::SwapLayers(a, b) => {
+            SceneCommand::SwapLayers(a, b) => {
                 if a >= self.inner.len() || b >= self.inner.len() {
                     return;
                 }
 
                 self.inner.swap(a, b);
             }
-            LayerMessage::SetActiveLayer(some_index) => self.active_layer = some_index,
+            SceneCommand::SetActiveLayer(some_index) => self.active_layer = some_index,
 
             // --- Edit layer properties ---
-            LayerMessage::EditLayerVisibility(index, new_visibility) => {
+            SceneCommand::EditLayerVisibility(index, new_visibility) => {
                 if let Some(layer) = self.inner.get_mut(index) {
                     layer.visible = new_visibility
                 }
             }
-            LayerMessage::EditLayerName(index, new_name) => {
+            SceneCommand::EditLayerName(index, new_name) => {
                 if let Some(layer) = self.inner.get_mut(index) {
                     layer.name = new_name
                 }
             }
-            LayerMessage::EditLayerFistColour(index, new_colour) => {
+            SceneCommand::EditLayerFistColour(index, new_colour) => {
                 if let Some(layer) = self.inner.get_mut(index) {
                     match &mut layer.inner {
                         LayerInner::Tiles(sparse_tiles) => sparse_tiles.set_colour(new_colour),
@@ -210,7 +154,7 @@ impl Scene {
                 }
             }
             // --- Edit Layer Properties (Proc gen) ---
-            LayerMessage::EditLayerSeed(index, seed) => match self.inner.get_mut(index) {
+            SceneCommand::EditLayerSeed(index, seed) => match self.inner.get_mut(index) {
                 Some(Layer {
                     name: _,
                     visible: _,
@@ -220,7 +164,7 @@ impl Scene {
                 }
                 _ => (),
             },
-            LayerMessage::EditLayerScale(index, scale) => match self.inner.get_mut(index) {
+            SceneCommand::EditLayerScale(index, scale) => match self.inner.get_mut(index) {
                 Some(Layer {
                     name: _,
                     visible: _,
@@ -230,7 +174,7 @@ impl Scene {
                 }
                 _ => (),
             },
-            LayerMessage::EditLayerThreshold(index, threshold) => match self.inner.get_mut(index) {
+            SceneCommand::EditLayerThreshold(index, threshold) => match self.inner.get_mut(index) {
                 Some(Layer {
                     name: _,
                     visible: _,
@@ -240,7 +184,7 @@ impl Scene {
                 }
                 _ => (),
             },
-            LayerMessage::EditLayerOctaves(index, count) => match self.inner.get_mut(index) {
+            SceneCommand::EditLayerOctaves(index, count) => match self.inner.get_mut(index) {
                 Some(Layer {
                     name: _,
                     visible: _,
@@ -261,7 +205,7 @@ impl Scene {
                 }
                 _ => (),
             },
-            LayerMessage::EditLayerPersistence(index, new_persistence) => {
+            SceneCommand::EditLayerPersistence(index, new_persistence) => {
                 match self.inner.get_mut(index) {
                     Some(Layer {
                         name: _,
@@ -279,7 +223,7 @@ impl Scene {
             }
 
             // --- Edit tiles ---
-            LayerMessage::PaintHex(hex_coord) => {
+            SceneCommand::PaintHex(hex_coord) => {
                 if let Some(layer) = self
                     .active_layer
                     .and_then(|index| self.inner.get_mut(index))
@@ -292,7 +236,7 @@ impl Scene {
                     }
                 }
             }
-            LayerMessage::EraseHex(hex_coord) => {
+            SceneCommand::EraseHex(hex_coord) => {
                 if let Some(layer) = self
                     .active_layer
                     .and_then(|index| self.inner.get_mut(index))
@@ -306,7 +250,7 @@ impl Scene {
                 }
             }
 
-            LayerMessage::FillFromHex(hex_coord) => {
+            SceneCommand::FillFromHex(hex_coord) => {
                 if let Some(layer) = self
                     .active_layer
                     .and_then(|index| self.inner.get_mut(index))

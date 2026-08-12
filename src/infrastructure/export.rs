@@ -1,10 +1,7 @@
-use iced::{Rectangle, Task};
-use image::{EncodableLayout, ImageBuffer, Rgba};
+use iced::Rectangle;
+use image::{ImageBuffer, Rgba};
 
-use crate::{
-    app::Message,
-    state::{Scene, hexes_in_range, rect_to_range},
-};
+use crate::domain::{Scene, hexes_in_range, rect_to_range};
 
 const HEX_SIZE: f32 = 100.0;
 
@@ -71,11 +68,11 @@ pub fn export_png(layers: &Scene) -> Vec<u8> {
         .get_visible_layers()
         .iter()
         .filter_map(|inner| match inner {
-            crate::state::LayerInner::Tiles(sparse_tiles) => sparse_tiles.bounding_box(HEX_SIZE),
-            crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
+            crate::domain::LayerInner::Tiles(sparse_tiles) => sparse_tiles.bounding_box(HEX_SIZE),
+            crate::domain::LayerInner::InvertedTiles(sparse_tiles) => {
                 sparse_tiles.bounding_box(HEX_SIZE)
             }
-            crate::state::LayerInner::Perlin(_) => None,
+            crate::domain::LayerInner::Perlin(_) => None,
         })
         .reduce(|acc, e| Rectangle::union(&acc, &e));
 
@@ -118,31 +115,4 @@ pub fn export_png(layers: &Scene) -> Vec<u8> {
     buf.write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
         .expect("PNG encoding failed");
     out
-}
-
-pub fn save_bytes_async(bytes: Vec<u8>, default_name: &str) -> Task<Message> {
-    use rfd::AsyncFileDialog;
-
-    Task::future(
-        AsyncFileDialog::new()
-            .set_file_name(default_name)
-            .set_title("Export to PNG")
-            .save_file(),
-    )
-    .then(move |handle| {
-        let inner_bytes = bytes.clone();
-        match handle {
-            Some(file_handle) => {
-                Task::perform(write_future(file_handle, inner_bytes), Message::Exported)
-            }
-            None => Task::done(Message::ExportCancelled),
-        }
-    })
-}
-
-async fn write_future(handle: rfd::FileHandle, bytes: Vec<u8>) -> Result<(), String> {
-    handle
-        .write(bytes.as_bytes())
-        .await
-        .map_err(|err| err.to_string())
 }

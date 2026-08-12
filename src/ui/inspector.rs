@@ -1,5 +1,5 @@
 use iced::{
-    Color, Element, Length, alignment, padding,
+    Color, Element, Length, Task, alignment, padding,
     widget::{
         Column, Row, button, column, container, responsive, row, rule, slider, space, text,
         text_input,
@@ -8,57 +8,92 @@ use iced::{
 use iced_fonts::bootstrap;
 
 use crate::{
-    app::{EditorState, Message},
-    state::{Layer, LayerMessage, Scene, PerlinNoiseLayer, SparseTiles},
+    app::Message,
+    domain::{Layer, NoiseOctaves, PerlinNoiseLayer, Scene, SceneCommand, SparseTiles},
 };
 
-pub fn inspector_panel<'a>(layers: &Scene, editor_state: &EditorState) -> Element<'a, Message> {
-    // Check for active content
-    let Some((layer_id, layer)) = layers
-        .active_layer
-        .and_then(|id| layers.inner.get(id).map(|layer| (id, layer)))
-    else {
-        return container(
-            column![rule::horizontal(1), text("No active content")]
+#[derive(Debug, Clone)]
+pub enum InspectorMessage {
+    LayerRename(Option<String>),
+    LayerRenameCommit(usize),
+    LayerRenameStart(String),
+}
+
+pub struct Inspector {
+    active_layer_name: Option<String>,
+}
+
+impl Inspector {
+    pub fn new() -> Self {
+        Self {
+            active_layer_name: None,
+        }
+    }
+
+    pub fn update(&mut self, message: InspectorMessage) -> Task<Message> {
+        match message {
+            InspectorMessage::LayerRename(new_name) => self.active_layer_name = new_name,
+            InspectorMessage::LayerRenameStart(name) => self.active_layer_name = Some(name),
+            InspectorMessage::LayerRenameCommit(index) => {
+                if let Some(name) = &mut self.active_layer_name {
+                    return Task::done(Message::Scene(SceneCommand::EditLayerName(
+                        index,
+                        name.clone(),
+                    )));
+                }
+            }
+        }
+
+        Task::none()
+    }
+
+    pub fn view<'a>(&self, scene: &'a Scene) -> Element<'a, Message> {
+        let Some((layer_id, layer)) = scene
+            .active_layer
+            .and_then(|id| scene.inner.get(id).map(|layer| (id, layer)))
+        else {
+            return container(
+                column![rule::horizontal(1), text("No active content")]
+                    .height(Length::Fill)
+                    .width(Length::Fill)
+                    .spacing(8.0)
+                    .padding(8.0),
+            )
+            .style(container::bordered_box)
+            .into();
+        };
+
+        let Layer {
+            name,
+            visible,
+            inner,
+        } = layer;
+
+        let starting_name = name;
+        let name = &self.active_layer_name;
+
+        let content = match inner {
+            crate::domain::LayerInner::Tiles(sparse_tiles) => {
+                sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
+            }
+            crate::domain::LayerInner::InvertedTiles(sparse_tiles) => {
+                sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
+            }
+            crate::domain::LayerInner::Perlin(content) => {
+                perlin_noise_details(layer_id, starting_name, name, visible, content)
+            }
+        };
+
+        container(
+            column![rule::horizontal(1), content]
                 .height(Length::Fill)
                 .width(Length::Fill)
                 .spacing(8.0)
                 .padding(8.0),
         )
         .style(container::bordered_box)
-        .into();
-    };
-
-    let Layer {
-        name,
-        visible,
-        inner,
-    } = layer;
-
-    let starting_name = name;
-    let name = &editor_state.active_layer_name;
-
-    let content = match inner {
-        crate::state::LayerInner::Tiles(sparse_tiles) => {
-            sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
-        }
-        crate::state::LayerInner::InvertedTiles(sparse_tiles) => {
-            sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
-        }
-        crate::state::LayerInner::Perlin(content) => {
-            perlin_noise_details(layer_id, starting_name, name, visible, content)
-        }
-    };
-
-    container(
-        column![rule::horizontal(1), content]
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .spacing(8.0)
-            .padding(8.0),
-    )
-    .style(container::bordered_box)
-    .into()
+        .into()
+    }
 }
 
 fn sparse_tile_details<'a>(
@@ -69,7 +104,7 @@ fn sparse_tile_details<'a>(
     tiles: &SparseTiles,
 ) -> Column<'a, Message> {
     column![
-        name_input(layer_id, starting_name, name),
+        name_input(layer_id, starting_name, name).map(Message::Inspector),
         visible_toggle(layer_id, visible),
         colour_panel(layer_id, tiles.get_colour())
     ]
@@ -94,7 +129,7 @@ fn perlin_noise_details<'a>(
             .style(button::text)
             .on_press_with(move || {
                 let new_seed = rand::random();
-                Message::LayerEvent(LayerMessage::EditLayerSeed(layer_id, new_seed))
+                Message::Scene(SceneCommand::EditLayerSeed(layer_id, new_seed))
             }),
         text(seed).style(text::secondary)
     ]
@@ -105,7 +140,7 @@ fn perlin_noise_details<'a>(
     let scale_controls = row![
         text!("{inverse_scale:.2}").style(text::secondary),
         slider(1.0..=20.0, inverse_scale, move |value| {
-            Message::LayerEvent(LayerMessage::EditLayerScale(layer_id, 1.0 / value))
+            Message::Scene(SceneCommand::EditLayerScale(layer_id, 1.0 / value))
         })
     ]
     .spacing(8.0)
@@ -114,15 +149,15 @@ fn perlin_noise_details<'a>(
     let threshold_controls = row![
         text!("{threshold:.2} / 1.00").style(text::secondary),
         slider(0.0..=100.0, threshold * 100.0, move |value| {
-            Message::LayerEvent(LayerMessage::EditLayerThreshold(layer_id, value / 100.0))
+            Message::Scene(SceneCommand::EditLayerThreshold(layer_id, value / 100.0))
         })
     ]
     .spacing(8.0)
     .align_y(alignment::Vertical::Center);
 
     let (octave_count, persistence) = match octaves {
-        crate::state::NoiseOctaves::One => (1, 0.0),
-        crate::state::NoiseOctaves::Many { count, persistence } => (*count as i32, *persistence),
+        NoiseOctaves::One => (1, 0.0),
+        NoiseOctaves::Many { count, persistence } => (*count as i32, *persistence),
     };
     let mut octave_controls = column![];
 
@@ -131,7 +166,7 @@ fn perlin_noise_details<'a>(
         row![
             text!("{octave_count}").style(text::secondary),
             slider(1..=8, octave_count, move |value| {
-                Message::LayerEvent(LayerMessage::EditLayerOctaves(layer_id, value as usize))
+                Message::Scene(SceneCommand::EditLayerOctaves(layer_id, value as usize))
             })
         ]
         .spacing(8.0)
@@ -144,7 +179,7 @@ fn perlin_noise_details<'a>(
             row![
                 text!("{persistence:.2} / 1.00").style(text::secondary),
                 slider(1.0..=10.0, persistence * 10.0, move |value| {
-                    Message::LayerEvent(LayerMessage::EditLayerPersistence(layer_id, value / 10.0))
+                    Message::Scene(SceneCommand::EditLayerPersistence(layer_id, value / 10.0))
                 })
             ]
             .spacing(8.0)
@@ -153,7 +188,7 @@ fn perlin_noise_details<'a>(
     }
 
     column![
-        name_input(layer_id, starting_name, name),
+        name_input(layer_id, starting_name, name).map(Message::Inspector),
         visible_toggle(layer_id, visible),
         text("Noise"),
         rule::horizontal(1),
@@ -172,13 +207,13 @@ fn name_input<'a>(
     layer_id: usize,
     starting_name: &String,
     name: &Option<String>,
-) -> Row<'a, Message> {
+) -> Element<'a, InspectorMessage> {
     if let Some(name) = name {
         row![
             bootstrap::input_cursor().style(text::secondary),
             text_input("Layer name...", &name)
-                .on_input(|s| Message::LayerRename(Some(s)))
-                .on_submit(Message::LayerRenameSubmit(layer_id))
+                .on_input(|s| InspectorMessage::LayerRename(Some(s)))
+                .on_submit(InspectorMessage::LayerRenameCommit(layer_id))
                 .width(Length::Fill)
                 .align_x(alignment::Horizontal::Center)
         ]
@@ -195,11 +230,12 @@ fn name_input<'a>(
                 .spacing(4.0)
                 .align_y(alignment::Vertical::Center),
             )
-            .on_press(Message::LayerRenameStart(starting_name.clone()))
+            .on_press(InspectorMessage::LayerRenameStart(starting_name.clone()))
             .style(button::text),
             space::horizontal()
         ]
     }
+    .into()
 }
 
 fn visible_toggle<'a>(layer_id: usize, visible: &bool) -> Row<'a, Message> {
@@ -214,11 +250,9 @@ fn visible_toggle<'a>(layer_id: usize, visible: &bool) -> Row<'a, Message> {
         ],
     }
     .spacing(4.0);
-    let toggle = button(inner)
-        .style(button::text)
-        .on_press(Message::LayerEvent(LayerMessage::EditLayerVisibility(
-            layer_id, !visible,
-        )));
+    let toggle = button(inner).style(button::text).on_press(Message::Scene(
+        SceneCommand::EditLayerVisibility(layer_id, !visible),
+    ));
     row![space::horizontal(), toggle, space::horizontal()]
 }
 
@@ -235,7 +269,7 @@ fn colour_panel<'a>(layer_id: usize, active_colour: Color) -> Column<'a, Message
     let Color { r, g, b, a } = active_colour;
 
     let red_slider: Element<'_, Message> = slider(0.0..=1.0, r, move |value| {
-        Message::LayerEvent(LayerMessage::EditLayerFistColour(
+        Message::Scene(SceneCommand::EditLayerFistColour(
             layer_id,
             Color { r: value, g, b, a },
         ))
@@ -244,7 +278,7 @@ fn colour_panel<'a>(layer_id: usize, active_colour: Color) -> Column<'a, Message
     .into();
 
     let green_slider: Element<'_, Message> = slider(0.0..=1.0, g, move |value| {
-        Message::LayerEvent(LayerMessage::EditLayerFistColour(
+        Message::Scene(SceneCommand::EditLayerFistColour(
             layer_id,
             Color { r, g: value, b, a },
         ))
@@ -253,7 +287,7 @@ fn colour_panel<'a>(layer_id: usize, active_colour: Color) -> Column<'a, Message
     .into();
 
     let blue_slider: Element<'_, Message> = slider(0.0..=1.0, b, move |value| {
-        Message::LayerEvent(LayerMessage::EditLayerFistColour(
+        Message::Scene(SceneCommand::EditLayerFistColour(
             layer_id,
             Color { r, g, b: value, a },
         ))
@@ -262,7 +296,7 @@ fn colour_panel<'a>(layer_id: usize, active_colour: Color) -> Column<'a, Message
     .into();
 
     let alpha_slider: Element<'_, Message> = slider(0.0..=1.0, a, move |value| {
-        Message::LayerEvent(LayerMessage::EditLayerFistColour(
+        Message::Scene(SceneCommand::EditLayerFistColour(
             layer_id,
             Color { r, g, b, a: value },
         ))

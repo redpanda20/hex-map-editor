@@ -1,74 +1,54 @@
 use iced::{
     Element, Subscription, Task, Theme,
-    widget::{container, pane_grid, stack},
+    widget::{container, stack},
 };
 
 use crate::{
-    export::{export_png, save_bytes_async},
-    panels::{
-        PaneType, ToastEvent, Toasts, canvas_panel, default_pane_config, inspector_panel,
-        layer_stack_panel, toast_widget, toolbar_panel,
+    domain::{Scene, SceneCommand},
+    infrastructure::{
+        IoProcess, SceneV1, export_png, load_project_async, save_bytes_async, save_project_async,
     },
-    persistence::{SceneV1, load_project_async, save_project_async},
-    state::{LayerMessage, LayerType, Scene, Tool},
+    ui::{
+        Inspector, InspectorMessage, Layers, LayersMessage, Panes, PanesMessage, ToastMessage,
+        Toasts, Toolbar, ToolbarMessage, canvas_panel,
+    },
 };
 
-#[derive(Default, Debug)]
-pub struct EditorState {
-    pub active_layer_name: Option<String>,
-    pub active_layer_type: LayerType,
-}
-
 pub struct App {
-    layers: Scene,
-    active_tool: Tool,
-    editor_state: EditorState,
+    pub scene: Scene,
 
-    panes: pane_grid::State<PaneType>,
-    toasts: Toasts,
+    pub toolbar: Toolbar,
+    pub layers: Layers,
+    pub inspector: Inspector,
+    pub toasts: Toasts,
+
+    pub panes: Panes,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    // Manage current tool
-    ChangeTool(Tool),
+    Panes(PanesMessage),
+    Toasts(ToastMessage),
+    Inspector(InspectorMessage),
+    Layers(LayersMessage),
+    Toolbar(ToolbarMessage),
 
-    // Layers
-    LayerEvent(LayerMessage),
+    Scene(SceneCommand),
 
-    ToastEvent(ToastEvent),
-
-    // Panel management
-    LayerRenameStart(String),
-    LayerRename(Option<String>),
-    LayerRenameSubmit(usize),
-    ChangeLayerType(LayerType),
-
-    PaneResized(pane_grid::ResizeEvent),
-
-    ExportPng,
-    ExportCancelled,
-    Exported(Result<(), String>),
-
-    SaveProject,
-    ProjectSaveCancelled,
-    ProjectSaved(Result<(), String>),
-
-    LoadProject,
-    ProjectLoadCancelled,
-    ProjectLoaded(Result<SceneV1, String>),
+    Load(IoProcess<SceneV1>),
+    Save(IoProcess<()>),
+    Export(IoProcess<()>),
 }
 
 impl App {
     pub fn new() -> (Self, Task<Message>) {
-        let panes = pane_grid::State::with_configuration(default_pane_config());
-
         let app = Self {
-            layers: Scene::default(),
-            editor_state: EditorState::default(),
+            scene: Scene::new(),
+            toolbar: Toolbar::new(),
+            layers: Layers::new(),
+            inspector: Inspector::new(),
             toasts: Toasts::new(),
-            panes,
-            active_tool: Tool::default(),
+            panes: Panes::new(),
         };
 
         (app, Task::none())
@@ -93,88 +73,62 @@ impl App {
         self.toasts.listen_to_events(&message);
 
         match message {
-            Message::LayerEvent(layers_message) => {
-                self.editor_state.active_layer_name = None;
-                self.layers.update(layers_message);
-            }
+            Message::Panes(message) => self.panes.update(message),
+            Message::Toasts(message) => return self.toasts.update(message),
+            Message::Inspector(message) => return self.inspector.update(message),
+            Message::Layers(message) => return self.layers.update(message),
+            Message::Toolbar(message) => return self.toolbar.update(message),
 
-            Message::ToastEvent(toast_event) => {
-                return self.toasts.update(toast_event);
-            }
+            Message::Scene(command) => self.scene.update(command),
 
-            Message::ChangeTool(new_tool) => self.active_tool = new_tool,
-
-            Message::ExportPng => {
-                let bytes = export_png(&self.layers);
+            Message::Export(IoProcess::Start) => {
+                let bytes = export_png(&self.scene);
                 return save_bytes_async(bytes, "hexmap.png");
             }
-            Message::ExportCancelled => {
+            Message::Export(IoProcess::Cancelled) => {
                 eprintln!("Export cancelled");
             }
-            Message::Exported(result) => match result {
+            Message::Export(IoProcess::Finished(result)) => match result {
                 Ok(_) => eprintln!("Export succeeded"),
                 Err(err) => eprintln!("Export failed: {err}"),
             },
 
-            Message::SaveProject => return save_project_async(&self.layers),
-            Message::ProjectSaveCancelled => {
+            Message::Save(IoProcess::Start) => return save_project_async(&self.scene),
+            Message::Save(IoProcess::Cancelled) => {
                 eprintln!("Project save cancelled");
             }
-            Message::ProjectSaved(result) => match result {
-                Ok(_) => eprintln!("Save succeeded"),
-                Err(err) => eprintln!("Save failed: {err}"),
+            Message::Save(IoProcess::Finished(result)) => match result {
+                Ok(_) => eprintln!("Project save succeeded"),
+                Err(err) => eprintln!("Project save failed: {err}"),
             },
 
-            Message::LoadProject => return load_project_async(),
-            Message::ProjectLoadCancelled => {
+            Message::Load(IoProcess::Start) => return load_project_async(),
+            Message::Load(IoProcess::Cancelled) => {
                 eprintln!("Project load cancelled");
             }
-            Message::ProjectLoaded(result) => match result {
+            Message::Load(IoProcess::Finished(result)) => match result {
                 Ok(document) => {
-                    self.layers = Scene::from(document);
-                    self.editor_state = EditorState::default();
+                    self.scene = Scene::from(document);
                 }
-                Err(err) => eprintln!("Load failed: {err}"),
+                Err(err) => eprintln!("Project save failed: {err}"),
             },
-            Message::PaneResized(resize_event) => {
-                let pane_grid::ResizeEvent { split, ratio } = resize_event;
-                self.panes.resize(split, ratio);
-            }
-
-            Message::LayerRename(new_name) => self.editor_state.active_layer_name = new_name,
-            Message::LayerRenameStart(name) => self.editor_state.active_layer_name = Some(name),
-            Message::LayerRenameSubmit(index) => {
-                if let Some(new_name) = &self.editor_state.active_layer_name {
-                    return Task::done(Message::LayerEvent(LayerMessage::EditLayerName(
-                        index,
-                        new_name.clone(),
-                    )));
-                }
-                self.editor_state.active_layer_name = None
-            }
-            Message::ChangeLayerType(layer_type) => {
-                self.editor_state.active_layer_type = layer_type
-            }
         }
 
         Task::none()
     }
 
     pub fn view<'a>(&'a self) -> Element<'a, Message> {
-        let grid = pane_grid(&self.panes, |_id, state, _is_maximised| {
-            let inner: Element<'_, Message> = match state {
-                PaneType::Toolbar => toolbar_panel(&self.active_tool),
-                PaneType::LayerStack => layer_stack_panel(&self.layers, &self.editor_state),
-                PaneType::Canvas => canvas_panel(&self.layers, &self.active_tool),
-                PaneType::Inspector => inspector_panel(&self.layers, &self.editor_state),
-            };
+        let inspector = |scene| self.inspector.view(scene);
+        let layers = |scene| self.layers.view(scene);
+        let toolbar = |scene| self.toolbar.view(scene);
 
-            pane_grid::Content::new(inner)
-        })
-        .on_resize(10, Message::PaneResized)
-        .spacing(2);
+        let grid = self
+            .panes
+            .view(&self.scene, canvas_panel, inspector, layers, toolbar);
 
-        container(stack!(grid, toast_widget(&self.toasts)))
+        let toasts = self.toasts.view().map(Message::Toasts);
+
+        container(stack!(grid, toasts))
             .padding(2)
             .style(|theme| container::background(theme.extended_palette().background.base.color))
             .into()
