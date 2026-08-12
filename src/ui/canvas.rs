@@ -65,7 +65,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         renderer: &iced::Renderer,
         theme: &Theme,
         bounds: Rectangle,
-        _cursor: mouse::Cursor,
+        cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
         // Invalidate render cache if the state of Layers has changed.
         let current_revision = self.scene.revision();
@@ -74,10 +74,23 @@ impl<'a> Program<Message> for HexCanvas<'a> {
             state.cached_layers_revision.set(current_revision);
         }
 
-        let geometry = state.cache.draw(renderer, bounds.size(), |frame| {
+        // Cache map drawing
+        let map = state.cache.draw(renderer, bounds.size(), |frame| {
             self.draw_map(state, theme, frame, bounds);
         });
-        vec![geometry]
+
+        // Get cursor pos. Otherwise just draw map by itself
+        let Some(cursor_pos) = cursor.position_in(bounds) else {
+            return vec![map];
+        };
+
+        // Don't draw hex indicator if user is panning
+        if Tool::Pan == self.scene.tool {
+            return vec![map];
+        }
+
+        let mouse = self.draw_cursor_hex(renderer, theme, bounds, state, cursor_pos);
+        vec![map, mouse]
     }
 
     fn update(
@@ -87,12 +100,6 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> Option<Action<Message>> {
-        if !cursor.is_over(bounds) {
-            state.dragging = false;
-            state.last_drag_pos = None;
-            return None;
-        }
-
         let Some(cursor_pos) = cursor.position_in(bounds) else {
             state.dragging = false;
             state.last_drag_pos = None;
@@ -127,7 +134,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
             Event::Mouse(mouse::Event::CursorMoved { .. })
             | Event::Touch(touch::Event::FingerMoved { .. }) => {
                 if !state.dragging {
-                    return None;
+                    return Some(Action::request_redraw());
                 };
 
                 let last = state.last_drag_pos;
@@ -189,6 +196,32 @@ impl<'a> Program<Message> for HexCanvas<'a> {
 }
 
 impl<'a> HexCanvas<'a> {
+    fn draw_cursor_hex(
+        &self,
+        renderer: &iced::Renderer,
+        theme: &Theme,
+        bounds: Rectangle,
+        state: &CanvasState,
+        cursor_pos: Point,
+    ) -> Geometry {
+        let mut frame = Frame::new(renderer, bounds.size());
+
+        let hex = self.screen_to_hex(state, cursor_pos);
+        let coord = hex.to_cartesian() * self.hex_size * state.zoom + state.translation;
+
+        frame.translate(coord);
+        frame.scale(state.zoom);
+
+        let stroke = Stroke {
+            style: canvas::Style::Solid(theme.extended_palette().primary.base.color),
+            width: 2.0 / state.zoom,
+            ..Stroke::default()
+        };
+
+        frame.stroke(&self.hex_path(), stroke);
+        frame.into_geometry()
+    }
+
     fn draw_map(&self, state: &CanvasState, theme: &Theme, frame: &mut Frame, bounds: Rectangle) {
         frame.translate(state.translation);
         frame.scale(state.zoom);
