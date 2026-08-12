@@ -168,6 +168,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                     mouse::ScrollDelta::Pixels { x, y } => x + y,
                 };
                 state.zoom = f32::clamp(state.zoom + delta * 0.01, 0.4, 10.0);
+                state.cache.clear();
                 Some(Action::request_redraw().and_capture())
             }
 
