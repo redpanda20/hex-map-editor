@@ -24,7 +24,7 @@ pub struct Layers {
 impl Layers {
     pub fn new() -> Self {
         Self {
-            active_layer_type: LayerType::PerlinNoise,
+            active_layer_type: LayerType::Tiles,
         }
     }
 
