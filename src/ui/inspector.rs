@@ -148,9 +148,10 @@ fn perlin_noise_details<'a>(
 
     let threshold_controls = row![
         text!("{threshold:.2} / 1.00").style(text::secondary),
-        slider(0.0..=100.0, threshold * 100.0, move |value| {
-            Message::Scene(SceneCommand::EditLayerThreshold(layer_id, value / 100.0))
+        slider(0.0..=1.0, *threshold, move |value| {
+            Message::Scene(SceneCommand::EditLayerThreshold(layer_id, value))
         })
+        .step(0.01)
     ]
     .spacing(8.0)
     .align_y(alignment::Vertical::Center);
@@ -178,9 +179,10 @@ fn perlin_noise_details<'a>(
         octave_controls = octave_controls.push(
             row![
                 text!("{persistence:.2} / 1.00").style(text::secondary),
-                slider(1.0..=10.0, persistence * 10.0, move |value| {
-                    Message::Scene(SceneCommand::EditLayerPersistence(layer_id, value / 10.0))
+                slider(1.0..=1.0, persistence, move |value| {
+                    Message::Scene(SceneCommand::EditLayerPersistence(layer_id, value))
                 })
+                .step(0.1)
             ]
             .spacing(8.0)
             .align_y(alignment::Vertical::Center),
