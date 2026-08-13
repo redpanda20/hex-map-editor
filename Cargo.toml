@@ -7,7 +7,7 @@ edition = "2024"
 iced_fonts = { version = "0.3.0", features = ["bootstrap"] }
 image = {version = "0.25.10", default-features = false, features = ["png"] }
 rand = "0.10.2"
-rfd = "0.15"   # File dialogs (Linux/Windows/macOS/WASM)
+rfd = "0.17.2"   # File dialogs (Linux/Windows/macOS/WASM)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
