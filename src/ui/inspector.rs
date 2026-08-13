@@ -1,15 +1,13 @@
 use iced::{
-    Color, Element, Length, Task, alignment, padding,
-    widget::{
-        Column, Row, button, column, container, responsive, row, rule, slider, space, text,
-        text_input,
-    },
+    Element, Length, Task, alignment, padding,
+    widget::{Column, Row, button, column, container, row, rule, slider, space, text, text_input},
 };
 use iced_fonts::bootstrap;
 
 use crate::{
     app::Message,
     domain::{Layer, NoiseOctaves, PerlinNoiseLayer, Scene, SceneCommand, SparseTiles},
+    ui::colour_picker,
 };
 
 #[derive(Debug, Clone)]
@@ -103,10 +101,16 @@ fn sparse_tile_details<'a>(
     visible: &bool,
     tiles: &SparseTiles,
 ) -> Column<'a, Message> {
+    let colour = tiles.get_colour();
+    let colour_panel = colour_picker(
+        colour,
+        move |colour| Message::Scene(SceneCommand::EditLayerFistColour(layer_id, colour)),
+        move |colour| Message::Scene(SceneCommand::EditLayerFistColour(layer_id, colour)),
+    );
     column![
         name_input(layer_id, starting_name, name).map(Message::Inspector),
         visible_toggle(layer_id, visible),
-        colour_panel(layer_id, tiles.get_colour())
+        colour_panel
     ]
 }
 
@@ -256,64 +260,4 @@ fn visible_toggle<'a>(layer_id: usize, visible: &bool) -> Row<'a, Message> {
         SceneCommand::EditLayerVisibility(layer_id, !visible),
     ));
     row![space::horizontal(), toggle, space::horizontal()]
-}
-
-fn colour_panel<'a>(layer_id: usize, active_colour: Color) -> Column<'a, Message> {
-    let square = responsive(|size| {
-        let new_size = size.ratio(1.0);
-        space().width(new_size.width).height(new_size.height).into()
-    });
-
-    let colour_preview = container(square)
-        .height(Length::Shrink)
-        .style(move |_theme| container::background(active_colour));
-
-    let Color { r, g, b, a } = active_colour;
-
-    let red_slider: Element<'_, Message> = slider(0.0..=1.0, r, move |value| {
-        Message::Scene(SceneCommand::EditLayerFistColour(
-            layer_id,
-            Color { r: value, g, b, a },
-        ))
-    })
-    .step(0.01)
-    .into();
-
-    let green_slider: Element<'_, Message> = slider(0.0..=1.0, g, move |value| {
-        Message::Scene(SceneCommand::EditLayerFistColour(
-            layer_id,
-            Color { r, g: value, b, a },
-        ))
-    })
-    .step(0.01)
-    .into();
-
-    let blue_slider: Element<'_, Message> = slider(0.0..=1.0, b, move |value| {
-        Message::Scene(SceneCommand::EditLayerFistColour(
-            layer_id,
-            Color { r, g, b: value, a },
-        ))
-    })
-    .step(0.01)
-    .into();
-
-    let alpha_slider: Element<'_, Message> = slider(0.0..=1.0, a, move |value| {
-        Message::Scene(SceneCommand::EditLayerFistColour(
-            layer_id,
-            Color { r, g, b, a: value },
-        ))
-    })
-    .step(0.01)
-    .into();
-
-    column![
-        colour_preview,
-        column![
-            row![text("R"), red_slider].spacing(16),
-            row![text("G"), green_slider].spacing(16),
-            row![text("B"), blue_slider].spacing(16),
-            row![text("A"), alpha_slider].spacing(16)
-        ]
-    ]
-    .spacing(8.0)
 }

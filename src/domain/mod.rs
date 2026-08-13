@@ -1,3 +1,4 @@
+pub mod colour;
 mod hex;
 mod layer;
 mod scene;
