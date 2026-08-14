@@ -33,11 +33,8 @@ impl Inspector {
             InspectorMessage::LayerRename(new_name) => self.active_layer_name = new_name,
             InspectorMessage::LayerRenameStart(name) => self.active_layer_name = Some(name),
             InspectorMessage::LayerRenameCommit(index) => {
-                if let Some(name) = &mut self.active_layer_name {
-                    return Task::done(Message::Scene(SceneCommand::EditLayerName(
-                        index,
-                        name.clone(),
-                    )));
+                if let Some(name) = self.active_layer_name.take() {
+                    return Task::done(Message::Scene(SceneCommand::EditLayerName(index, name)));
                 }
             }
         }
