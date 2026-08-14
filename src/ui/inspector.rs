@@ -120,7 +120,7 @@ fn perlin_noise_details<'a>(
 ) -> Column<'a, Message> {
     let PerlinNoiseLayer {
         seed,
-        scale,
+        frequency,
         threshold,
         octaves,
         ..
@@ -137,11 +137,10 @@ fn perlin_noise_details<'a>(
     .spacing(4.0)
     .align_y(alignment::Vertical::Center);
 
-    let inverse_scale = 1.0 / scale;
-    let scale_controls = row![
-        text!("{inverse_scale:.2}").style(text::secondary),
-        slider(1.0..=20.0, inverse_scale, move |value| {
-            Message::Scene(SceneCommand::EditLayerScale(layer_id, 1.0 / value))
+    let frequency_controls = row![
+        text!("{frequency:.2}").style(text::secondary),
+        slider(1.0..=20.0, *frequency, move |value| {
+            Message::Scene(SceneCommand::EditLayerScale(layer_id, value))
         })
     ]
     .spacing(8.0)
@@ -180,7 +179,7 @@ fn perlin_noise_details<'a>(
         octave_controls = octave_controls.push(
             row![
                 text!("{persistence:.2} / 1.00").style(text::secondary),
-                slider(1.0..=1.0, persistence, move |value| {
+                slider(0.0..=1.0, persistence, move |value| {
                     Message::Scene(SceneCommand::EditLayerPersistence(layer_id, value))
                 })
                 .step(0.1)
@@ -198,7 +197,7 @@ fn perlin_noise_details<'a>(
         text("Seed:"),
         seed_controls,
         text("Scale:"),
-        scale_controls,
+        frequency_controls,
         text("Threshold:"),
         threshold_controls,
         column![text("Octaves:"), rule::horizontal(1), octave_controls,]

@@ -17,7 +17,7 @@ pub struct PerlinNoiseLayer {
     gradient_table: [Vector; TABLE_SIZE],
 
     pub threshold: f32,
-    pub scale: f32,
+    pub frequency: f32,
     pub octaves: NoiseOctaves,
 }
 
@@ -35,7 +35,7 @@ impl PerlinNoiseLayer {
             seed,
             gradient_table,
             threshold: 0.0,
-            scale: 0.2,
+            frequency: 5.0,
             octaves: NoiseOctaves::One,
         }
     }
@@ -71,7 +71,10 @@ impl PerlinNoiseLayer {
     /// frequency   Multiplier of the fundamental frequency
     /// Returns a float the range [-1, 1]
     fn sample_octave(&self, x: f32, y: f32, frequency: f32) -> f32 {
-        let (x, y) = (x * self.scale * frequency, y * self.scale * frequency);
+        let (x, y) = (
+            x / self.frequency * frequency,
+            y / self.frequency * frequency,
+        );
 
         let (x0, y0) = (x.floor(), y.floor());
         let (x1, y1) = (x0 + 1.0, y0 + 1.0);
@@ -158,8 +161,8 @@ impl PerlinNoiseLayer {
         self.gradient_table = gradient_table
     }
 
-    pub fn set_scale(&mut self, scale: f32) {
-        self.scale = scale
+    pub fn set_frequency(&mut self, frequency: f32) {
+        self.frequency = frequency
     }
 
     /// Expects a threshold between 0 and 1 inclusive

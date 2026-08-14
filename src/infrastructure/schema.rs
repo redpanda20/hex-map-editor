@@ -131,7 +131,7 @@ pub enum LayerKindV1 {
     Perlin {
         seed: u64,
         threshold: f32,
-        scale: f32,
+        frequency: f32,
         octaves: NoiseOctavesV1,
     },
 }

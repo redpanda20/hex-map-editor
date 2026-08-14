@@ -89,7 +89,7 @@ impl From<&LayerInner> for LayerKindV1 {
             LayerInner::Perlin(perlin) => LayerKindV1::Perlin {
                 seed: perlin.seed,
                 threshold: perlin.threshold,
-                scale: perlin.scale,
+                frequency: perlin.frequency,
                 octaves: (&perlin.octaves).into(),
             },
         }
@@ -108,7 +108,7 @@ impl From<LayerKindV1> for LayerInner {
             LayerKindV1::Perlin {
                 seed,
                 threshold,
-                scale,
+                frequency,
                 octaves,
             } => {
                 // `PerlinNoiseLayer::new` deterministically derives its gradient
@@ -116,7 +116,7 @@ impl From<LayerKindV1> for LayerInner {
                 // exactly reproduces the original layer.
                 let mut perlin = PerlinNoiseLayer::new(seed);
                 perlin.set_threshold(threshold);
-                perlin.set_scale(scale);
+                perlin.set_frequency(frequency);
                 match octaves {
                     NoiseOctavesV1::One => perlin.set_single_octave(),
                     NoiseOctavesV1::Many { count, persistence } => {

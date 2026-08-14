@@ -53,7 +53,7 @@ pub fn colour_picker<'a>(
             value,
             on_change: Box::new(on_change),
             on_commit: Box::new(on_commit),
-            is_column: is_col_layout,
+            is_row: is_col_layout,
         };
 
         let alpha_picker = AlphaPicker {
@@ -62,7 +62,7 @@ pub fn colour_picker<'a>(
             hue,
             on_change: Box::new(on_change),
             on_commit: Box::new(on_commit),
-            is_column: is_col_layout,
+            is_row: is_col_layout,
         };
 
         if is_col_layout {
@@ -207,7 +207,7 @@ pub struct HuePicker<'a> {
     alpha: f32,
     on_change: Box<dyn Fn(Color) -> Message + 'a>,
     on_commit: Box<dyn Fn(Color) -> Message + 'a>,
-    is_column: bool,
+    is_row: bool,
 }
 
 impl<'a> Picker for HuePicker<'a> {
@@ -219,7 +219,10 @@ impl<'a> Picker for HuePicker<'a> {
     }
 
     fn relative_position_to_colour(&self, relative_pos: Point, bounds: iced::Rectangle) -> Color {
-        let hue = (relative_pos.x / bounds.width) * 360.0;
+        let hue = match self.is_row {
+            true => (relative_pos.x / bounds.width) * 360.0,
+            false => (relative_pos.y / bounds.height) * 360.0,
+        };
 
         Hsva {
             hue,
@@ -232,7 +235,7 @@ impl<'a> Picker for HuePicker<'a> {
 
     fn draw(&self, state: &PickerState, frame: &mut canvas::Frame, bounds: iced::Rectangle) {
         let origin = Point { x: 0.0, y: 0.0 };
-        let end = match self.is_column {
+        let end = match self.is_row {
             false => Point {
                 x: 0.0,
                 y: bounds.height,
@@ -255,7 +258,7 @@ impl<'a> Picker for HuePicker<'a> {
 
         frame.fill_rectangle(Point::ORIGIN, bounds.size(), hue_gradient);
 
-        let hue_indicator = match self.is_column {
+        let hue_indicator = match self.is_row {
             false => Path::line(
                 Point {
                     x: 0.0,
@@ -288,7 +291,7 @@ pub struct AlphaPicker<'a> {
     hue: f32,
     on_change: Box<dyn Fn(Color) -> Message + 'a>,
     on_commit: Box<dyn Fn(Color) -> Message + 'a>,
-    is_column: bool,
+    is_row: bool,
 }
 
 impl<'a> Picker for AlphaPicker<'a> {
@@ -300,7 +303,10 @@ impl<'a> Picker for AlphaPicker<'a> {
     }
 
     fn relative_position_to_colour(&self, relative_pos: Point, bounds: iced::Rectangle) -> Color {
-        let alpha = relative_pos.x / bounds.width;
+        let alpha = match self.is_row {
+            true => relative_pos.x / bounds.width,
+            false => relative_pos.y / bounds.height,
+        };
 
         Hsva {
             hue: self.hue,
@@ -313,7 +319,7 @@ impl<'a> Picker for AlphaPicker<'a> {
 
     fn draw(&self, state: &PickerState, frame: &mut canvas::Frame, bounds: iced::Rectangle) {
         // Checkerboard background
-        let checkerboard_size = match self.is_column {
+        let checkerboard_size = match self.is_row {
             false => bounds.width,
             true => bounds.height,
         } / 4.0;
@@ -339,7 +345,7 @@ impl<'a> Picker for AlphaPicker<'a> {
         }
 
         let origin = Point { x: 0.0, y: 0.0 };
-        let end = match self.is_column {
+        let end = match self.is_row {
             false => Point {
                 x: 0.0,
                 y: bounds.height,
@@ -375,7 +381,7 @@ impl<'a> Picker for AlphaPicker<'a> {
 
         frame.fill_rectangle(Point::ORIGIN, bounds.size(), alpha_gradient);
 
-        let alpha_indicator = match self.is_column {
+        let alpha_indicator = match self.is_row {
             false => Path::line(
                 Point {
                     x: 0.0,
@@ -429,13 +435,27 @@ impl<T: Picker> canvas::Program<Message> for PickerProgram<T> {
         bounds: iced::Rectangle,
         cursor: mouse::Cursor,
     ) -> Option<canvas::Action<Message>> {
-        // Check if mouse is out of bounds first
+        // Stop evaulating if out of bounds
         let Some(relative_pos) = cursor.position_in(bounds) else {
+            // Grace effect if user was holding mouse down
+            if state.is_selecting {
+                if let Some(Point { x, y }) = cursor.position() {
+                    let x = f32::clamp(x - bounds.x, 0.0, bounds.width);
+                    let y = f32::clamp(y - bounds.y, 0.0, bounds.height);
+                    let relative_pos = Point { x, y };
+
+                    let new_colour = self.0.relative_position_to_colour(relative_pos, bounds);
+                    state.selected_point = relative_pos;
+                    state.is_selecting = false;
+
+                    return Some(Action::publish((self.0.on_change())(new_colour)).and_capture());
+                }
+            }
+
             state.is_selecting = false;
             return None;
         };
 
-        // iced::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
         match event {
             iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 // Compute colour from relative position

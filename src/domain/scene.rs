@@ -170,7 +170,7 @@ impl Scene {
                     visible: _,
                     inner: LayerInner::Perlin(perlin_noise_layer),
                 }) => {
-                    perlin_noise_layer.set_scale(scale);
+                    perlin_noise_layer.set_frequency(scale);
                 }
                 _ => (),
             },
