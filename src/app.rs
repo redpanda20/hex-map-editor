@@ -127,7 +127,7 @@ impl App {
     pub fn view<'a>(&'a self) -> Element<'a, Message> {
         let inspector = |scene| self.inspector.view(scene);
         let layers = |scene| self.layers.view(scene);
-        let toolbar = |scene| self.toolbar.view(scene);
+        let toolbar = |scene| self.toolbar.view(scene, &self.history);
 
         let grid = self
             .panes

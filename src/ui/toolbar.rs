@@ -6,7 +6,7 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::Message,
-    domain::{HistoryCommand, Scene, SceneMessage, Tool},
+    domain::{History, HistoryCommand, Scene, SceneMessage, Tool},
     infrastructure::IoProcess,
 };
 
@@ -24,7 +24,7 @@ impl Toolbar {
         Task::none()
     }
 
-    pub fn view<'a>(&self, scene: &'a Scene) -> Element<'a, Message> {
+    pub fn view<'a>(&self, scene: &'a Scene, history: &'a History) -> Element<'a, Message> {
         let current_tool = scene.tool.clone();
 
         let brush_tool = button(bootstrap::brush())
@@ -92,11 +92,35 @@ impl Toolbar {
         );
 
         let undo = button(bootstrap::arrow_counterclockwise())
-            .style(button::subtle)
-            .on_press(Message::History(HistoryCommand::Undo));
+            .on_press(Message::History(HistoryCommand::Undo))
+            .style(move |theme, mut status| {
+                if !history.can_undo() {
+                    status = button::Status::Disabled
+                }
+                button::subtle(theme, status)
+            });
+        let undo = tooltip(
+            undo,
+            container("Undo last command")
+                .padding(4.0)
+                .style(container::bordered_box),
+            tooltip::Position::Right,
+        );
         let redo = button(bootstrap::arrow_clockwise())
-            .style(button::subtle)
-            .on_press(Message::History(HistoryCommand::Redo));
+            .on_press(Message::History(HistoryCommand::Redo))
+            .style(move |theme, mut status| {
+                if !history.can_redo() {
+                    status = button::Status::Disabled
+                }
+                button::subtle(theme, status)
+            });
+        let redo = tooltip(
+            redo,
+            container("Redo last command")
+                .padding(4.0)
+                .style(container::bordered_box),
+            tooltip::Position::Right,
+        );
 
         let save_scene = button(bootstrap::floppy_fill())
             .style(button::subtle)
