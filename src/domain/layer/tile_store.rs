@@ -6,7 +6,7 @@ use crate::domain::{HexBounds, HexCoord};
 
 #[derive(Debug, Clone)]
 pub struct SparseTiles {
-    tiles: HashSet<HexCoord>,
+    pub tiles: HashSet<HexCoord>,
     colour: Color,
 }
 
@@ -28,14 +28,6 @@ impl SparseTiles {
 
     pub fn set_colour(&mut self, colour: Color) {
         self.colour = colour
-    }
-
-    pub fn paint(&mut self, coord: HexCoord) {
-        self.tiles.insert(coord);
-    }
-
-    pub fn erase(&mut self, coord: HexCoord) {
-        self.tiles.remove(&coord);
     }
 
     pub fn is_empty(&self) -> bool {

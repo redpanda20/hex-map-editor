@@ -6,7 +6,7 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::Message,
-    domain::{Layer, NoiseOctaves, PerlinNoiseLayer, Scene, SceneCommand, SparseTiles},
+    domain::{Layer, NoiseOctaves, PerlinNoiseLayer, Scene, SceneMessage, SparseTiles},
     ui::colour_picker,
 };
 
@@ -34,7 +34,7 @@ impl Inspector {
             InspectorMessage::LayerRenameStart(name) => self.active_layer_name = Some(name),
             InspectorMessage::LayerRenameCommit(index) => {
                 if let Some(name) = self.active_layer_name.take() {
-                    return Task::done(Message::Scene(SceneCommand::EditLayerName(index, name)));
+                    return Task::done(Message::Scene(SceneMessage::EditLayerName(index, name)));
                 }
             }
         }
@@ -101,8 +101,8 @@ fn sparse_tile_details<'a>(
     let colour = tiles.get_colour();
     let colour_panel = colour_picker(
         colour,
-        move |colour| Message::Scene(SceneCommand::EditLayerFistColour(layer_id, colour)),
-        move |colour| Message::Scene(SceneCommand::EditLayerFistColour(layer_id, colour)),
+        move |colour| Message::Scene(SceneMessage::EditLayerFistColour(layer_id, colour)),
+        move |colour| Message::Scene(SceneMessage::EditLayerFistColour(layer_id, colour)),
     );
     column![
         name_input(layer_id, starting_name, name).map(Message::Inspector),
@@ -130,7 +130,7 @@ fn perlin_noise_details<'a>(
             .style(button::text)
             .on_press_with(move || {
                 let new_seed = rand::random();
-                Message::Scene(SceneCommand::EditLayerSeed(layer_id, new_seed))
+                Message::Scene(SceneMessage::EditLayerSeed(layer_id, new_seed))
             }),
         text(seed).style(text::secondary)
     ]
@@ -140,7 +140,7 @@ fn perlin_noise_details<'a>(
     let frequency_controls = row![
         text!("{frequency:.2}").style(text::secondary),
         slider(1.0..=20.0, *frequency, move |value| {
-            Message::Scene(SceneCommand::EditLayerScale(layer_id, value))
+            Message::Scene(SceneMessage::EditLayerScale(layer_id, value))
         })
     ]
     .spacing(8.0)
@@ -149,7 +149,7 @@ fn perlin_noise_details<'a>(
     let threshold_controls = row![
         text!("{threshold:.2} / 1.00").style(text::secondary),
         slider(0.0..=1.0, *threshold, move |value| {
-            Message::Scene(SceneCommand::EditLayerThreshold(layer_id, value))
+            Message::Scene(SceneMessage::EditLayerThreshold(layer_id, value))
         })
         .step(0.01)
     ]
@@ -167,7 +167,7 @@ fn perlin_noise_details<'a>(
         row![
             text!("{octave_count}").style(text::secondary),
             slider(1..=8, octave_count, move |value| {
-                Message::Scene(SceneCommand::EditLayerOctaves(layer_id, value as usize))
+                Message::Scene(SceneMessage::EditLayerOctaves(layer_id, value as usize))
             })
         ]
         .spacing(8.0)
@@ -180,7 +180,7 @@ fn perlin_noise_details<'a>(
             row![
                 text!("{persistence:.2} / 1.00").style(text::secondary),
                 slider(0.0..=1.0, persistence, move |value| {
-                    Message::Scene(SceneCommand::EditLayerPersistence(layer_id, value))
+                    Message::Scene(SceneMessage::EditLayerPersistence(layer_id, value))
                 })
                 .step(0.1)
             ]
@@ -253,7 +253,7 @@ fn visible_toggle<'a>(layer_id: usize, visible: &bool) -> Row<'a, Message> {
     }
     .spacing(4.0);
     let toggle = button(inner).style(button::text).on_press(Message::Scene(
-        SceneCommand::EditLayerVisibility(layer_id, !visible),
+        SceneMessage::EditLayerVisibility(layer_id, !visible),
     ));
     row![space::horizontal(), toggle, space::horizontal()]
 }

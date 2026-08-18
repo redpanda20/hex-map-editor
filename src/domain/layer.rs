@@ -25,6 +25,7 @@ impl ToString for LayerType {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum LayerInner {
     Tiles(SparseTiles),
     InvertedTiles(SparseTiles),
@@ -60,10 +61,10 @@ impl LayerInner {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Layer {
     pub name: String,
     pub visible: bool,
 
     pub inner: LayerInner,
 }
-

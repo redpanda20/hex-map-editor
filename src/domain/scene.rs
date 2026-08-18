@@ -2,7 +2,7 @@ use iced::Color;
 
 use crate::domain::{
     HexCoord, Layer, LayerInner, LayerType, PerlinNoiseLayer, SparseTiles, Tool, flood_fill,
-    layer::{noise, tile_store},
+    history::Edit, layer::noise::NoiseOctaves,
 };
 
 const DEFAULT_COLORS: [Color; 5] = [
@@ -14,12 +14,10 @@ const DEFAULT_COLORS: [Color; 5] = [
 ];
 
 #[derive(Debug, Clone)]
-pub enum SceneCommand {
+pub enum SceneMessage {
     AddLayer(String, LayerType),
     RemoveLayer(usize),
     SwapLayers(usize, usize),
-
-    SetActiveLayer(Option<usize>),
 
     EditLayerVisibility(usize, bool),
     EditLayerName(usize, String),
@@ -35,6 +33,7 @@ pub enum SceneCommand {
     FillFromHex(HexCoord),
 
     ChangeTool(Tool),
+    SetActiveLayer(Option<usize>),
 }
 
 pub struct Scene {
@@ -47,7 +46,7 @@ pub struct Scene {
 
 impl Scene {
     pub fn new() -> Self {
-        let inner = LayerInner::Tiles(tile_store::SparseTiles::new(DEFAULT_COLORS[0]));
+        let inner = LayerInner::Tiles(SparseTiles::new(DEFAULT_COLORS[0]));
 
         let layer = Layer {
             name: "Layer 1".to_string(),
@@ -80,23 +79,56 @@ impl Scene {
 
     /// A counter incremented when the state of Layers changes.
     /// Used by consumers to invalidate out of date caches
-    ///
-    /// TODO: Only update on meangiful content changes
     pub fn revision(&self) -> u64 {
         self.revision
     }
 
-    pub fn update(&mut self, message: SceneCommand) {
-        self.revision = self.revision.wrapping_add(1);
-
+    /// Applies `SceneMessage`.
+    ///
+    /// If content changed, the relevant `Edit` is returned.
+    /// None if message didn't change content, or if it was a no-op
+    pub fn update(&mut self, message: SceneMessage) -> Option<Edit> {
+        // Apply non-revertable changes
         match message {
+            SceneMessage::ChangeTool(tool) => self.tool = tool,
+            SceneMessage::SetActiveLayer(active_layer) => self.active_layer = active_layer,
+            _ => {}
+        };
+
+        let edit = self.command_to_edit(message);
+
+        if let Some(edit) = &edit {
+            self.apply_edit(edit, true);
+        }
+
+        edit
+    }
+
+    /// Reverses a single `Edit` (sets the `before` value). Used by `History::undo`.
+    pub fn undo_edit(&mut self, edit: &Edit) {
+        self.revision = self.revision.wrapping_add(1);
+        self.apply_edit(edit, false);
+    }
+
+    /// Re-applies a single `Edit` (sets the `after` value). Used by `History::redo`.
+    pub fn redo_edit(&mut self, edit: &Edit) {
+        self.revision = self.revision.wrapping_add(1);
+        self.apply_edit(edit, true);
+    }
+
+    fn command_to_edit(&self, message: SceneMessage) -> Option<Edit> {
+        let edit = match message {
             // --- Edit tools ---
-            SceneCommand::ChangeTool(tool) => self.tool = tool,
+            SceneMessage::ChangeTool(_) => {
+                return None;
+            }
+            SceneMessage::SetActiveLayer(_) => {
+                return None;
+            }
 
             // --- Edit Layers ---
-            SceneCommand::AddLayer(name, layer_type) => {
+            SceneMessage::AddLayer(name, layer_type) => {
                 let name = self.canonacalize_name(name);
-                let visible = true;
                 let inner = match layer_type {
                     LayerType::Tiles => {
                         let colour = DEFAULT_COLORS[self.inner.len() % 5];
@@ -107,191 +139,420 @@ impl Scene {
                         LayerInner::Perlin(PerlinNoiseLayer::new(seed))
                     }
                 };
-
-                self.inner.push(Layer {
+                let layer = Layer {
                     name,
-                    visible,
+                    visible: true,
                     inner,
-                });
+                };
+                let index = self.inner.len();
+
+                Edit::LayerAdded { index, layer }
             }
 
-            SceneCommand::RemoveLayer(index) => {
-                if index >= self.inner.len() {
-                    return;
+            SceneMessage::RemoveLayer(index) => {
+                let layer = self.inner.get(index)?.clone();
+                Edit::LayerRemoved { index, layer }
+            }
+            SceneMessage::SwapLayers(a, b) => {
+                if a >= self.inner.len() || b >= self.inner.len() || a == b {
+                    return None;
                 }
-
-                self.inner.remove(index);
+                Edit::LayersSwapped { a, b }
             }
-            SceneCommand::SwapLayers(a, b) => {
-                if a >= self.inner.len() || b >= self.inner.len() {
-                    return;
-                }
-
-                self.inner.swap(a, b);
-            }
-            SceneCommand::SetActiveLayer(some_index) => self.active_layer = some_index,
 
             // --- Edit layer properties ---
-            SceneCommand::EditLayerVisibility(index, new_visibility) => {
-                if let Some(layer) = self.inner.get_mut(index) {
-                    layer.visible = new_visibility
+            SceneMessage::EditLayerVisibility(index, new_visibility) => {
+                let before = self.inner.get(index)?.visible;
+                if before == new_visibility {
+                    return None;
+                }
+                Edit::LayerVisibility {
+                    index,
+                    before,
+                    after: new_visibility,
                 }
             }
-            SceneCommand::EditLayerName(index, new_name) => {
-                if let Some(layer) = self.inner.get_mut(index) {
-                    layer.name = new_name
+            SceneMessage::EditLayerName(index, new_name) => {
+                let layer = self.inner.get(index)?;
+                if layer.name == new_name {
+                    return None;
+                }
+                Edit::LayerName {
+                    index,
+                    before: layer.name.clone(),
+                    after: new_name,
                 }
             }
-            SceneCommand::EditLayerFistColour(index, new_colour) => {
-                if let Some(layer) = self.inner.get_mut(index) {
-                    match &mut layer.inner {
-                        LayerInner::Tiles(sparse_tiles) => sparse_tiles.set_colour(new_colour),
-                        LayerInner::InvertedTiles(sparse_tiles) => {
-                            sparse_tiles.set_colour(new_colour)
-                        }
-                        LayerInner::Perlin(_) => todo!(),
+            SceneMessage::EditLayerFistColour(index, new_colour) => {
+                let before = match &self.inner.get(index)?.inner {
+                    LayerInner::Tiles(store) | LayerInner::InvertedTiles(store) => {
+                        store.get_colour()
                     }
+                    LayerInner::Perlin(_) => todo!(),
+                };
+                if before == new_colour {
+                    return None;
+                }
+                Edit::LayerColour {
+                    index,
+                    before,
+                    after: new_colour,
                 }
             }
             // --- Edit Layer Properties (Proc gen) ---
-            SceneCommand::EditLayerSeed(index, seed) => match self.inner.get_mut(index) {
-                Some(Layer {
-                    name: _,
-                    visible: _,
-                    inner: LayerInner::Perlin(perlin_noise_layer),
-                }) => {
-                    perlin_noise_layer.set_seed(seed);
+            SceneMessage::EditLayerSeed(index, seed) => {
+                let LayerInner::Perlin(perlin) = &self.inner.get(index)?.inner else {
+                    return None;
+                };
+                let before = perlin.seed;
+                if before == seed {
+                    return None;
                 }
-                _ => (),
-            },
-            SceneCommand::EditLayerScale(index, scale) => match self.inner.get_mut(index) {
-                Some(Layer {
-                    name: _,
-                    visible: _,
-                    inner: LayerInner::Perlin(perlin_noise_layer),
-                }) => {
-                    perlin_noise_layer.set_frequency(scale);
+                Edit::LayerSeed {
+                    index,
+                    before,
+                    after: seed,
                 }
-                _ => (),
-            },
-            SceneCommand::EditLayerThreshold(index, threshold) => match self.inner.get_mut(index) {
-                Some(Layer {
-                    name: _,
-                    visible: _,
-                    inner: LayerInner::Perlin(perlin_noise_layer),
-                }) => {
-                    perlin_noise_layer.set_threshold(threshold);
+            }
+            SceneMessage::EditLayerScale(index, scale) => {
+                let LayerInner::Perlin(perlin) = &self.inner.get(index)?.inner else {
+                    return None;
+                };
+                let before = perlin.frequency;
+                if before == scale {
+                    return None;
                 }
-                _ => (),
-            },
-            SceneCommand::EditLayerOctaves(index, count) => match self.inner.get_mut(index) {
-                Some(Layer {
-                    name: _,
-                    visible: _,
-                    inner: LayerInner::Perlin(perlin_noise_layer),
-                }) => {
-                    let current_persistence = match &mut perlin_noise_layer.octaves {
-                        noise::NoiseOctaves::One => None,
-                        noise::NoiseOctaves::Many {
-                            count: _,
-                            persistence,
-                        } => Some(*persistence),
-                    };
-                    if count == 1 {
-                        perlin_noise_layer.set_single_octave();
-                    } else {
-                        perlin_noise_layer.set_octaves(count, current_persistence.unwrap_or(0.5));
+                Edit::LayerScale {
+                    index,
+                    before,
+                    after: scale,
+                }
+            }
+            SceneMessage::EditLayerThreshold(index, threshold) => {
+                let LayerInner::Perlin(perlin) = &self.inner.get(index)?.inner else {
+                    return None;
+                };
+                let before = perlin.threshold;
+                if before == threshold {
+                    return None;
+                }
+                Edit::LayerThreshold {
+                    index,
+                    before,
+                    after: threshold,
+                }
+            }
+            SceneMessage::EditLayerOctaves(index, count) => {
+                let LayerInner::Perlin(perlin) = &self.inner.get(index)?.inner else {
+                    return None;
+                };
+                let before = perlin.octaves;
+                let current_persistence = match before {
+                    NoiseOctaves::One => None,
+                    NoiseOctaves::Many { persistence, .. } => Some(persistence),
+                };
+                let after = if count == 1 {
+                    NoiseOctaves::One
+                } else {
+                    NoiseOctaves::Many {
+                        count,
+                        persistence: current_persistence.unwrap_or(0.5),
                     }
+                };
+                if before == after {
+                    return None;
                 }
-                _ => (),
-            },
-            SceneCommand::EditLayerPersistence(index, new_persistence) => {
-                match self.inner.get_mut(index) {
-                    Some(Layer {
-                        name: _,
-                        visible: _,
-                        inner: LayerInner::Perlin(perlin_noise_layer),
-                    }) => match &mut perlin_noise_layer.octaves {
-                        noise::NoiseOctaves::One => (),
-                        noise::NoiseOctaves::Many {
-                            count: _,
-                            persistence,
-                        } => *persistence = new_persistence,
-                    },
-                    _ => (),
+                Edit::LayerOctaves {
+                    index,
+                    before,
+                    after,
+                }
+            }
+            SceneMessage::EditLayerPersistence(index, new_persistence) => {
+                let LayerInner::Perlin(perlin) = &self.inner.get(index)?.inner else {
+                    return None;
+                };
+                let NoiseOctaves::Many {
+                    persistence: before,
+                    ..
+                } = perlin.octaves
+                else {
+                    return None;
+                };
+                if before == new_persistence {
+                    return None;
+                }
+                Edit::LayerPersistence {
+                    index,
+                    before,
+                    after: new_persistence,
                 }
             }
 
             // --- Edit tiles ---
-            SceneCommand::PaintHex(hex_coord) => {
-                if let Some(layer) = self
-                    .active_layer
-                    .and_then(|index| self.inner.get_mut(index))
-                {
-                    match &mut layer.inner {
-                        LayerInner::Tiles(store) => store.paint(hex_coord),
-                        LayerInner::InvertedTiles(store) => store.erase(hex_coord),
-                        // Noise layer cannot be drawn to
-                        LayerInner::Perlin(_) => (),
-                    }
+            SceneMessage::PaintHex(hex_coord) => {
+                let active_index = self.active_layer?;
+                let layer = self.inner.get(active_index)?;
+
+                let (before, after) = match &layer.inner {
+                    LayerInner::Tiles(store) => (store.tiles.contains(&hex_coord), true),
+                    LayerInner::InvertedTiles(store) => (!store.tiles.contains(&hex_coord), false),
+                    // Noise layer cannot be drawn to
+                    LayerInner::Perlin(_) => return None,
+                };
+
+                if before == after {
+                    return None;
+                }
+
+                Edit::Tile {
+                    layer: active_index,
+                    coord: hex_coord,
+                    before,
+                    after,
                 }
             }
-            SceneCommand::EraseHex(hex_coord) => {
-                if let Some(layer) = self
-                    .active_layer
-                    .and_then(|index| self.inner.get_mut(index))
-                {
-                    match &mut layer.inner {
-                        LayerInner::Tiles(store) => store.erase(hex_coord),
-                        LayerInner::InvertedTiles(store) => store.paint(hex_coord),
-                        // Noise layer cannot be drawn changed
-                        LayerInner::Perlin(_) => (),
+
+            SceneMessage::EraseHex(hex_coord) => {
+                let active_index = self.active_layer?;
+                let layer = self.inner.get(active_index)?;
+
+                let (before, after) = match &layer.inner {
+                    LayerInner::Tiles(store) => (store.tiles.contains(&hex_coord), false),
+                    LayerInner::InvertedTiles(store) => (!store.tiles.contains(&hex_coord), true),
+                    // Noise layer cannot be drawn to
+                    LayerInner::Perlin(_) => return None,
+                };
+
+                if before == after {
+                    return None;
+                }
+
+                Edit::Tile {
+                    layer: active_index,
+                    coord: hex_coord,
+                    before,
+                    after,
+                }
+            }
+
+            SceneMessage::FillFromHex(hex_coord) => {
+                let index = self.active_layer?;
+                let layer = self.inner.get(index)?;
+                let store = match &layer.inner {
+                    LayerInner::Tiles(store) | LayerInner::InvertedTiles(store) => store,
+                    LayerInner::Perlin(_) => return None,
+                };
+                // Tiles layers fill by painting the region; InvertedTiles fill by erasing it.
+                let insert = matches!(layer.inner, LayerInner::Tiles(_));
+
+                // If the layer is empty, short circuit and invert
+                let Some(bounds) = store.get_bounds() else {
+                    Edit::LayerInverted { index };
+                    let edit = Edit::LayerInverted { index };
+                    return Some(edit);
+                };
+
+                match flood_fill(hex_coord, store.get_all_tiles(), bounds) {
+                    Some(region) => {
+                        let edits = region
+                            .into_iter()
+                            .filter_map(|coord| {
+                                let before = store.exists_at(&coord);
+                                (before != insert).then_some(Edit::Tile {
+                                    layer: index,
+                                    coord,
+                                    before,
+                                    after: insert,
+                                })
+                            })
+                            .collect::<Vec<_>>();
+                        Edit::coalesce(edits)?
+                    }
+                    None => Edit::LayerInverted { index },
+                }
+            }
+        };
+
+        Some(edit)
+    }
+
+    /// The single place which mutates state of `Scene`.
+    /// Can perform changes in forward or reverse
+    ///
+    /// `edit` is applied to Scene's state
+    /// `forward` selects if the change is done or undone
+    fn apply_edit(&mut self, edit: &Edit, forward: bool) {
+        self.revision = self.revision.wrapping_add(1);
+
+        match edit {
+            Edit::Batch { edits } => {
+                if forward {
+                    for edit in edits {
+                        self.apply_edit(edit, true);
+                    }
+                } else {
+                    for edit in edits.iter().rev() {
+                        self.apply_edit(edit, false);
                     }
                 }
             }
 
-            SceneCommand::FillFromHex(hex_coord) => {
-                if let Some(layer) = self
-                    .active_layer
-                    .and_then(|index| self.inner.get_mut(index))
-                {
-                    let store = match &layer.inner {
-                        LayerInner::Tiles(store) => store,
-                        LayerInner::InvertedTiles(store) => store,
+            Edit::Tile {
+                layer,
+                coord,
+                before,
+                after,
+            } => {
+                if let Some(store) = self.inner.get_mut(*layer).and_then(|l| match &mut l.inner {
+                    LayerInner::Tiles(store) | LayerInner::InvertedTiles(store) => Some(store),
+                    LayerInner::Perlin(_) => None,
+                }) {
+                    let is_tile_present = match forward {
+                        true => *after,
+                        false => *before,
+                    };
+                    if is_tile_present {
+                        store.tiles.insert(*coord);
+                    } else {
+                        store.tiles.remove(coord);
+                    }
+                }
+            }
+
+            Edit::LayerAdded { index, layer } => {
+                if forward {
+                    self.inner.insert(*index, layer.clone());
+                } else if *index < self.inner.len() {
+                    self.inner.remove(*index);
+                }
+            }
+            Edit::LayerRemoved { index, layer } => {
+                if forward {
+                    if *index < self.inner.len() {
+                        self.inner.remove(*index);
+                    }
+                } else {
+                    self.inner.insert(*index, layer.clone());
+                }
+            }
+            Edit::LayersSwapped { a, b } => {
+                if *a < self.inner.len() && *b < self.inner.len() {
+                    self.inner.swap(*a, *b);
+                }
+            }
+            Edit::LayerInverted { index } => {
+                if let Some(layer) = self.inner.get_mut(*index) {
+                    layer.inner = match &layer.inner {
+                        LayerInner::Tiles(store) => LayerInner::InvertedTiles(store.clone()),
+                        LayerInner::InvertedTiles(store) => LayerInner::Tiles(store.clone()),
                         LayerInner::Perlin(_) => return,
                     };
+                }
+            }
 
-                    // If the layer is empty, short circuit and invert
-                    let Some(bounds) = store.get_bounds() else {
-                        layer.inner = match &layer.inner {
-                            LayerInner::Tiles(store) => LayerInner::InvertedTiles(store.clone()),
-                            LayerInner::InvertedTiles(store) => LayerInner::Tiles(store.clone()),
-                            LayerInner::Perlin(_) => return,
-                        };
-                        return;
+            Edit::LayerVisibility {
+                index,
+                before,
+                after,
+            } => {
+                if let Some(layer) = self.inner.get_mut(*index) {
+                    layer.visible = if forward { *after } else { *before };
+                }
+            }
+            Edit::LayerName {
+                index,
+                before,
+                after,
+            } => {
+                if let Some(layer) = self.inner.get_mut(*index) {
+                    layer.name = if forward {
+                        after.clone()
+                    } else {
+                        before.clone()
                     };
-
-                    match flood_fill(hex_coord, &store.get_all_tiles(), bounds) {
-                        Some(region) => match &mut layer.inner {
-                            LayerInner::Tiles(store) => {
-                                region.into_iter().for_each(|c| store.paint(c))
-                            }
-                            LayerInner::InvertedTiles(store) => {
-                                region.into_iter().for_each(|c| store.erase(c))
-                            }
-                            LayerInner::Perlin(_) => return,
-                        },
-                        None => {
-                            layer.inner = match &layer.inner {
-                                LayerInner::Tiles(store) => {
-                                    LayerInner::InvertedTiles(store.clone())
-                                }
-                                LayerInner::InvertedTiles(store) => {
-                                    LayerInner::Tiles(store.clone())
-                                }
-                                LayerInner::Perlin(_) => return,
-                            };
+                }
+            }
+            Edit::LayerColour {
+                index,
+                before,
+                after,
+            } => {
+                if let Some(layer) = self.inner.get_mut(*index) {
+                    let colour = if forward { *after } else { *before };
+                    match &mut layer.inner {
+                        LayerInner::Tiles(store) | LayerInner::InvertedTiles(store) => {
+                            store.set_colour(colour)
                         }
+                        LayerInner::Perlin(_) => (),
+                    }
+                }
+            }
+
+            Edit::LayerSeed {
+                index,
+                before,
+                after,
+            } => {
+                if let Some(Layer {
+                    inner: LayerInner::Perlin(perlin),
+                    ..
+                }) = self.inner.get_mut(*index)
+                {
+                    perlin.set_seed(if forward { *after } else { *before });
+                }
+            }
+            Edit::LayerScale {
+                index,
+                before,
+                after,
+            } => {
+                if let Some(Layer {
+                    inner: LayerInner::Perlin(perlin),
+                    ..
+                }) = self.inner.get_mut(*index)
+                {
+                    perlin.set_frequency(if forward { *after } else { *before });
+                }
+            }
+            Edit::LayerThreshold {
+                index,
+                before,
+                after,
+            } => {
+                if let Some(Layer {
+                    inner: LayerInner::Perlin(perlin),
+                    ..
+                }) = self.inner.get_mut(*index)
+                {
+                    perlin.set_threshold(if forward { *after } else { *before });
+                }
+            }
+            Edit::LayerOctaves {
+                index,
+                before,
+                after,
+            } => {
+                if let Some(Layer {
+                    inner: LayerInner::Perlin(perlin),
+                    ..
+                }) = self.inner.get_mut(*index)
+                {
+                    perlin.octaves = if forward { *after } else { *before };
+                }
+            }
+            Edit::LayerPersistence {
+                index,
+                before,
+                after,
+            } => {
+                if let Some(Layer {
+                    inner: LayerInner::Perlin(perlin),
+                    ..
+                }) = self.inner.get_mut(*index)
+                {
+                    if let NoiseOctaves::Many { persistence, .. } = &mut perlin.octaves {
+                        *persistence = if forward { *after } else { *before };
                     }
                 }
             }

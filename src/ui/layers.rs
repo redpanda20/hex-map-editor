@@ -9,7 +9,7 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::Message,
-    domain::{Layer, LayerInner, LayerType, PerlinNoiseLayer, Scene, SceneCommand, SparseTiles},
+    domain::{Layer, LayerInner, LayerType, PerlinNoiseLayer, Scene, SceneMessage, SparseTiles},
 };
 
 #[derive(Debug, Clone)]
@@ -41,9 +41,9 @@ impl Layers {
             LayersMessage::DragLayerDropped { dropped } => {
                 if let Some(picked) = self.dragged_layer.take() {
                     let swap =
-                        Task::done(Message::Scene(SceneCommand::SwapLayers(picked, dropped)));
+                        Task::done(Message::Scene(SceneMessage::SwapLayers(picked, dropped)));
                     let focus_old =
-                        Task::done(Message::Scene(SceneCommand::SetActiveLayer(Some(dropped))));
+                        Task::done(Message::Scene(SceneMessage::SetActiveLayer(Some(dropped))));
                     return Task::batch(vec![swap, focus_old]);
                 }
             }
@@ -79,7 +79,7 @@ impl Layers {
                 .align_y(alignment::Vertical::Center),
         )
         .width(Length::Fill)
-        .on_press(Message::Scene(SceneCommand::AddLayer(
+        .on_press(Message::Scene(SceneMessage::AddLayer(
             "Layer".to_string(),
             self.active_layer_type,
         )));
@@ -141,7 +141,7 @@ fn layer_preview<'a>(
     });
 
     mouse_area(content)
-        .on_press(Message::Scene(SceneCommand::SetActiveLayer(Some(layer_id))))
+        .on_press(Message::Scene(SceneMessage::SetActiveLayer(Some(layer_id))))
         .on_release(Message::Layers(LayersMessage::DragLayerDropped {
             dropped: layer_id,
         }))
@@ -165,7 +165,7 @@ fn visible_toggle<'a>(layer_id: usize, visible: &bool) -> Button<'a, Message> {
     button(inner)
         .style(button::text)
         .padding(0)
-        .on_press(Message::Scene(SceneCommand::EditLayerVisibility(
+        .on_press(Message::Scene(SceneMessage::EditLayerVisibility(
             layer_id, !visible,
         )))
 }
@@ -195,6 +195,6 @@ fn thumbnail_noise<'a>(_inner: &'a PerlinNoiseLayer) -> Element<'a, Message> {
 
 fn delete_button<'a>(layer_id: usize) -> Button<'a, Message> {
     button(bootstrap::trash_fill())
-        .on_press(Message::Scene(SceneCommand::RemoveLayer(layer_id)))
+        .on_press(Message::Scene(SceneMessage::RemoveLayer(layer_id)))
         .style(button::danger)
 }

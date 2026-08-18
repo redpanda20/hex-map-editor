@@ -10,7 +10,7 @@ use iced::{
 
 use crate::{
     app::Message,
-    domain::{HexCoord, Scene, SceneCommand, Tool, hexes_in_range},
+    domain::{HexCoord, HistoryCommand, Scene, SceneMessage, Tool, hexes_in_range},
 };
 
 pub fn canvas_panel<'a>(scene: &'a Scene) -> Element<'a, Message> {
@@ -114,10 +114,14 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                 let coord = self.screen_to_hex(state, cursor_pos);
 
                 let message = match self.scene.tool {
-                    Tool::Paint => Message::Scene(SceneCommand::PaintHex(coord)),
-                    Tool::Erase => Message::Scene(SceneCommand::EraseHex(coord)),
+                    Tool::Paint => Message::History(HistoryCommand::BeginTransaction(
+                        SceneMessage::PaintHex(coord),
+                    )),
+                    Tool::Erase => Message::History(HistoryCommand::BeginTransaction(
+                        SceneMessage::EraseHex(coord),
+                    )),
                     Tool::Pan => return Some(Action::capture()),
-                    Tool::Fill => Message::Scene(SceneCommand::FillFromHex(coord)),
+                    Tool::Fill => Message::Scene(SceneMessage::FillFromHex(coord)),
                 };
 
                 Some(Action::publish(message).and_capture())
@@ -128,7 +132,11 @@ impl<'a> Program<Message> for HexCanvas<'a> {
             | Event::Touch(touch::Event::FingerLost { .. }) => {
                 state.dragging = false;
                 state.last_drag_pos = None;
-                None
+
+                Some(
+                    Action::publish(Message::History(HistoryCommand::CommitTransaction))
+                        .and_capture(),
+                )
             }
 
             Event::Mouse(mouse::Event::CursorMoved { .. })
@@ -143,8 +151,8 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                 let coord = self.screen_to_hex(state, cursor_pos);
 
                 let message = match self.scene.tool {
-                    Tool::Paint => Message::Scene(SceneCommand::PaintHex(coord)),
-                    Tool::Erase => Message::Scene(SceneCommand::EraseHex(coord)),
+                    Tool::Paint => Message::Scene(SceneMessage::PaintHex(coord)),
+                    Tool::Erase => Message::Scene(SceneMessage::EraseHex(coord)),
                     // Bucket fill is explicitly disabled while dragging
                     // This is to avoid triggering epilieptic seizures
                     Tool::Fill => return None,

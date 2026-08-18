@@ -4,7 +4,7 @@ use iced::{
 };
 
 use crate::{
-    domain::{Scene, SceneCommand},
+    domain::{History, HistoryCommand, Scene, SceneMessage},
     infrastructure::{
         IoProcess, SceneV1, export_png, load_project_async, save_bytes_async, save_project_async,
     },
@@ -16,6 +16,7 @@ use crate::{
 
 pub struct App {
     pub scene: Scene,
+    pub history: History,
 
     pub toolbar: Toolbar,
     pub layers: Layers,
@@ -33,7 +34,8 @@ pub enum Message {
     Layers(LayersMessage),
     Toolbar(ToolbarMessage),
 
-    Scene(SceneCommand),
+    Scene(SceneMessage),
+    History(HistoryCommand),
 
     Load(IoProcess<SceneV1>),
     Save(IoProcess<()>),
@@ -44,6 +46,7 @@ impl App {
     pub fn new() -> (Self, Task<Message>) {
         let app = Self {
             scene: Scene::new(),
+            history: History::new(),
             toolbar: Toolbar::new(),
             layers: Layers::new(),
             inspector: Inspector::new(),
@@ -79,7 +82,11 @@ impl App {
             Message::Layers(message) => return self.layers.update(message),
             Message::Toolbar(message) => return self.toolbar.update(message),
 
-            Message::Scene(command) => self.scene.update(command),
+            Message::Scene(message) => {
+                let edit = self.scene.update(message);
+                self.history.apply(edit);
+            }
+            Message::History(command) => return self.history.update(command, &mut self.scene),
 
             Message::Export(IoProcess::Start) => {
                 let bytes = export_png(&self.scene);

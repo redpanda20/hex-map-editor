@@ -5,6 +5,7 @@ use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use crate::domain::{HexBounds, HexCoord};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NoiseOctaves {
     One,
     Many { count: usize, persistence: f32 },
@@ -12,6 +13,7 @@ pub enum NoiseOctaves {
 
 const TABLE_SIZE: usize = 64;
 
+#[derive(Debug, Clone)]
 pub struct PerlinNoiseLayer {
     pub seed: u64,
     gradient_table: [Vector; TABLE_SIZE],

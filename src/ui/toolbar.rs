@@ -6,7 +6,7 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::Message,
-    domain::{Scene, SceneCommand, Tool},
+    domain::{HistoryCommand, Scene, SceneMessage, Tool},
     infrastructure::IoProcess,
 };
 
@@ -28,7 +28,7 @@ impl Toolbar {
         let current_tool = scene.tool.clone();
 
         let brush_tool = button(bootstrap::brush())
-            .on_press(Message::Scene(SceneCommand::ChangeTool(Tool::Paint)))
+            .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Paint)))
             .style(move |theme, mut status| {
                 if scene.tool == Tool::Paint {
                     status = button::Status::Disabled
@@ -44,7 +44,7 @@ impl Toolbar {
         );
 
         let move_tool = button(bootstrap::arrows_move())
-            .on_press(Message::Scene(SceneCommand::ChangeTool(Tool::Pan)))
+            .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Pan)))
             .style(move |theme, mut status| {
                 if current_tool == Tool::Pan {
                     status = button::Status::Disabled
@@ -60,7 +60,7 @@ impl Toolbar {
         );
 
         let erase_tool = button(bootstrap::eraser_fill())
-            .on_press(Message::Scene(SceneCommand::ChangeTool(Tool::Erase)))
+            .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Erase)))
             .style(move |theme, mut status| {
                 if current_tool == Tool::Erase {
                     status = button::Status::Disabled
@@ -76,7 +76,7 @@ impl Toolbar {
         );
 
         let paint_tool = button(bootstrap::paint_bucket())
-            .on_press(Message::Scene(SceneCommand::ChangeTool(Tool::Fill)))
+            .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Fill)))
             .style(move |theme, mut status| {
                 if current_tool == Tool::Fill {
                     status = button::Status::Disabled
@@ -90,6 +90,13 @@ impl Toolbar {
                 .style(container::bordered_box),
             tooltip::Position::Right,
         );
+
+        let undo = button(bootstrap::arrow_counterclockwise())
+            .style(button::subtle)
+            .on_press(Message::History(HistoryCommand::Undo));
+        let redo = button(bootstrap::arrow_clockwise())
+            .style(button::subtle)
+            .on_press(Message::History(HistoryCommand::Redo));
 
         let save_scene = button(bootstrap::floppy_fill())
             .style(button::subtle)
@@ -112,8 +119,8 @@ impl Toolbar {
             tooltip::Position::Right,
         );
 
-        let export_png = button(bootstrap::file_earmark_image())
-            .on_press(Message::Export(IoProcess::Start));
+        let export_png =
+            button(bootstrap::file_earmark_image()).on_press(Message::Export(IoProcess::Start));
         let export_png = tooltip(
             export_png,
             container("Export scene as a PNG")
@@ -128,6 +135,9 @@ impl Toolbar {
             move_tool,
             erase_tool,
             paint_tool,
+            rule::horizontal(1),
+            undo,
+            redo,
             space::vertical(),
             save_scene,
             load_scene,
