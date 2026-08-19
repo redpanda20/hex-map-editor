@@ -9,8 +9,8 @@ use crate::{
         IoProcess, SceneV1, export_png, load_project_async, save_bytes_async, save_project_async,
     },
     ui::{
-        Inspector, InspectorMessage, Layers, LayersMessage, Panes, PanesMessage, ToastMessage,
-        Toasts, Toolbar, ToolbarMessage, canvas_panel,
+        Inspector, InspectorMessage, Keybinds, Layers, LayersMessage, Panes, PanesMessage,
+        ToastMessage, Toasts, Toolbar, ToolbarMessage, canvas_panel,
     },
 };
 
@@ -21,8 +21,9 @@ pub struct App {
     pub toolbar: Toolbar,
     pub layers: Layers,
     pub inspector: Inspector,
-    pub toasts: Toasts,
 
+    pub toasts: Toasts,
+    pub keybinds: Keybinds,
     pub panes: Panes,
 }
 
@@ -51,6 +52,7 @@ impl App {
             layers: Layers::new(),
             inspector: Inspector::new(),
             toasts: Toasts::new(),
+            keybinds: Keybinds::new(),
             panes: Panes::new(),
         };
 
@@ -66,7 +68,9 @@ impl App {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        self.toasts.subscription()
+        let subscriptions = vec![self.toasts.subscription(), self.keybinds.subscription()];
+
+        Subscription::batch(subscriptions)
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {

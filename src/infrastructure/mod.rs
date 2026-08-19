@@ -9,7 +9,7 @@ pub use export::export_png;
 pub use io::{load_project_async, save_bytes_async, save_project_async};
 pub use schema::SceneV1;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub enum IoProcess<T> {
     Start,
     Cancelled,

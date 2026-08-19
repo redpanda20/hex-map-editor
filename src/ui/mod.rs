@@ -1,5 +1,6 @@
 mod canvas;
 mod inspector;
+mod keybinds;
 mod layers;
 mod panes;
 mod toasts;
@@ -15,3 +16,5 @@ pub use toolbar::{Toolbar, ToolbarMessage};
 // Widgets
 mod colour_picker;
 use colour_picker::colour_picker;
+
+pub use keybinds::Keybinds;
