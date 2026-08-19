@@ -9,8 +9,8 @@ use crate::{
         IoProcess, SceneV1, export_png, load_project_async, save_bytes_async, save_project_async,
     },
     ui::{
-        Inspector, InspectorMessage, Keybinds, Layers, LayersMessage, Panes, PanesMessage,
-        ToastMessage, Toasts, Toolbar, ToolbarMessage, canvas_panel,
+        Inspector, InspectorMessage, KeybindMessage, Keybinds, Layers, LayersMessage, Panes,
+        PanesMessage, ToastMessage, Toasts, Toolbar, ToolbarMessage, canvas_panel,
     },
 };
 
@@ -29,14 +29,16 @@ pub struct App {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Panes(PanesMessage),
-    Toasts(ToastMessage),
+    Scene(SceneMessage),
+    History(HistoryCommand),
+
     Inspector(InspectorMessage),
     Layers(LayersMessage),
     Toolbar(ToolbarMessage),
 
-    Scene(SceneMessage),
-    History(HistoryCommand),
+    Toasts(ToastMessage),
+    Keybinds(KeybindMessage),
+    Panes(PanesMessage),
 
     Load(IoProcess<SceneV1>),
     Save(IoProcess<()>),
@@ -52,7 +54,7 @@ impl App {
             layers: Layers::new(),
             inspector: Inspector::new(),
             toasts: Toasts::new(),
-            keybinds: Keybinds::new(),
+            keybinds: Keybinds::default(),
             panes: Panes::new(),
         };
 
@@ -82,6 +84,8 @@ impl App {
         match message {
             Message::Panes(message) => self.panes.update(message),
             Message::Toasts(message) => return self.toasts.update(message),
+            Message::Keybinds(message) => self.keybinds.update(message),
+
             Message::Inspector(message) => return self.inspector.update(message),
             Message::Layers(message) => return self.layers.update(message),
             Message::Toolbar(message) => return self.toolbar.update(message),
@@ -92,36 +96,28 @@ impl App {
             }
             Message::History(command) => return self.history.update(command, &mut self.scene),
 
-            Message::Export(IoProcess::Start) => {
-                let bytes = export_png(&self.scene);
-                return save_bytes_async(bytes, "hexmap.png");
-            }
-            Message::Export(IoProcess::Cancelled) => {
-                eprintln!("Export cancelled");
-            }
-            Message::Export(IoProcess::Finished(result)) => match result {
-                Ok(_) => eprintln!("Export succeeded"),
-                Err(err) => eprintln!("Export failed: {err}"),
+            Message::Export(process) => match process {
+                IoProcess::Start => return save_bytes_async(export_png(&self.scene), "hexmap.png"),
+                IoProcess::Cancelled => eprintln!("Export cancelled"),
+                IoProcess::Finished(Ok(_)) => eprintln!("Export succeeded"),
+                IoProcess::Finished(Err(err)) => eprintln!("Export failed: {err}"),
             },
 
-            Message::Save(IoProcess::Start) => return save_project_async(&self.scene),
-            Message::Save(IoProcess::Cancelled) => {
-                eprintln!("Project save cancelled");
-            }
-            Message::Save(IoProcess::Finished(result)) => match result {
-                Ok(_) => eprintln!("Project save succeeded"),
-                Err(err) => eprintln!("Project save failed: {err}"),
+            Message::Save(process) => match process {
+                IoProcess::Start => return save_project_async(&self.scene),
+                IoProcess::Cancelled => eprintln!("Project save cancelled"),
+                IoProcess::Finished(Ok(_)) => eprintln!("Project save succeeded"),
+                IoProcess::Finished(Err(err)) => eprintln!("Project save failed: {err}"),
             },
 
-            Message::Load(IoProcess::Start) => return load_project_async(),
-            Message::Load(IoProcess::Cancelled) => {
-                eprintln!("Project load cancelled");
-            }
-            Message::Load(IoProcess::Finished(result)) => match result {
-                Ok(document) => {
+            Message::Load(process) => match process {
+                IoProcess::Start => return load_project_async(),
+                IoProcess::Cancelled => eprintln!("Project load cancelled"),
+                IoProcess::Finished(Ok(document)) => {
                     self.scene = Scene::from(document);
+                    eprintln!("Project load succeeded")
                 }
-                Err(err) => eprintln!("Project save failed: {err}"),
+                IoProcess::Finished(Err(err)) => eprintln!("Project load failed: {err}"),
             },
         }
 
