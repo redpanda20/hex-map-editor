@@ -19,7 +19,7 @@ pub fn main() -> iced::Result {
     }
 
     #[allow(unused_mut)]
-    let mut app = iced::application(App::new, App::update, App::view)
+    let mut app = iced::application(App::boot, App::update, App::view)
         .antialiasing(true)
         .title(App::title)
         .theme(App::theme)

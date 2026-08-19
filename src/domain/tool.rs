@@ -1,13 +1,8 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Tool {
     Paint,
     Erase,
+    #[default]
     Pan,
     Fill,
-}
-
-impl Default for Tool {
-    fn default() -> Self {
-        Tool::Pan
-    }
 }

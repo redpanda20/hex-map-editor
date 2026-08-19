@@ -14,6 +14,7 @@ use crate::{
     },
 };
 
+#[derive(Default)]
 pub struct App {
     pub scene: Scene,
     pub history: History,
@@ -46,23 +47,12 @@ pub enum Message {
 }
 
 impl App {
-    pub fn new() -> (Self, Task<Message>) {
-        let app = Self {
-            scene: Scene::new(),
-            history: History::new(),
-            toolbar: Toolbar::new(),
-            layers: Layers::new(),
-            inspector: Inspector::new(),
-            toasts: Toasts::new(),
-            keybinds: Keybinds::default(),
-            panes: Panes::new(),
-        };
-
-        (app, Task::none())
+    pub fn boot() -> (Self, Task<Message>) {
+        (App::default(), Task::none())
     }
 
     pub fn title(&self) -> String {
-        format!("HexMap Editor")
+        "HexMap Editor".to_string()
     }
 
     pub fn theme(&self) -> Option<Theme> {

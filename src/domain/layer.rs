@@ -1,30 +1,33 @@
 pub mod noise;
 pub mod tile_store;
 
+use std::fmt::Display;
+
 use iced::Color;
 pub use tile_store::SparseTiles;
 
 use crate::domain::HexCoord;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum LayerType {
+    #[default]
     Tiles,
     PerlinNoise,
 }
-impl Default for LayerType {
-    fn default() -> Self {
-        LayerType::Tiles
-    }
-}
-impl ToString for LayerType {
-    fn to_string(&self) -> String {
+
+impl Display for LayerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LayerType::Tiles => "Tile".to_string(),
-            LayerType::PerlinNoise => "Noise".to_string(),
+            LayerType::Tiles => write!(f, "Tile"),
+            LayerType::PerlinNoise => write!(f, "Noise"),
         }
     }
 }
 
+#[allow(
+    clippy::large_enum_variant,
+    reason = "Indirection via Boxed<Trait> will be implemented in the future"
+)]
 #[derive(Debug, Clone)]
 pub enum LayerInner {
     Tiles(SparseTiles),

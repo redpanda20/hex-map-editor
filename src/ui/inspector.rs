@@ -17,17 +17,12 @@ pub enum InspectorMessage {
     LayerRenameStart(String),
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct Inspector {
     active_layer_name: Option<String>,
 }
 
 impl Inspector {
-    pub fn new() -> Self {
-        Self {
-            active_layer_name: None,
-        }
-    }
-
     pub fn update(&mut self, message: InspectorMessage) -> Task<Message> {
         match message {
             InspectorMessage::LayerRename(new_name) => self.active_layer_name = new_name,
@@ -93,7 +88,7 @@ impl Inspector {
 
 fn sparse_tile_details<'a>(
     layer_id: usize,
-    starting_name: &String,
+    starting_name: &str,
     name: &Option<String>,
     visible: &bool,
     tiles: &SparseTiles,
@@ -113,7 +108,7 @@ fn sparse_tile_details<'a>(
 
 fn perlin_noise_details<'a>(
     layer_id: usize,
-    starting_name: &String,
+    starting_name: &str,
     name: &Option<String>,
     visible: &bool,
     content: &PerlinNoiseLayer,
@@ -207,13 +202,13 @@ fn perlin_noise_details<'a>(
 
 fn name_input<'a>(
     layer_id: usize,
-    starting_name: &String,
+    starting_name: &str,
     name: &Option<String>,
 ) -> Element<'a, InspectorMessage> {
     if let Some(name) = name {
         row![
             bootstrap::input_cursor().style(text::secondary),
-            text_input("Layer name...", &name)
+            text_input("Layer name...", name)
                 .on_input(|s| InspectorMessage::LayerRename(Some(s)))
                 .on_submit(InspectorMessage::LayerRenameCommit(layer_id))
                 .width(Length::Fill)
@@ -227,12 +222,12 @@ fn name_input<'a>(
             button(
                 row![
                     bootstrap::input_cursor().style(text::secondary),
-                    text(starting_name.clone()).height(20.0)
+                    text(starting_name.to_owned()).height(20.0)
                 ]
                 .spacing(4.0)
                 .align_y(alignment::Vertical::Center),
             )
-            .on_press(InspectorMessage::LayerRenameStart(starting_name.clone()))
+            .on_press(InspectorMessage::LayerRenameStart(starting_name.to_owned()))
             .style(button::text),
             space::horizontal()
         ]

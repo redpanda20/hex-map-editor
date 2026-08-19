@@ -26,13 +26,6 @@ pub struct Layers {
 }
 
 impl Layers {
-    pub fn new() -> Self {
-        Self {
-            active_layer_type: LayerType::Tiles,
-            dragged_layer: None,
-        }
-    }
-
     pub fn update(&mut self, message: LayersMessage) -> Task<Message> {
         match message {
             LayersMessage::ChangeLayerType(layer_type) => self.active_layer_type = layer_type,
@@ -104,6 +97,14 @@ impl Layers {
     }
 }
 
+impl Default for Layers {
+    fn default() -> Self {
+        Self {
+            active_layer_type: LayerType::Tiles,
+            dragged_layer: None,
+        }
+    }
+}
 fn layer_preview<'a>(
     layer: &'a Layer,
     layer_id: usize,

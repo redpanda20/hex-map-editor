@@ -14,6 +14,7 @@ pub enum HistoryCommand {
 }
 
 /// Records every content changing `SceneCommand` as a series of edits.
+#[derive(Debug, Default, Clone)]
 pub struct History {
     pub undo_stack: Vec<Edit>,
     pub redo_stack: Vec<Edit>,
@@ -24,14 +25,6 @@ pub struct History {
 }
 
 impl History {
-    pub fn new() -> Self {
-        Self {
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
-            open_transaction: None,
-        }
-    }
-
     /// Include an edit in history
     ///
     /// Pushes change to transaction if available,
@@ -74,11 +67,11 @@ impl History {
     /// A transaction that produced no edits pushes nothing,
     /// so an empty drag doesn't create a no-op undo entry.
     fn commit_transaction(&mut self) {
-        if let Some(batch) = self.open_transaction.take() {
-            if let Some(edit) = Edit::coalesce(batch) {
-                self.undo_stack.push(edit);
-                self.redo_stack.clear();
-            }
+        if let Some(batch) = self.open_transaction.take()
+            && let Some(edit) = Edit::coalesce(batch)
+        {
+            self.undo_stack.push(edit);
+            self.redo_stack.clear();
         }
     }
 

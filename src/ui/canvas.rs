@@ -281,7 +281,7 @@ impl<'a> HexCanvas<'a> {
             let centre = hex.to_cartesian() * self.hex_size;
             frame.with_save(|frame| {
                 frame.translate(centre);
-                frame.stroke(&hex_path, grid_stroke);
+                frame.stroke(hex_path, grid_stroke);
             })
         }
     }

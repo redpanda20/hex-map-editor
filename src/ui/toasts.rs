@@ -28,74 +28,6 @@ pub struct Toasts {
 }
 
 impl Toasts {
-    pub fn new() -> Self {
-        Self {
-            toasts: Vec::new(),
-            timeout: DEFAULT_TIMEOUT,
-        }
-    }
-
-    pub fn _timeout(self, seconds: u64) -> Self {
-        Self {
-            timeout: Duration::from_secs(seconds),
-            ..self
-        }
-    }
-
-    pub fn subscription(&self) -> Subscription<Message> {
-        if let Some(earliest) = self.toasts.iter().min_by_key(|toast| toast.lifetime) {
-            iced::time::every(earliest.lifetime - Instant::now())
-                .map(|instant| ToastMessage::Tick(instant))
-                .map(Message::Toasts)
-        } else {
-            Subscription::none()
-        }
-    }
-
-    pub fn update(&mut self, toast_event: ToastMessage) -> Task<Message> {
-        match toast_event {
-            ToastMessage::RemoveToast(index) => {
-                self.toasts.remove(index);
-            }
-            ToastMessage::Tick(instant) => {
-                self.toasts.retain(|toast| toast.lifetime > instant);
-            }
-        };
-
-        Task::none()
-    }
-
-    pub fn view(&self) -> Element<'_, ToastMessage> {
-        let toasts: Vec<Element<'_, ToastMessage>> = self
-            .toasts
-            .iter()
-            .enumerate()
-            .map(|(index, toast)| {
-                tooltip(
-                    container(row![
-                        text(toast.title.as_str()),
-                        space::horizontal(),
-                        button(bootstrap::x_lg()).on_press(ToastMessage::RemoveToast(index))
-                    ])
-                    .padding(4.0)
-                    .style(container::rounded_box)
-                    .max_width(200.0),
-                    container(text(toast.body.as_str()))
-                        .padding(4.0)
-                        .style(container::rounded_box),
-                    tooltip::Position::Right,
-                )
-                .into()
-            })
-            .collect();
-
-        container(column(toasts).spacing(4.0))
-            .align_left(Length::Fill)
-            .align_bottom(Length::Fill)
-            .padding([32.0, 64.0])
-            .into()
-    }
-
     pub fn listen_to_events(&mut self, message: &Message) {
         match message {
             Message::Export(IoProcess::Start) => self.add_toast(
@@ -150,5 +82,69 @@ impl Toasts {
             body,
             lifetime: Instant::now() + self.timeout,
         });
+    }
+}
+
+impl Toasts {
+    pub fn subscription(&self) -> Subscription<Message> {
+        if let Some(earliest) = self.toasts.iter().min_by_key(|toast| toast.lifetime) {
+            iced::time::every(earliest.lifetime - Instant::now())
+                .map(ToastMessage::Tick)
+                .map(Message::Toasts)
+        } else {
+            Subscription::none()
+        }
+    }
+
+    pub fn update(&mut self, toast_event: ToastMessage) -> Task<Message> {
+        match toast_event {
+            ToastMessage::RemoveToast(index) => {
+                self.toasts.remove(index);
+            }
+            ToastMessage::Tick(instant) => {
+                self.toasts.retain(|toast| toast.lifetime > instant);
+            }
+        };
+
+        Task::none()
+    }
+
+    pub fn view(&self) -> Element<'_, ToastMessage> {
+        let toasts: Vec<Element<'_, ToastMessage>> = self
+            .toasts
+            .iter()
+            .enumerate()
+            .map(|(index, toast)| {
+                tooltip(
+                    container(row![
+                        text(toast.title.as_str()),
+                        space::horizontal(),
+                        button(bootstrap::x_lg()).on_press(ToastMessage::RemoveToast(index))
+                    ])
+                    .padding(4.0)
+                    .style(container::rounded_box)
+                    .max_width(200.0),
+                    container(text(toast.body.as_str()))
+                        .padding(4.0)
+                        .style(container::rounded_box),
+                    tooltip::Position::Right,
+                )
+                .into()
+            })
+            .collect();
+
+        container(column(toasts).spacing(4.0))
+            .align_left(Length::Fill)
+            .align_bottom(Length::Fill)
+            .padding([32.0, 64.0])
+            .into()
+    }
+}
+impl Default for Toasts {
+    fn default() -> Self {
+        Self {
+            toasts: Vec::new(),
+            timeout: DEFAULT_TIMEOUT,
+        }
     }
 }

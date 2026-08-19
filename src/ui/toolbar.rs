@@ -13,20 +13,15 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum ToolbarMessage {}
 
+#[derive(Debug, Default, Clone)]
 pub struct Toolbar {}
 
 impl Toolbar {
-    pub fn new() -> Self {
-        Self {}
-    }
-
     pub fn update(&mut self, _message: ToolbarMessage) -> Task<Message> {
         Task::none()
     }
 
     pub fn view<'a>(&self, scene: &'a Scene, history: &'a History) -> Element<'a, Message> {
-        let current_tool = scene.tool.clone();
-
         let brush_tool = button(bootstrap::brush())
             .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Paint)))
             .style(move |theme, mut status| {
@@ -46,7 +41,7 @@ impl Toolbar {
         let move_tool = button(bootstrap::arrows_move())
             .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Pan)))
             .style(move |theme, mut status| {
-                if current_tool == Tool::Pan {
+                if scene.tool == Tool::Pan {
                     status = button::Status::Disabled
                 };
                 button::background(theme, status)
@@ -62,7 +57,7 @@ impl Toolbar {
         let erase_tool = button(bootstrap::eraser_fill())
             .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Erase)))
             .style(move |theme, mut status| {
-                if current_tool == Tool::Erase {
+                if scene.tool == Tool::Erase {
                     status = button::Status::Disabled
                 };
                 button::background(theme, status)
@@ -78,7 +73,7 @@ impl Toolbar {
         let paint_tool = button(bootstrap::paint_bucket())
             .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Fill)))
             .style(move |theme, mut status| {
-                if current_tool == Tool::Fill {
+                if scene.tool == Tool::Fill {
                     status = button::Status::Disabled
                 };
                 button::background(theme, status)

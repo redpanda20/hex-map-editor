@@ -36,6 +36,7 @@ pub enum SceneMessage {
     SetActiveLayer(Option<usize>),
 }
 
+#[derive(Debug, Clone)]
 pub struct Scene {
     pub inner: Vec<Layer>,
     pub active_layer: Option<usize>,
@@ -45,23 +46,6 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new() -> Self {
-        let inner = LayerInner::Tiles(SparseTiles::new(DEFAULT_COLORS[0]));
-
-        let layer = Layer {
-            name: "Layer 1".to_string(),
-            visible: true,
-            inner,
-        };
-
-        Self {
-            inner: vec![layer],
-            active_layer: Some(0),
-            tool: Tool::default(),
-            revision: 0,
-        }
-    }
-
     pub fn from_layers(inner: Vec<Layer>) -> Self {
         Self {
             inner,
@@ -348,29 +332,27 @@ impl Scene {
 
                 // If the layer is empty, short circuit and invert
                 let Some(bounds) = store.get_bounds() else {
-                    Edit::LayerInverted { index };
-                    let edit = Edit::LayerInverted { index };
-                    return Some(edit);
+                    return Some(Edit::LayerInverted { index });
                 };
 
-                match flood_fill(hex_coord, store.get_all_tiles(), bounds) {
-                    Some(region) => {
-                        let edits = region
-                            .into_iter()
-                            .filter_map(|coord| {
-                                let before = store.exists_at(&coord);
-                                (before != insert).then_some(Edit::Tile {
-                                    layer: index,
-                                    coord,
-                                    before,
-                                    after: insert,
-                                })
-                            })
-                            .collect::<Vec<_>>();
-                        Edit::coalesce(edits)?
-                    }
-                    None => Edit::LayerInverted { index },
-                }
+                // If the layer has no bound, short circuit and invert
+                let Some(region) = flood_fill(hex_coord, store.get_all_tiles(), bounds) else {
+                    return Some(Edit::LayerInverted { index });
+                };
+
+                let edits = region
+                    .into_iter()
+                    .filter_map(|coord| {
+                        let before = store.exists_at(&coord);
+                        (before != insert).then_some(Edit::Tile {
+                            layer: index,
+                            coord,
+                            before,
+                            after: insert,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                Edit::coalesce(edits)?
             }
         };
 
@@ -547,13 +529,15 @@ impl Scene {
                 after,
             } => {
                 if let Some(Layer {
-                    inner: LayerInner::Perlin(perlin),
+                    inner:
+                        LayerInner::Perlin(PerlinNoiseLayer {
+                            octaves: NoiseOctaves::Many { persistence, .. },
+                            ..
+                        }),
                     ..
                 }) = self.inner.get_mut(*index)
                 {
-                    if let NoiseOctaves::Many { persistence, .. } = &mut perlin.octaves {
-                        *persistence = if forward { *after } else { *before };
-                    }
+                    *persistence = if forward { *after } else { *before };
                 }
             }
         }
@@ -565,5 +549,24 @@ impl Scene {
             .filter(|layer| layer.visible)
             .map(|layer| &layer.inner)
             .collect::<Vec<_>>()
+    }
+}
+
+impl Default for Scene {
+    fn default() -> Self {
+        let inner = LayerInner::Tiles(SparseTiles::new(DEFAULT_COLORS[0]));
+
+        let layer = Layer {
+            name: "Layer 1".to_string(),
+            visible: true,
+            inner,
+        };
+
+        Self {
+            inner: vec![layer],
+            active_layer: Some(0),
+            tool: Tool::default(),
+            revision: 0,
+        }
     }
 }

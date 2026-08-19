@@ -99,11 +99,11 @@ impl From<&LayerInner> for LayerKindV1 {
 impl From<LayerKindV1> for LayerInner {
     fn from(kind: LayerKindV1) -> Self {
         match kind {
-            LayerKindV1::Tiles { colour, tiles } => LayerInner::Tiles(
-                SparseTiles::new_from_existing(colour.into(), tiles_from_v1(tiles)),
-            ),
+            LayerKindV1::Tiles { colour, tiles } => {
+                LayerInner::Tiles(SparseTiles::new_with(colour.into(), tiles_from_v1(tiles)))
+            }
             LayerKindV1::InvertedTiles { colour, tiles } => LayerInner::InvertedTiles(
-                SparseTiles::new_from_existing(colour.into(), tiles_from_v1(tiles)),
+                SparseTiles::new_with(colour.into(), tiles_from_v1(tiles)),
             ),
             LayerKindV1::Perlin {
                 seed,

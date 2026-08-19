@@ -18,7 +18,7 @@ impl SparseTiles {
         }
     }
 
-    pub fn new_from_existing(colour: Color, tiles: HashSet<HexCoord>) -> Self {
+    pub fn new_with(colour: Color, tiles: HashSet<HexCoord>) -> Self {
         SparseTiles { tiles, colour }
     }
 
@@ -61,9 +61,11 @@ impl SparseTiles {
     pub fn get_all_tiles(&self) -> &HashSet<HexCoord> {
         &self.tiles
     }
+}
 
+impl SparseTiles {
     pub fn exists_at(&self, coord: &HexCoord) -> bool {
-        self.tiles.contains(&coord)
+        self.tiles.contains(coord)
     }
 
     pub fn colour_at(&self, _coord: &HexCoord) -> Color {

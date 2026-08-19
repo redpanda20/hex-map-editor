@@ -438,18 +438,18 @@ impl<T: Picker> canvas::Program<Message> for PickerProgram<T> {
         // Stop evaulating if out of bounds
         let Some(relative_pos) = cursor.position_in(bounds) else {
             // Grace effect if user was holding mouse down
-            if state.is_selecting {
-                if let Some(Point { x, y }) = cursor.position() {
-                    let x = f32::clamp(x - bounds.x, 0.0, bounds.width);
-                    let y = f32::clamp(y - bounds.y, 0.0, bounds.height);
-                    let relative_pos = Point { x, y };
+            if state.is_selecting
+                && let Some(Point { x, y }) = cursor.position()
+            {
+                let x = f32::clamp(x - bounds.x, 0.0, bounds.width);
+                let y = f32::clamp(y - bounds.y, 0.0, bounds.height);
+                let relative_pos = Point { x, y };
 
-                    let new_colour = self.0.relative_position_to_colour(relative_pos, bounds);
-                    state.selected_point = relative_pos;
-                    state.is_selecting = false;
+                let new_colour = self.0.relative_position_to_colour(relative_pos, bounds);
+                state.selected_point = relative_pos;
+                state.is_selecting = false;
 
-                    return Some(Action::publish((self.0.on_change())(new_colour)).and_capture());
-                }
+                return Some(Action::publish((self.0.on_change())(new_colour)).and_capture());
             }
 
             state.is_selecting = false;

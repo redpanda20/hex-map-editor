@@ -19,8 +19,8 @@ pub struct Panes {
 }
 
 impl Panes {
-    pub fn new() -> Self {
-        let state = pane_grid::State::with_configuration(default_pane_config());
+    pub fn new_with(config: impl Into<pane_grid::Configuration<PaneKind>>) -> Self {
+        let state = pane_grid::State::with_configuration(config);
 
         Self { state }
     }
@@ -45,10 +45,10 @@ impl Panes {
     ) -> Element<'a, Message> {
         pane_grid(&self.state, |_id, state, _is_maximised| {
             let inner: Element<'_, Message> = match state {
-                PaneKind::Toolbar => toolbar(&scene),
-                PaneKind::LayerStack => layers(&scene),
-                PaneKind::Canvas => canvas(&scene),
-                PaneKind::Inspector => inspector(&scene),
+                PaneKind::Toolbar => toolbar(scene),
+                PaneKind::LayerStack => layers(scene),
+                PaneKind::Canvas => canvas(scene),
+                PaneKind::Inspector => inspector(scene),
             };
 
             pane_grid::Content::new(inner)
@@ -61,30 +61,34 @@ impl Panes {
     }
 }
 
-fn default_pane_config() -> pane_grid::Configuration<PaneKind> {
-    let toolbar_pane = pane_grid::Configuration::Pane(PaneKind::Toolbar);
-    let canvas_pane = pane_grid::Configuration::Pane(PaneKind::Canvas);
-    let layers_pane = pane_grid::Configuration::Pane(PaneKind::LayerStack);
-    let inspector_pane = pane_grid::Configuration::Pane(PaneKind::Inspector);
+impl Default for Panes {
+    fn default() -> Self {
+        let toolbar_pane = pane_grid::Configuration::Pane(PaneKind::Toolbar);
+        let canvas_pane = pane_grid::Configuration::Pane(PaneKind::Canvas);
+        let layers_pane = pane_grid::Configuration::Pane(PaneKind::LayerStack);
+        let inspector_pane = pane_grid::Configuration::Pane(PaneKind::Inspector);
 
-    let map_and_toolbar = pane_grid::Configuration::Split {
-        axis: pane_grid::Axis::Vertical,
-        ratio: 0.0,
-        a: Box::new(toolbar_pane),
-        b: Box::new(canvas_pane),
-    };
+        let map_and_toolbar = pane_grid::Configuration::Split {
+            axis: pane_grid::Axis::Vertical,
+            ratio: 0.0,
+            a: Box::new(toolbar_pane),
+            b: Box::new(canvas_pane),
+        };
 
-    let layers_editor = pane_grid::Configuration::Split {
-        axis: pane_grid::Axis::Horizontal,
-        ratio: 0.3,
-        a: Box::new(inspector_pane),
-        b: Box::new(layers_pane),
-    };
+        let layers_editor = pane_grid::Configuration::Split {
+            axis: pane_grid::Axis::Horizontal,
+            ratio: 0.3,
+            a: Box::new(inspector_pane),
+            b: Box::new(layers_pane),
+        };
 
-    pane_grid::Configuration::Split {
-        axis: pane_grid::Axis::Vertical,
-        ratio: 0.8,
-        a: Box::new(map_and_toolbar),
-        b: Box::new(layers_editor),
+        let config = pane_grid::Configuration::Split {
+            axis: pane_grid::Axis::Vertical,
+            ratio: 0.8,
+            a: Box::new(map_and_toolbar),
+            b: Box::new(layers_editor),
+        };
+
+        Self::new_with(config)
     }
 }
