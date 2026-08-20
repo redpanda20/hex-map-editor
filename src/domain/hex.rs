@@ -1,8 +1,12 @@
 use std::collections::HashSet;
 
-use iced::{Rectangle, Vector};
-/// Flat topped axial grid
+use iced::{Point, Rectangle, Size, Vector};
 
+/// Taken from Rust nightly:
+/// https://doc.rust-lang.org/std/f32/consts/constant.SQRT_3.html
+const SQRT_3: f32 = 1.732050807568877293527446341505872367_f32;
+
+/// Flat topped axial grid
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HexCoord {
     pub col: i32,
@@ -24,14 +28,14 @@ impl HexCoord {
         let r = self.row as f32;
 
         let x = 1.5 * q;
-        let y = (3.0_f32.sqrt() * 0.5 * q) + (3.0_f32.sqrt() * r);
+        let y = (SQRT_3 * 0.5 * q) + (SQRT_3 * r);
 
         Vector { x, y }
     }
 
     pub fn from_cartesian(vec: Vector) -> HexCoord {
         let q = 2.0 / 3.0 * vec.x;
-        let r = -1.0 / 3.0 * vec.x + (3.0_f32.sqrt() / 3.0) * vec.y;
+        let r = -1.0 / 3.0 * vec.x + (SQRT_3 / 3.0) * vec.y;
 
         // Axial to cubic coordinates
         let cube_x = q;
@@ -44,10 +48,10 @@ impl HexCoord {
 
 #[derive(Debug, Clone, Copy)]
 pub struct HexBounds {
-    pub col_min: i32,
-    pub col_max: i32,
-    pub row_min: i32,
-    pub row_max: i32,
+    col_min: i32,
+    col_max: i32,
+    row_min: i32,
+    row_max: i32,
 }
 
 impl HexBounds {
@@ -56,6 +60,91 @@ impl HexBounds {
             && coord.col <= self.col_max
             && coord.row >= self.row_min
             && coord.row <= self.row_max
+    }
+
+    pub fn union(&self, other: &Self) -> Self {
+        let col_min = self.col_min.min(other.col_min);
+        let col_max = self.col_max.max(other.col_max);
+        let row_min = self.row_min.min(other.row_min);
+        let row_max = self.row_max.max(other.row_max);
+
+        HexBounds {
+            col_min,
+            col_max,
+            row_min,
+            row_max,
+        }
+    }
+}
+
+impl HexBounds {
+    /// Create bounds from explicit values
+    pub fn new(col_min: i32, col_max: i32, row_min: i32, row_max: i32) -> Self {
+        debug_assert!(col_min <= col_max);
+        debug_assert!(row_min <= row_max);
+        Self {
+            col_min,
+            col_max,
+            row_min,
+            row_max,
+        }
+    }
+
+    /// Expand bounds by `padding`.
+    /// Negative values will shrink the bounds
+    pub fn expand(self, padding: i32) -> Self {
+        Self {
+            col_min: self.col_min - padding,
+            col_max: self.col_max + padding,
+            row_min: self.row_min - padding,
+            row_max: self.row_max + padding,
+        }
+    }
+
+    /// Move the bounds on the x-axis by `offset`
+    pub fn translate_x(self, offset: i32) -> Self {
+        Self {
+            col_min: self.col_min + offset,
+            col_max: self.col_max + offset,
+            row_min: self.row_min,
+            row_max: self.row_max,
+        }
+    }
+
+    /// Create an axial bounding box, that conservatively covers every hex in `rect`.
+    ///
+    /// Excludes intersecting hexes with centres outside of `rect`.
+    pub fn from_rect(rect: Rectangle) -> Self {
+        let coords = [
+            Vector::new(rect.x, rect.y),
+            Vector::new(rect.x + rect.width, rect.y),
+            Vector::new(rect.x, rect.y + rect.height),
+            Vector::new(rect.x + rect.width, rect.y + rect.height),
+        ]
+        .map(HexCoord::from_cartesian);
+
+        Self::from_hexes(coords).expect("A rectangle always produces four corners")
+    }
+
+    pub fn into_rect(&self) -> Rectangle {
+        let min = HexCoord {
+            col: self.col_min,
+            row: self.row_min,
+        }
+        .to_cartesian();
+        let max = HexCoord {
+            col: self.col_max,
+            row: self.row_max,
+        }
+        .to_cartesian();
+
+        let top_left = Point { x: min.x, y: min.y };
+        let size = Size {
+            width: max.x - min.x,
+            height: max.y - min.y,
+        };
+
+        Rectangle::new(top_left, size)
     }
 
     pub fn from_hexes(source: impl IntoIterator<Item = HexCoord>) -> Option<HexBounds> {
@@ -79,33 +168,12 @@ impl HexBounds {
             row_max,
         })
     }
-}
 
-pub fn hexes_in_range(
-    col_min: i32,
-    col_max: i32,
-    row_min: i32,
-    row_max: i32,
-) -> impl Iterator<Item = HexCoord> {
-    (col_min..=col_max).flat_map(move |col| {
-        (row_min..=row_max).map(move |row| HexCoord {
-            col,
-            row: row - col / 2,
+    pub fn into_hexes(self) -> impl Iterator<Item = HexCoord> {
+        (self.col_min..=self.col_max).flat_map(move |col| {
+            (self.row_min..=self.row_max).map(move |row| HexCoord { col, row })
         })
-    })
-}
-
-pub fn rect_to_range(rect: Rectangle, hex_size: f32) -> (i32, i32, i32, i32) {
-    let inv_hex_w = 1.0 / (hex_size * 1.5);
-    let inv_hex_h = 1.0 / (hex_size * 3.0_f32.sqrt());
-
-    let col_min = (rect.x * inv_hex_w).floor() as i32;
-    let col_max = col_min + (rect.width * inv_hex_w).ceil() as i32;
-
-    let row_min = (rect.y * inv_hex_h).floor() as i32;
-    let row_max = row_min + (rect.height * inv_hex_h).ceil() as i32;
-
-    (col_min, col_max, row_min, row_max)
+    }
 }
 
 fn frac_round(frac_q: f32, frac_r: f32, frac_s: f32) -> HexCoord {
@@ -150,7 +218,7 @@ pub fn flood_fill(
         if visited.contains(&coord) {
             continue;
         }
-        if !bounds.contains(coord) || visited.len() > FLOOD_FILL_TILE_CAP {
+        if !bounds.contains(coord) || visited.len() >= FLOOD_FILL_TILE_CAP {
             return None;
         }
         visited.insert(coord);

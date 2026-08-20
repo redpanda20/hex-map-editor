@@ -10,7 +10,7 @@ use iced::{
 
 use crate::{
     app::Message,
-    domain::{HexCoord, HistoryCommand, Scene, SceneMessage, Tool, hexes_in_range},
+    domain::{HexBounds, HexCoord, HistoryCommand, Scene, SceneMessage, Tool},
 };
 
 pub fn canvas_panel<'a>(scene: &'a Scene) -> Element<'a, Message> {
@@ -235,23 +235,16 @@ impl<'a> HexCanvas<'a> {
         frame.translate(state.translation);
         frame.scale(state.zoom);
 
-        // Compute hex bounds in map-space for culling
-        let inv_zoom = 1.0 / state.zoom;
-        let inv_hex_w = 1.0 / (self.hex_size * 1.5);
-        let inv_hex_h = 1.0 / (self.hex_size * (3.0_f32).sqrt());
-
-        let col_min = (-state.translation.x * inv_hex_w * inv_zoom).floor() as i32;
-        let col_max = col_min + (bounds.width * inv_hex_w * inv_zoom).ceil() as i32;
-
-        let row_min = (-state.translation.y * inv_hex_h * inv_zoom).floor() as i32;
-        let row_max = row_min + (bounds.height * inv_hex_h * inv_zoom).ceil() as i32;
+        let inv_scale = 1.0 / self.hex_size / state.zoom;
+        let relative_bounds =
+            Rectangle::with_size(bounds.size()) * inv_scale - state.translation * inv_scale;
 
         let hex_path = &self.hex_path();
+        let hex_bounds = HexBounds::from_rect(relative_bounds);
 
         // Draw grid layers
         for layer in self.scene.get_visible_layers() {
-            // Column / Row maximum increased to full cover screen
-            let coords = hexes_in_range(col_min, col_max + 1, row_min, row_max + 1);
+            let coords = hex_bounds.into_hexes();
 
             layer.draw(frame, coords, |frame, hex, colour| {
                 let centre = hex.to_cartesian() * self.hex_size;
@@ -263,20 +256,16 @@ impl<'a> HexCanvas<'a> {
         }
 
         // Draw grid overlay
-        let grid_stroke = Stroke {
-            style: canvas::Style::Solid(
-                theme
-                    .extended_palette()
-                    .background
-                    .base
-                    .text
-                    .scale_alpha(0.1),
-            ),
-            width: 1.0,
-            ..Stroke::default()
-        };
+        let grid_stroke = Stroke::default().with_color(
+            theme
+                .extended_palette()
+                .background
+                .base
+                .text
+                .scale_alpha(0.1),
+        );
 
-        let coords = hexes_in_range(col_min, col_max, row_min, row_max);
+        let coords = hex_bounds.into_hexes();
         for hex in coords {
             let centre = hex.to_cartesian() * self.hex_size;
             frame.with_save(|frame| {

@@ -1,12 +1,13 @@
-pub mod noise;
-pub mod tile_store;
+mod noise;
+mod tile_store;
 
-use std::fmt::Display;
-
-use iced::Color;
+pub use noise::{NoiseOctaves, PerlinNoiseLayer};
 pub use tile_store::SparseTiles;
 
-use crate::domain::HexCoord;
+use iced::{Color, Rectangle};
+use std::fmt::Display;
+
+use crate::domain::{HexBounds, HexCoord};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum LayerType {
@@ -36,6 +37,42 @@ pub enum LayerInner {
 }
 
 impl LayerInner {
+    pub fn exists_at(&self, location: &HexCoord) -> bool {
+        match self {
+            LayerInner::Tiles(tiles) | LayerInner::InvertedTiles(tiles) => {
+                tiles.exists_at(location)
+            }
+            LayerInner::Perlin(noise) => noise.exists_at(location),
+        }
+    }
+
+    pub fn colour_at(&self, location: &HexCoord) -> Color {
+        match self {
+            LayerInner::Tiles(tiles) | LayerInner::InvertedTiles(tiles) => {
+                tiles.colour_at(location)
+            }
+            LayerInner::Perlin(noise) => noise.colour_at(location),
+        }
+    }
+
+    pub fn get_bounds(&self) -> Option<HexBounds> {
+        match self {
+            LayerInner::Tiles(tiles) | LayerInner::InvertedTiles(tiles) => tiles.get_bounds(),
+            LayerInner::Perlin(noise) => noise.get_bounds(),
+        }
+    }
+
+    pub fn get_bounding_box(&self, hex_size: f32) -> Option<Rectangle> {
+        match self {
+            LayerInner::Tiles(tiles) | LayerInner::InvertedTiles(tiles) => {
+                tiles.get_bounding_box(hex_size)
+            }
+            LayerInner::Perlin(noise) => noise.get_bounding_box(),
+        }
+    }
+}
+
+impl LayerInner {
     pub fn draw<T>(
         &self,
         target: &mut T,
@@ -43,22 +80,8 @@ impl LayerInner {
         mut draw: impl FnMut(&mut T, HexCoord, Color),
     ) {
         for coord in coords {
-            match self {
-                LayerInner::Tiles(sparse_tiles) => {
-                    if sparse_tiles.exists_at(&coord) {
-                        draw(target, coord, sparse_tiles.colour_at(&coord))
-                    }
-                }
-                LayerInner::InvertedTiles(sparse_tiles) => {
-                    if !sparse_tiles.exists_at(&coord) {
-                        draw(target, coord, sparse_tiles.colour_at(&coord))
-                    }
-                }
-                LayerInner::Perlin(perlin_noise_layer) => {
-                    if perlin_noise_layer.exists_at(&coord) {
-                        draw(target, coord, perlin_noise_layer.colour_at(&coord))
-                    }
-                }
+            if self.exists_at(&coord) {
+                draw(target, coord, self.colour_at(&coord))
             }
         }
     }

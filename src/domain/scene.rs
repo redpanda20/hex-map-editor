@@ -1,8 +1,8 @@
 use iced::Color;
 
 use crate::domain::{
-    HexCoord, Layer, LayerInner, LayerType, PerlinNoiseLayer, SparseTiles, Tool, flood_fill,
-    history::Edit, layer::noise::NoiseOctaves,
+    HexCoord, Layer, LayerInner, LayerType, NoiseOctaves, PerlinNoiseLayer, SparseTiles, Tool,
+    flood_fill, history::Edit,
 };
 
 const DEFAULT_COLORS: [Color; 5] = [
@@ -331,7 +331,7 @@ impl Scene {
                 let insert = matches!(layer.inner, LayerInner::Tiles(_));
 
                 // If the layer is empty, short circuit and invert
-                let Some(bounds) = store.get_bounds() else {
+                let Some(bounds) = layer.inner.get_bounds() else {
                     return Some(Edit::LayerInverted { index });
                 };
 
@@ -343,7 +343,7 @@ impl Scene {
                 let edits = region
                     .into_iter()
                     .filter_map(|coord| {
-                        let before = store.exists_at(&coord);
+                        let before = layer.inner.exists_at(&coord);
                         (before != insert).then_some(Edit::Tile {
                             layer: index,
                             coord,

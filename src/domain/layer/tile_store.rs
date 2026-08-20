@@ -34,7 +34,26 @@ impl SparseTiles {
         self.tiles.is_empty()
     }
 
-    pub fn bounding_box(&self, hex_size: f32) -> Option<Rectangle> {
+    // Used for flood fill
+    pub fn get_all_tiles(&self) -> &HashSet<HexCoord> {
+        &self.tiles
+    }
+}
+
+impl SparseTiles {
+    pub(super) fn exists_at(&self, location: &HexCoord) -> bool {
+        self.tiles.contains(location)
+    }
+
+    pub(super) fn colour_at(&self, _location: &HexCoord) -> Color {
+        self.colour
+    }
+
+    pub(super) fn get_bounds(&self) -> Option<HexBounds> {
+        HexBounds::from_hexes(self.tiles.clone())
+    }
+
+    pub(super) fn get_bounding_box(&self, hex_size: f32) -> Option<Rectangle> {
         let mut iter = self.tiles.iter();
         let first = iter.next()?.to_cartesian() * hex_size;
 
@@ -55,24 +74,5 @@ impl SparseTiles {
             width: max_x - min_x,
             height: max_y - min_y,
         })
-    }
-
-    // Used for flood fill
-    pub fn get_all_tiles(&self) -> &HashSet<HexCoord> {
-        &self.tiles
-    }
-}
-
-impl SparseTiles {
-    pub fn exists_at(&self, coord: &HexCoord) -> bool {
-        self.tiles.contains(coord)
-    }
-
-    pub fn colour_at(&self, _coord: &HexCoord) -> Color {
-        self.colour
-    }
-
-    pub fn get_bounds(&self) -> Option<HexBounds> {
-        HexBounds::from_hexes(self.tiles.clone())
     }
 }

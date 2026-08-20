@@ -1,6 +1,6 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use iced::{Color, Vector};
+use iced::{Color, Rectangle, Vector};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use crate::domain::{HexBounds, HexCoord};
@@ -130,21 +130,25 @@ fn dot(lhs: Vector, rhs: Vector) -> f32 {
 }
 
 impl PerlinNoiseLayer {
-    pub fn exists_at(&self, location: &HexCoord) -> bool {
+    pub(super) fn exists_at(&self, location: &HexCoord) -> bool {
         let Vector { x, y } = location.to_cartesian();
         let sample = self.sample(x, y);
         let normalized = sample * 0.5 + 0.5;
         normalized >= self.threshold
     }
 
-    pub fn colour_at(&self, location: &HexCoord) -> Color {
+    pub(super) fn colour_at(&self, location: &HexCoord) -> Color {
         let Vector { x, y } = location.to_cartesian();
         let sample = self.sample(x, y);
         let normalized = sample * 0.5 + 0.5;
         Color::from_rgb(normalized, normalized, normalized)
     }
 
-    pub fn get_bounds(&self) -> Option<HexBounds> {
+    pub(super) fn get_bounds(&self) -> Option<HexBounds> {
+        None
+    }
+
+    pub(super) fn get_bounding_box(&self) -> Option<Rectangle> {
         None
     }
 }
