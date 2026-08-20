@@ -142,6 +142,8 @@ impl Keybinds {
     }
 }
 
+// Used indirectly in Toolbar tooltips.
+// If default bindings are changed, they need to be changed over there
 impl Default for Keybinds {
     fn default() -> Self {
         let bindings = HashMap::from([

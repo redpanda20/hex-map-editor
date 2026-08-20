@@ -32,7 +32,7 @@ impl Toolbar {
             });
         let brush_tool = tooltip(
             brush_tool,
-            container("Brush tool")
+            container("Brush tool (Ctrl + B)")
                 .padding(4.0)
                 .style(container::bordered_box),
             tooltip::Position::Right,
@@ -48,7 +48,7 @@ impl Toolbar {
             });
         let move_tool = tooltip(
             move_tool,
-            container("Move tool")
+            container("Move tool (Ctrl + M)")
                 .padding(4.0)
                 .style(container::bordered_box),
             tooltip::Position::Right,
@@ -64,7 +64,7 @@ impl Toolbar {
             });
         let erase_tool = tooltip(
             erase_tool,
-            container("Erase tool")
+            container("Erase tool (Ctrl + E)")
                 .padding(4.0)
                 .style(container::bordered_box),
             tooltip::Position::Right,
@@ -80,7 +80,7 @@ impl Toolbar {
             });
         let paint_tool = tooltip(
             paint_tool,
-            container("Bucket fill tool")
+            container("Bucket fill tool (Ctrl + B)")
                 .padding(4.0)
                 .style(container::bordered_box),
             tooltip::Position::Right,
@@ -96,7 +96,7 @@ impl Toolbar {
             });
         let undo = tooltip(
             undo,
-            container("Undo last command")
+            container("Undo last command (Ctrl + Z)")
                 .padding(4.0)
                 .style(container::bordered_box),
             tooltip::Position::Right,
@@ -111,7 +111,7 @@ impl Toolbar {
             });
         let redo = tooltip(
             redo,
-            container("Redo last command")
+            container("Redo last command (Ctrl + Y)")
                 .padding(4.0)
                 .style(container::bordered_box),
             tooltip::Position::Right,
@@ -122,7 +122,7 @@ impl Toolbar {
             .on_press(Message::Save(IoProcess::Start));
         let save_scene = tooltip(
             save_scene,
-            container("Save scene to file")
+            container("Save scene to file (Ctrl + S)")
                 .padding(4.0)
                 .style(container::bordered_box),
             tooltip::Position::Right,
@@ -132,7 +132,7 @@ impl Toolbar {
             .on_press(Message::Load(IoProcess::Start));
         let load_scene = tooltip(
             load_scene,
-            container("Load scene from file")
+            container("Load scene from file (Ctrl + O))")
                 .padding(4.0)
                 .style(container::bordered_box),
             tooltip::Position::Right,
