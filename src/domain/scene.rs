@@ -1,8 +1,10 @@
 use iced::Color;
 
 use crate::domain::{
-    HexCoord, Layer, LayerInner, LayerType, NoiseOctaves, PerlinNoiseLayer, SparseTiles, Tool,
-    flood_fill, history::Edit,
+    HexCoord, Layer, Tool, flood_fill,
+    history::Edit,
+    layer_inner::LayerKind,
+    layer_inner::{LayerInner, NoiseOctaves, PerlinNoiseLayer, SparseTiles},
 };
 
 const DEFAULT_COLORS: [Color; 5] = [
@@ -15,7 +17,7 @@ const DEFAULT_COLORS: [Color; 5] = [
 
 #[derive(Debug, Clone)]
 pub enum SceneMessage {
-    AddLayer(String, LayerType),
+    AddLayer(String, LayerKind),
     RemoveLayer(usize),
     SwapLayers(usize, usize),
 
@@ -114,11 +116,11 @@ impl Scene {
             SceneMessage::AddLayer(name, layer_type) => {
                 let name = self.canonacalize_name(name);
                 let inner = match layer_type {
-                    LayerType::Tiles => {
+                    LayerKind::Tiles => {
                         let colour = DEFAULT_COLORS[self.inner.len() % 5];
                         LayerInner::Tiles(SparseTiles::new(colour))
                     }
-                    LayerType::PerlinNoise => {
+                    LayerKind::PerlinNoise => {
                         let seed = rand::random();
                         LayerInner::Perlin(PerlinNoiseLayer::new(seed))
                     }

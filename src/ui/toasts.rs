@@ -42,6 +42,10 @@ impl Toasts {
                 "Export Complete".to_string(),
                 "Map exported successfully.".to_string(),
             ),
+            Message::Export(IoProcess::Finished(Err(err))) => {
+                self.add_toast("Export Failed".to_string(), err.clone())
+            }
+
             // TODO: Evaluate if Finished(Err) is needed
             Message::Save(IoProcess::Start) => {
                 self.add_toast("Saving".to_string(), "Saving project...".to_string())

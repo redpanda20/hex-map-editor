@@ -98,8 +98,6 @@ pub fn export_png(layers: &Scene) -> Vec<u8> {
         *p = Rgba([0, 0, 0, 0]);
     }
 
-    // let hex_bounds = HexBounds::from_rect(bounds);
-
     // Draw all layers
     for layer in layers.get_visible_layers() {
         let coords = hex_bounds.into_hexes();

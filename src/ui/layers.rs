@@ -9,19 +9,22 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::Message,
-    domain::{Layer, LayerInner, LayerType, PerlinNoiseLayer, Scene, SceneMessage, SparseTiles},
+    domain::{
+        Layer, Scene, SceneMessage,
+        layer_inner::{LayerInner, LayerKind, PerlinNoiseLayer, SparseTiles},
+    },
 };
 
 #[derive(Debug, Clone)]
 pub enum LayersMessage {
-    ChangeLayerType(LayerType),
+    ChangeLayerType(LayerKind),
     DragLayerPick { picked: usize },
     DragLayerDropped { dropped: usize },
     DragLayerCancelled,
 }
 
 pub struct Layers {
-    active_layer_type: LayerType,
+    active_layer_type: LayerKind,
     dragged_layer: Option<usize>,
 }
 
@@ -78,7 +81,7 @@ impl Layers {
         )));
 
         let add_layer_list = pick_list(
-            [LayerType::Tiles, LayerType::PerlinNoise],
+            [LayerKind::Tiles, LayerKind::PerlinNoise],
             Some(self.active_layer_type),
             |kind| Message::Layers(LayersMessage::ChangeLayerType(kind)),
         );
@@ -100,7 +103,7 @@ impl Layers {
 impl Default for Layers {
     fn default() -> Self {
         Self {
-            active_layer_type: LayerType::Tiles,
+            active_layer_type: LayerKind::Tiles,
             dragged_layer: None,
         }
     }

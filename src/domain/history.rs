@@ -2,7 +2,7 @@ use iced::{Color, Task};
 
 use crate::{
     app::Message,
-    domain::{HexCoord, Layer, NoiseOctaves, Scene, SceneMessage},
+    domain::{HexCoord, Layer, Scene, SceneMessage, layer_inner::NoiseOctaves},
 };
 
 #[derive(Debug, Clone)]

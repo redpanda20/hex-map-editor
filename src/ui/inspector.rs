@@ -6,7 +6,10 @@ use iced_fonts::bootstrap;
 
 use crate::{
     app::Message,
-    domain::{Layer, NoiseOctaves, PerlinNoiseLayer, Scene, SceneMessage, SparseTiles},
+    domain::{
+        Layer, Scene, SceneMessage,
+        layer_inner::{LayerInner, NoiseOctaves, PerlinNoiseLayer, SparseTiles},
+    },
     ui::colour_picker,
 };
 
@@ -63,13 +66,13 @@ impl Inspector {
         let name = &self.active_layer_name;
 
         let content = match inner {
-            crate::domain::LayerInner::Tiles(sparse_tiles) => {
+            LayerInner::Tiles(sparse_tiles) => {
                 sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
             }
-            crate::domain::LayerInner::InvertedTiles(sparse_tiles) => {
+            LayerInner::InvertedTiles(sparse_tiles) => {
                 sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
             }
-            crate::domain::LayerInner::Perlin(content) => {
+            LayerInner::Perlin(content) => {
                 perlin_noise_details(layer_id, starting_name, name, visible, content)
             }
         };

@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use iced::Color;
 
-use crate::domain::{Layer, LayerInner, NoiseOctaves, PerlinNoiseLayer, Scene, SparseTiles};
+use crate::domain::{
+    Layer, Scene,
+    layer_inner::{LayerInner, NoiseOctaves, PerlinNoiseLayer, SparseTiles},
+};
 
 use super::schema::{ColourV1, HexCoordV1, LayerKindV1, LayerV1, NoiseOctavesV1, SceneV1};
 use crate::domain::HexCoord;
