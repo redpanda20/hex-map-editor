@@ -3,7 +3,7 @@ mod png_export;
 use iced::Rectangle;
 use image::{ImageBuffer, Rgba};
 
-use crate::domain::Scene;
+use crate::domain::{Scene, layer_inner::HexGridOverlay};
 use png_export::PngRenderTarget;
 
 const EXPORT_HEX_SIZE: f32 = 100.0;
@@ -34,8 +34,10 @@ pub fn export_png(scene: &Scene) -> Vec<u8> {
     let mut image = ImageBuffer::from_pixel(width, height, Rgba([0, 0, 0, 0]));
 
     let mut target = PngRenderTarget::new(&mut image, bounds);
+    let mut layers = scene.get_visible_layers();
+    layers.push(&HexGridOverlay);
 
-    for layer in scene.get_visible_layers() {
+    for layer in layers {
         layer.draw(&mut target);
     }
 

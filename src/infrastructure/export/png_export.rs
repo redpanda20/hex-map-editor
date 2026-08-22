@@ -24,7 +24,7 @@ impl RenderTarget for PngRenderTarget<'_> {
     }
 
     fn get_bounds(&self) -> Rectangle {
-        self.bounds
+        self.bounds * (1.0 / EXPORT_HEX_SIZE)
     }
 
     fn fill_polygon(&mut self, point: &Point, fill: Color) {
