@@ -7,15 +7,13 @@ use crate::domain::HexCoord;
 /// Used to delegate rendering to each LayerInner
 /// Implemented by ~~HexCanvas~~, ~~ExportPng~~
 pub trait RenderTarget {
-    type Target;
-
     fn hex_to_point(coord: &HexCoord) -> Point;
 
-    fn fill_polygon(target: &mut Self::Target, point: &Point, fill: Color);
+    fn fill_polygon(&mut self, point: &Point, fill: Color);
 
-    // fn stroke_polygon(target: &mut Self::Target, point: &Point, stroke: Stroke);
+    fn stroke_polygon(&mut self, point: &Point, colour: Color);
 
-    // fn draw_image(target: &mut Self::Target, point: Point, size: Size, image: &Image, opacity: f32);
+    // fn draw_image(&mut self, point: Point, size: Size, image: &Image, opacity: f32);
 
-    // fn draw_text(target: &mut Self::Target, point: Point, size: Size, text: &str);
+    // fn draw_text(&mut self, point: Point, size: Size, text: &str);
 }

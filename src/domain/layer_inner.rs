@@ -25,14 +25,6 @@ impl Display for LayerKind {
     }
 }
 
-// TODO
-// Move messages from scene
-#[derive(Debug, Clone, Copy)]
-pub enum LayerMessage {
-    // Tiles(TilesMessage),
-    // Perlin(PerlinMessage),
-}
-
 #[allow(
     clippy::large_enum_variant,
     reason = "Indirection via Boxed<Trait> will be implemented in the future"
@@ -41,7 +33,7 @@ pub enum LayerMessage {
 pub enum LayerInner {
     Tiles(SparseTiles),
     InvertedTiles(SparseTiles),
-    Perlin(noise::PerlinNoiseLayer),
+    Perlin(PerlinNoiseLayer),
 }
 
 pub trait LayerInnerImpl {
@@ -49,9 +41,7 @@ pub trait LayerInnerImpl {
 
     fn bounds(&self, hex_size: f32) -> Option<Rectangle>;
 
-    fn render<T>(&self, target: &mut T, renderer: impl RenderTarget<Target = T>);
-
-    fn handle_message(&mut self, message: LayerMessage);
+    fn draw(&self, renderer: impl RenderTarget);
 }
 
 impl LayerInner {
