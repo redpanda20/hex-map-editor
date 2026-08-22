@@ -243,8 +243,8 @@ impl<'a> HexCanvas<'a> {
         let target: &mut dyn RenderTarget = &mut (frame, relative_bounds);
 
         let mut layers = self.scene.get_visible_layers();
-
-        layers.push(&HexGridOverlay);
+        let overlay = HexGridOverlay::new_light();
+        layers.push(&overlay);
 
         for layer in layers {
             layer.draw(target);

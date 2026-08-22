@@ -6,7 +6,37 @@ use super::LayerKind;
 
 /// An entirely empty layer that is used to draw the hex grid overlay.
 #[derive(Debug, Clone, Copy)]
-pub struct HexGridOverlay;
+pub struct HexGridOverlay {
+    colour: Color,
+}
+
+impl HexGridOverlay {
+    pub fn new(colour: Color) -> Self {
+        Self { colour }
+    }
+
+    pub fn new_dark() -> Self {
+        Self {
+            colour: Color {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.1,
+            },
+        }
+    }
+
+    pub fn new_light() -> Self {
+        Self {
+            colour: Color {
+                r: 1.0,
+                g: 1.0,
+                b: 1.0,
+                a: 0.1,
+            },
+        }
+    }
+}
 
 impl LayerInnerImpl for HexGridOverlay {
     fn kind(&self) -> LayerKind {
@@ -23,8 +53,7 @@ impl LayerInnerImpl for HexGridOverlay {
 
         for coord in hexes {
             let point = renderer.hex_to_point(&coord);
-            let colour = Color::from_rgba(1.0, 1.0, 1.0, 0.1);
-            renderer.stroke_polygon(&point, colour);
+            renderer.stroke_polygon(&point, self.colour);
         }
     }
 }

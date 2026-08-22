@@ -35,7 +35,8 @@ pub fn export_png(scene: &Scene) -> Vec<u8> {
 
     let mut target = PngRenderTarget::new(&mut image, bounds);
     let mut layers = scene.get_visible_layers();
-    layers.push(&HexGridOverlay);
+    let overlay = HexGridOverlay::new_dark();
+    layers.push(&overlay);
 
     for layer in layers {
         layer.draw(&mut target);
