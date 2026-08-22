@@ -5,7 +5,7 @@ use crate::domain::HexCoord;
 /// Provides methods to draw to a given target
 ///
 /// Used to delegate rendering to each LayerInner
-/// Implemented by ~~HexCanvas~~, ~~ExportPng~~
+/// Implemented by HexCanvas, ExportPng
 pub trait RenderTarget {
     fn hex_to_point(coord: &HexCoord) -> Point;
 

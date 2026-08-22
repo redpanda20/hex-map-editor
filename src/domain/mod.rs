@@ -16,3 +16,5 @@ pub use layer::Layer;
 pub use scene::{Scene, SceneMessage};
 
 pub use tool::Tool;
+
+pub use render::RenderTarget;

@@ -10,14 +10,13 @@ use iced::{
 
 use crate::{
     app::Message,
-    domain::{HexBounds, HexCoord, HistoryCommand, Scene, SceneMessage, Tool},
+    domain::{HexBounds, HexCoord, HistoryCommand, RenderTarget, Scene, SceneMessage, Tool},
 };
 
+const HEX_SIZE: f32 = 16.0;
+
 pub fn canvas_panel<'a>(scene: &'a Scene) -> Element<'a, Message> {
-    let hex_canvas = HexCanvas {
-        scene,
-        hex_size: 16.0,
-    };
+    let hex_canvas = HexCanvas { scene };
 
     iced::widget::canvas(hex_canvas)
         .width(Length::Fill)
@@ -27,7 +26,6 @@ pub fn canvas_panel<'a>(scene: &'a Scene) -> Element<'a, Message> {
 
 pub struct HexCanvas<'a> {
     pub scene: &'a Scene,
-    pub hex_size: f32,
 }
 
 #[derive(Debug)]
@@ -216,7 +214,7 @@ impl<'a> HexCanvas<'a> {
         let mut frame = Frame::new(renderer, bounds.size());
 
         let hex = self.screen_to_hex(state, cursor_pos);
-        let coord = hex.to_cartesian() * self.hex_size * state.zoom + state.translation;
+        let coord = hex.to_cartesian() * HEX_SIZE * state.zoom + state.translation;
 
         frame.translate(coord);
         frame.scale(state.zoom);
@@ -227,7 +225,7 @@ impl<'a> HexCanvas<'a> {
             ..Stroke::default()
         };
 
-        frame.stroke(&self.hex_path(), stroke);
+        frame.stroke(&hex_path(HEX_SIZE), stroke);
         frame.into_geometry()
     }
 
@@ -235,24 +233,16 @@ impl<'a> HexCanvas<'a> {
         frame.translate(state.translation);
         frame.scale(state.zoom);
 
-        let inv_scale = 1.0 / self.hex_size / state.zoom;
+        let inv_scale = 1.0 / HEX_SIZE / state.zoom;
         let relative_bounds =
             Rectangle::with_size(bounds.size()) * inv_scale - state.translation * inv_scale;
 
-        let hex_path = &self.hex_path();
+        let hex_path = &hex_path(HEX_SIZE);
         let hex_bounds = HexBounds::from_rect(relative_bounds);
 
         // Draw grid layers
         for layer in self.scene.get_visible_layers() {
-            let coords = hex_bounds.into_hexes();
-
-            layer.draw(frame, coords, |frame, hex, colour| {
-                let centre = hex.to_cartesian() * self.hex_size;
-                frame.with_save(|frame| {
-                    frame.translate(centre);
-                    frame.fill(hex_path, Fill::from(colour));
-                })
-            });
+            layer.draw(frame, hex_bounds.into_hexes());
         }
 
         // Draw grid overlay
@@ -267,7 +257,7 @@ impl<'a> HexCanvas<'a> {
 
         let coords = hex_bounds.into_hexes();
         for hex in coords {
-            let centre = hex.to_cartesian() * self.hex_size;
+            let centre = hex.to_cartesian() * HEX_SIZE;
             frame.with_save(|frame| {
                 frame.translate(centre);
                 frame.stroke(hex_path, grid_stroke);
@@ -283,22 +273,50 @@ impl<'a> HexCanvas<'a> {
         let y = (screen.y - translation.y) / zoom;
         let map_vec = Vector { x, y };
 
-        HexCoord::from_cartesian(map_vec / self.hex_size)
+        HexCoord::from_cartesian(map_vec / HEX_SIZE)
+    }
+}
+
+fn hex_path(hex_size: f32) -> Path {
+    let mut builder = canvas::path::Builder::new();
+    for i in 0..6 {
+        let angle = std::f32::consts::PI / 180.0 * (60.0 * i as f32);
+        let px = hex_size * angle.cos();
+        let py = hex_size * angle.sin();
+        if i == 0 {
+            builder.move_to(Point::new(px, py));
+        } else {
+            builder.line_to(Point::new(px, py));
+        }
+    }
+    builder.close();
+    builder.build()
+}
+
+impl RenderTarget for Frame {
+    fn hex_to_point(coord: &HexCoord) -> Point {
+        let point = coord.to_cartesian();
+
+        Point::new(point.x * HEX_SIZE, point.y * HEX_SIZE)
     }
 
-    fn hex_path(&self) -> Path {
-        let mut builder = canvas::path::Builder::new();
-        for i in 0..6 {
-            let angle = std::f32::consts::PI / 180.0 * (60.0 * i as f32);
-            let px = self.hex_size * angle.cos();
-            let py = self.hex_size * angle.sin();
-            if i == 0 {
-                builder.move_to(Point::new(px, py));
-            } else {
-                builder.line_to(Point::new(px, py));
-            }
-        }
-        builder.close();
-        builder.build()
+    fn fill_polygon(&mut self, point: &Point, fill: iced::Color) {
+        let path = hex_path(HEX_SIZE);
+
+        self.with_save(|frame| {
+            frame.translate(Vector::new(point.x, point.y));
+            frame.fill(&path, Fill::from(fill));
+        });
+    }
+
+    fn stroke_polygon(&mut self, point: &Point, colour: iced::Color) {
+        let path = hex_path(HEX_SIZE);
+
+        self.with_save(|frame| {
+            frame.translate(Vector::new(point.x, point.y));
+
+            let stroke = Stroke::default().with_color(colour);
+            frame.stroke(&path, stroke);
+        });
     }
 }

@@ -81,15 +81,11 @@ impl LayerInner {
 }
 
 impl LayerInner {
-    pub fn draw<T>(
-        &self,
-        target: &mut T,
-        coords: impl Iterator<Item = HexCoord>,
-        mut draw: impl FnMut(&mut T, HexCoord, Color),
-    ) {
+    pub fn draw<T: RenderTarget>(&self, target: &mut T, coords: impl Iterator<Item = HexCoord>) {
         for coord in coords {
             if self.exists_at(&coord) {
-                draw(target, coord, self.colour_at(&coord))
+                let point = T::hex_to_point(&coord);
+                target.fill_polygon(&point, self.colour_at(&coord));
             }
         }
     }
