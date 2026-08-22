@@ -1,4 +1,4 @@
-use iced::{Color, Point};
+use iced::{Color, Point, Rectangle};
 use image::{ImageBuffer, Rgba};
 
 use crate::domain::{HexCoord, RenderTarget};
@@ -7,24 +7,28 @@ use super::EXPORT_HEX_SIZE;
 
 pub struct PngRenderTarget<'a> {
     image: &'a mut ImageBuffer<Rgba<u8>, Vec<u8>>,
-    origin: Point,
+    bounds: Rectangle,
 }
 
 impl<'a> PngRenderTarget<'a> {
-    pub fn new(image: &'a mut ImageBuffer<Rgba<u8>, Vec<u8>>, origin: Point) -> Self {
-        Self { image, origin }
+    pub fn new(image: &'a mut ImageBuffer<Rgba<u8>, Vec<u8>>, bounds: Rectangle) -> Self {
+        Self { image, bounds }
     }
 }
 
 impl RenderTarget for PngRenderTarget<'_> {
-    fn hex_to_point(coord: &HexCoord) -> Point {
+    fn hex_to_point(&self, coord: &HexCoord) -> Point {
         let point = coord.to_cartesian();
 
         Point::new(point.x * EXPORT_HEX_SIZE, point.y * EXPORT_HEX_SIZE)
     }
 
+    fn get_bounds(&self) -> Rectangle {
+        self.bounds
+    }
+
     fn fill_polygon(&mut self, point: &Point, fill: Color) {
-        let centre = Point::new(point.x - self.origin.x, point.y - self.origin.y);
+        let centre = Point::new(point.x - self.bounds.x, point.y - self.bounds.y);
 
         let vertices = hex_vertices_f(centre.x, centre.y);
 
@@ -32,7 +36,7 @@ impl RenderTarget for PngRenderTarget<'_> {
     }
 
     fn stroke_polygon(&mut self, point: &Point, colour: Color) {
-        let centre = Point::new(point.x - self.origin.x, point.y - self.origin.y);
+        let centre = Point::new(point.x - self.bounds.x, point.y - self.bounds.y);
 
         let vertices = hex_vertices_f(centre.x, centre.y);
 

@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use iced::{Color, Rectangle};
 
-use crate::domain::{HexBounds, HexCoord};
+use crate::domain::{HexCoord, RenderTarget};
+
+use super::{LayerInnerImpl, LayerKind};
 
 #[derive(Debug, Clone)]
 pub struct SparseTiles {
@@ -38,22 +40,8 @@ impl SparseTiles {
     pub fn get_all_tiles(&self) -> &HashSet<HexCoord> {
         &self.tiles
     }
-}
 
-impl SparseTiles {
-    pub(super) fn exists_at(&self, location: &HexCoord) -> bool {
-        self.tiles.contains(location)
-    }
-
-    pub(super) fn colour_at(&self, _location: &HexCoord) -> Color {
-        self.colour
-    }
-
-    pub(super) fn get_bounds(&self) -> Option<HexBounds> {
-        HexBounds::from_hexes(self.tiles.clone())
-    }
-
-    pub(super) fn get_bounding_box(&self, hex_size: f32) -> Option<Rectangle> {
+    fn get_bounding_box(&self, hex_size: f32) -> Option<Rectangle> {
         let mut iter = self.tiles.iter();
         let first = iter.next()?.to_cartesian() * hex_size;
 
@@ -74,5 +62,22 @@ impl SparseTiles {
             width: max_x - min_x,
             height: max_y - min_y,
         })
+    }
+}
+
+impl LayerInnerImpl for SparseTiles {
+    fn kind(&self) -> LayerKind {
+        LayerKind::Tiles
+    }
+
+    fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
+        self.get_bounding_box(hex_size)
+    }
+
+    fn draw(&self, renderer: &mut dyn RenderTarget) {
+        for coord in &self.tiles {
+            let point = renderer.hex_to_point(coord);
+            renderer.fill_polygon(&point, self.colour);
+        }
     }
 }

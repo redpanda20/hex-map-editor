@@ -1,4 +1,4 @@
-use iced::{Color, Point};
+use iced::{Color, Point, Rectangle};
 
 use crate::domain::HexCoord;
 
@@ -7,7 +7,8 @@ use crate::domain::HexCoord;
 /// Used to delegate rendering to each LayerInner
 /// Implemented by HexCanvas, ExportPng
 pub trait RenderTarget {
-    fn hex_to_point(coord: &HexCoord) -> Point;
+    fn hex_to_point(&self, coord: &HexCoord) -> Point;
+    fn get_bounds(&self) -> Rectangle;
 
     fn fill_polygon(&mut self, point: &Point, fill: Color);
 

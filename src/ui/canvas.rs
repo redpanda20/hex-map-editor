@@ -10,7 +10,10 @@ use iced::{
 
 use crate::{
     app::Message,
-    domain::{HexBounds, HexCoord, HistoryCommand, RenderTarget, Scene, SceneMessage, Tool},
+    domain::{
+        HexCoord, HistoryCommand, RenderTarget, Scene, SceneMessage, Tool,
+        layer_inner::HexGridOverlay,
+    },
 };
 
 const HEX_SIZE: f32 = 16.0;
@@ -229,7 +232,7 @@ impl<'a> HexCanvas<'a> {
         frame.into_geometry()
     }
 
-    fn draw_map(&self, state: &CanvasState, theme: &Theme, frame: &mut Frame, bounds: Rectangle) {
+    fn draw_map(&self, state: &CanvasState, _theme: &Theme, frame: &mut Frame, bounds: Rectangle) {
         frame.translate(state.translation);
         frame.scale(state.zoom);
 
@@ -237,31 +240,14 @@ impl<'a> HexCanvas<'a> {
         let relative_bounds =
             Rectangle::with_size(bounds.size()) * inv_scale - state.translation * inv_scale;
 
-        let hex_path = &hex_path(HEX_SIZE);
-        let hex_bounds = HexBounds::from_rect(relative_bounds);
+        let target: &mut dyn RenderTarget = &mut (frame, relative_bounds);
 
-        // Draw grid layers
-        for layer in self.scene.get_visible_layers() {
-            layer.draw(frame, hex_bounds.into_hexes());
-        }
+        let mut layers = self.scene.get_visible_layers();
 
-        // Draw grid overlay
-        let grid_stroke = Stroke::default().with_color(
-            theme
-                .extended_palette()
-                .background
-                .base
-                .text
-                .scale_alpha(0.1),
-        );
+        layers.push(&HexGridOverlay);
 
-        let coords = hex_bounds.into_hexes();
-        for hex in coords {
-            let centre = hex.to_cartesian() * HEX_SIZE;
-            frame.with_save(|frame| {
-                frame.translate(centre);
-                frame.stroke(hex_path, grid_stroke);
-            })
+        for layer in layers {
+            layer.draw(target);
         }
     }
 
@@ -293,17 +279,21 @@ fn hex_path(hex_size: f32) -> Path {
     builder.build()
 }
 
-impl RenderTarget for Frame {
-    fn hex_to_point(coord: &HexCoord) -> Point {
+impl RenderTarget for (&mut Frame, Rectangle) {
+    fn hex_to_point(&self, coord: &HexCoord) -> Point {
         let point = coord.to_cartesian();
 
         Point::new(point.x * HEX_SIZE, point.y * HEX_SIZE)
     }
 
+    fn get_bounds(&self) -> Rectangle {
+        self.1
+    }
+
     fn fill_polygon(&mut self, point: &Point, fill: iced::Color) {
         let path = hex_path(HEX_SIZE);
 
-        self.with_save(|frame| {
+        self.0.with_save(|frame| {
             frame.translate(Vector::new(point.x, point.y));
             frame.fill(&path, Fill::from(fill));
         });
@@ -312,7 +302,7 @@ impl RenderTarget for Frame {
     fn stroke_polygon(&mut self, point: &Point, colour: iced::Color) {
         let path = hex_path(HEX_SIZE);
 
-        self.with_save(|frame| {
+        self.0.with_save(|frame| {
             frame.translate(Vector::new(point.x, point.y));
 
             let stroke = Stroke::default().with_color(colour);

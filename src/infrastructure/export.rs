@@ -1,27 +1,21 @@
 mod png_export;
 
-use iced::{Point, Rectangle};
+use iced::Rectangle;
 use image::{ImageBuffer, Rgba};
 
-use crate::domain::{HexBounds, Scene};
+use crate::domain::Scene;
 use png_export::PngRenderTarget;
 
 const EXPORT_HEX_SIZE: f32 = 100.0;
 
 pub fn export_png(scene: &Scene) -> Vec<u8> {
-    let hex_bounds = scene
-        .get_visible_layers()
-        .iter()
-        .filter_map(|inner| inner.get_bounds())
-        .reduce(|acc, bounds| HexBounds::union(&acc, &bounds));
-
     let bounding_box = scene
         .get_visible_layers()
         .iter()
-        .filter_map(|inner| inner.get_bounding_box(EXPORT_HEX_SIZE))
+        .filter_map(|inner| inner.bounds(EXPORT_HEX_SIZE))
         .reduce(|acc, bounds| Rectangle::union(&acc, &bounds));
 
-    let (Some(hex_bounds), Some(bounding_box)) = (hex_bounds, bounding_box) else {
+    let Some(bounding_box) = bounding_box else {
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(256, 256);
 
         let mut out = Vec::new();
@@ -39,10 +33,10 @@ pub fn export_png(scene: &Scene) -> Vec<u8> {
 
     let mut image = ImageBuffer::from_pixel(width, height, Rgba([0, 0, 0, 0]));
 
-    let mut target = PngRenderTarget::new(&mut image, Point::new(bounds.x, bounds.y));
+    let mut target = PngRenderTarget::new(&mut image, bounds);
 
     for layer in scene.get_visible_layers() {
-        layer.draw(&mut target, hex_bounds.into_hexes());
+        layer.draw(&mut target);
     }
 
     let mut out = Vec::new();

@@ -1,19 +1,22 @@
+mod grid_overlay;
 mod noise;
 mod tile_store;
 
 use std::fmt::Display;
 
-use iced::{Color, Rectangle};
+pub use grid_overlay::HexGridOverlay;
+use iced::Rectangle;
 pub use noise::{NoiseOctaves, PerlinNoiseLayer};
 pub use tile_store::SparseTiles;
 
-use crate::domain::{HexBounds, HexCoord, render::RenderTarget};
+use crate::domain::render::RenderTarget;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum LayerKind {
     #[default]
     Tiles,
     PerlinNoise,
+    Utility,
 }
 
 impl Display for LayerKind {
@@ -21,6 +24,7 @@ impl Display for LayerKind {
         match self {
             LayerKind::Tiles => write!(f, "Tile"),
             LayerKind::PerlinNoise => write!(f, "Noise"),
+            LayerKind::Utility => write!(f, "Utility"),
         }
     }
 }
@@ -41,52 +45,31 @@ pub trait LayerInnerImpl {
 
     fn bounds(&self, hex_size: f32) -> Option<Rectangle>;
 
-    fn draw(&self, renderer: impl RenderTarget);
+    fn draw(&self, renderer: &mut dyn RenderTarget);
 }
 
-impl LayerInner {
-    pub fn exists_at(&self, location: &HexCoord) -> bool {
+impl LayerInnerImpl for LayerInner {
+    fn kind(&self) -> LayerKind {
         match self {
-            LayerInner::Tiles(tiles) | LayerInner::InvertedTiles(tiles) => {
-                tiles.exists_at(location)
-            }
-            LayerInner::Perlin(noise) => noise.exists_at(location),
+            LayerInner::Tiles(sparse_tiles) => sparse_tiles.kind(),
+            LayerInner::InvertedTiles(sparse_tiles) => sparse_tiles.kind(),
+            LayerInner::Perlin(perlin_noise_layer) => perlin_noise_layer.kind(),
         }
     }
 
-    pub fn colour_at(&self, location: &HexCoord) -> Color {
+    fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
         match self {
-            LayerInner::Tiles(tiles) | LayerInner::InvertedTiles(tiles) => {
-                tiles.colour_at(location)
-            }
-            LayerInner::Perlin(noise) => noise.colour_at(location),
+            LayerInner::Tiles(sparse_tiles) => sparse_tiles.bounds(hex_size),
+            LayerInner::InvertedTiles(sparse_tiles) => sparse_tiles.bounds(hex_size),
+            LayerInner::Perlin(perlin_noise_layer) => perlin_noise_layer.bounds(hex_size),
         }
     }
 
-    pub fn get_bounds(&self) -> Option<HexBounds> {
+    fn draw(&self, renderer: &mut dyn RenderTarget) {
         match self {
-            LayerInner::Tiles(tiles) | LayerInner::InvertedTiles(tiles) => tiles.get_bounds(),
-            LayerInner::Perlin(noise) => noise.get_bounds(),
-        }
-    }
-
-    pub fn get_bounding_box(&self, hex_size: f32) -> Option<Rectangle> {
-        match self {
-            LayerInner::Tiles(tiles) | LayerInner::InvertedTiles(tiles) => {
-                tiles.get_bounding_box(hex_size)
-            }
-            LayerInner::Perlin(noise) => noise.get_bounding_box(),
-        }
-    }
-}
-
-impl LayerInner {
-    pub fn draw<T: RenderTarget>(&self, target: &mut T, coords: impl Iterator<Item = HexCoord>) {
-        for coord in coords {
-            if self.exists_at(&coord) {
-                let point = T::hex_to_point(&coord);
-                target.fill_polygon(&point, self.colour_at(&coord));
-            }
+            LayerInner::Tiles(sparse_tiles) => sparse_tiles.draw(renderer),
+            LayerInner::InvertedTiles(sparse_tiles) => sparse_tiles.draw(renderer),
+            LayerInner::Perlin(perlin_noise_layer) => perlin_noise_layer.draw(renderer),
         }
     }
 }

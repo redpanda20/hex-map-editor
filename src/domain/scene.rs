@@ -1,10 +1,11 @@
 use iced::Color;
 
 use crate::domain::{
-    HexCoord, Layer, Tool, flood_fill,
+    HexBounds, HexCoord, Layer, Tool, flood_fill,
     history::Edit,
-    layer_inner::LayerKind,
-    layer_inner::{LayerInner, NoiseOctaves, PerlinNoiseLayer, SparseTiles},
+    layer_inner::{
+        LayerInner, LayerInnerImpl, LayerKind, NoiseOctaves, PerlinNoiseLayer, SparseTiles,
+    },
 };
 
 const DEFAULT_COLORS: [Color; 5] = [
@@ -124,6 +125,7 @@ impl Scene {
                         let seed = rand::random();
                         LayerInner::Perlin(PerlinNoiseLayer::new(seed))
                     }
+                    LayerKind::Utility => return None,
                 };
                 let layer = Layer {
                     name,
@@ -333,7 +335,7 @@ impl Scene {
                 let insert = matches!(layer.inner, LayerInner::Tiles(_));
 
                 // If the layer is empty, short circuit and invert
-                let Some(bounds) = layer.inner.get_bounds() else {
+                let Some(bounds) = HexBounds::from_hexes(store.tiles.clone()) else {
                     return Some(Edit::LayerInverted { index });
                 };
 
@@ -345,7 +347,7 @@ impl Scene {
                 let edits = region
                     .into_iter()
                     .filter_map(|coord| {
-                        let before = layer.inner.exists_at(&coord);
+                        let before = store.tiles.contains(&coord);
                         (before != insert).then_some(Edit::Tile {
                             layer: index,
                             coord,
@@ -545,12 +547,12 @@ impl Scene {
         }
     }
 
-    pub fn get_visible_layers(&self) -> Vec<&LayerInner> {
+    pub fn get_visible_layers(&self) -> Vec<&dyn LayerInnerImpl> {
         self.inner
             .iter()
             .filter(|layer| layer.visible)
-            .map(|layer| &layer.inner)
-            .collect::<Vec<_>>()
+            .map(|layer| &layer.inner as &dyn LayerInnerImpl)
+            .collect()
     }
 }
 

@@ -3,7 +3,9 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use iced::{Color, Rectangle, Vector};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
-use crate::domain::{HexBounds, HexCoord};
+use crate::domain::{HexBounds, RenderTarget};
+
+use super::{LayerInnerImpl, LayerKind};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NoiseOctaves {
@@ -130,30 +132,6 @@ fn dot(lhs: Vector, rhs: Vector) -> f32 {
 }
 
 impl PerlinNoiseLayer {
-    pub(super) fn exists_at(&self, location: &HexCoord) -> bool {
-        let Vector { x, y } = location.to_cartesian();
-        let sample = self.sample(x, y);
-        let normalized = sample * 0.5 + 0.5;
-        normalized >= self.threshold
-    }
-
-    pub(super) fn colour_at(&self, location: &HexCoord) -> Color {
-        let Vector { x, y } = location.to_cartesian();
-        let sample = self.sample(x, y);
-        let normalized = sample * 0.5 + 0.5;
-        Color::from_rgb(normalized, normalized, normalized)
-    }
-
-    pub(super) fn get_bounds(&self) -> Option<HexBounds> {
-        None
-    }
-
-    pub(super) fn get_bounding_box(&self) -> Option<Rectangle> {
-        None
-    }
-}
-
-impl PerlinNoiseLayer {
     pub fn set_seed(&mut self, seed: u64) {
         let mut rng = SmallRng::seed_from_u64(seed);
         let gradient_table: [Vector; TABLE_SIZE] = std::array::from_fn(|_| {
@@ -182,5 +160,33 @@ impl PerlinNoiseLayer {
 
     pub fn set_octaves(&mut self, count: usize, persistence: f32) {
         self.octaves = NoiseOctaves::Many { count, persistence }
+    }
+}
+
+impl LayerInnerImpl for PerlinNoiseLayer {
+    fn kind(&self) -> LayerKind {
+        LayerKind::PerlinNoise
+    }
+
+    fn bounds(&self, _hex_size: f32) -> Option<Rectangle> {
+        None
+    }
+
+    fn draw(&self, renderer: &mut dyn RenderTarget) {
+        let bounds = renderer.get_bounds();
+        let hexes = HexBounds::from_rect(bounds).into_hexes();
+
+        for coord in hexes {
+            let Vector { x, y } = coord.to_cartesian();
+            // Normalize from range [-1, 1] to [0, 1]
+            let sample = self.sample(x, y) * 0.5 + 0.5;
+
+            if sample >= self.threshold {
+                let fill = Color::from_rgb(sample, sample, sample);
+                let point = renderer.hex_to_point(&coord);
+
+                renderer.fill_polygon(&point, fill);
+            }
+        }
     }
 }
