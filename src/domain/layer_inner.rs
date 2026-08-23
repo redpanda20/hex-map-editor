@@ -39,12 +39,25 @@ pub enum LayerInner {
     Perlin(PerlinNoiseLayer),
 }
 
-pub trait LayerInnerImpl {
+pub trait LayerInnerImpl: std::fmt::Debug + LayerInnerImplClone {
     fn kind(&self) -> LayerKind;
 
     fn bounds(&self, hex_size: f32) -> Option<Rectangle>;
 
     fn draw(&self, renderer: &mut dyn RenderTarget);
+}
+
+pub trait LayerInnerImplClone {
+    fn clone_box(&self) -> Box<dyn LayerInnerImpl>;
+}
+
+impl<T> LayerInnerImplClone for T
+where
+    T: 'static + LayerInnerImpl + Clone,
+{
+    fn clone_box(&self) -> Box<dyn LayerInnerImpl> {
+        Box::new(self.clone())
+    }
 }
 
 impl LayerInnerImpl for LayerInner {
