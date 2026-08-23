@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use iced::{Color, Rectangle};
 
-use crate::domain::{HexCoord, RenderTarget};
+use crate::domain::{HexBounds, HexCoord, RenderTarget};
 
 use super::{LayerInnerImpl, LayerKind};
 
@@ -10,6 +10,7 @@ use super::{LayerInnerImpl, LayerKind};
 pub struct SparseTiles {
     pub tiles: HashSet<HexCoord>,
     colour: Color,
+    inverted: bool,
 }
 
 impl SparseTiles {
@@ -17,11 +18,16 @@ impl SparseTiles {
         SparseTiles {
             tiles: HashSet::new(),
             colour,
+            inverted: false,
         }
     }
 
     pub fn new_with(colour: Color, tiles: HashSet<HexCoord>) -> Self {
-        SparseTiles { tiles, colour }
+        SparseTiles {
+            tiles,
+            colour,
+            inverted: false,
+        }
     }
 
     pub fn get_colour(&self) -> Color {
@@ -30,6 +36,14 @@ impl SparseTiles {
 
     pub fn set_colour(&mut self, colour: Color) {
         self.colour = colour
+    }
+
+    pub fn is_inverted(&self) -> bool {
+        self.inverted
+    }
+
+    pub fn invert(&mut self) {
+        self.inverted = !self.inverted;
     }
 
     pub fn is_empty(&self) -> bool {
@@ -75,9 +89,15 @@ impl LayerInnerImpl for SparseTiles {
     }
 
     fn draw(&self, renderer: &mut dyn RenderTarget) {
-        for coord in &self.tiles {
-            let point = renderer.hex_to_point(coord);
-            renderer.fill_polygon(&point, self.colour);
+        let bounds = renderer.get_bounds();
+        let hexes = HexBounds::from_rect(bounds).into_hexes();
+
+        for coord in hexes {
+            if self.tiles.contains(&coord) ^ self.inverted {
+                let point = renderer.hex_to_point(&coord);
+
+                renderer.fill_polygon(&point, self.colour);
+            }
         }
     }
 }

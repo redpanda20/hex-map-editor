@@ -81,11 +81,11 @@ fn tiles_from_v1(tiles: Vec<HexCoordV1>) -> HashSet<HexCoord> {
 impl From<&LayerInner> for LayerKindV1 {
     fn from(inner: &LayerInner) -> Self {
         match inner {
-            LayerInner::Tiles(store) => LayerKindV1::Tiles {
+            LayerInner::Tiles(store) if store.is_inverted() => LayerKindV1::InvertedTiles {
                 colour: store.get_colour().into(),
                 tiles: tiles_to_v1(store.get_all_tiles()),
             },
-            LayerInner::InvertedTiles(store) => LayerKindV1::InvertedTiles {
+            LayerInner::Tiles(store) => LayerKindV1::Tiles {
                 colour: store.get_colour().into(),
                 tiles: tiles_to_v1(store.get_all_tiles()),
             },
@@ -105,9 +105,11 @@ impl From<LayerKindV1> for LayerInner {
             LayerKindV1::Tiles { colour, tiles } => {
                 LayerInner::Tiles(SparseTiles::new_with(colour.into(), tiles_from_v1(tiles)))
             }
-            LayerKindV1::InvertedTiles { colour, tiles } => LayerInner::InvertedTiles(
-                SparseTiles::new_with(colour.into(), tiles_from_v1(tiles)),
-            ),
+            LayerKindV1::InvertedTiles { colour, tiles } => {
+                let mut store = SparseTiles::new_with(colour.into(), tiles_from_v1(tiles));
+                store.invert();
+                LayerInner::Tiles(store)
+            }
             LayerKindV1::Perlin {
                 seed,
                 threshold,

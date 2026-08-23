@@ -69,9 +69,6 @@ impl Inspector {
             LayerInner::Tiles(sparse_tiles) => {
                 sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
             }
-            LayerInner::InvertedTiles(sparse_tiles) => {
-                sparse_tile_details(layer_id, starting_name, name, visible, sparse_tiles)
-            }
             LayerInner::Perlin(content) => {
                 perlin_noise_details(layer_id, starting_name, name, visible, content)
             }

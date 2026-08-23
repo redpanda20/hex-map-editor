@@ -36,7 +36,6 @@ impl Display for LayerKind {
 #[derive(Debug, Clone)]
 pub enum LayerInner {
     Tiles(SparseTiles),
-    InvertedTiles(SparseTiles),
     Perlin(PerlinNoiseLayer),
 }
 
@@ -52,7 +51,6 @@ impl LayerInnerImpl for LayerInner {
     fn kind(&self) -> LayerKind {
         match self {
             LayerInner::Tiles(sparse_tiles) => sparse_tiles.kind(),
-            LayerInner::InvertedTiles(sparse_tiles) => sparse_tiles.kind(),
             LayerInner::Perlin(perlin_noise_layer) => perlin_noise_layer.kind(),
         }
     }
@@ -60,7 +58,6 @@ impl LayerInnerImpl for LayerInner {
     fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
         match self {
             LayerInner::Tiles(sparse_tiles) => sparse_tiles.bounds(hex_size),
-            LayerInner::InvertedTiles(sparse_tiles) => sparse_tiles.bounds(hex_size),
             LayerInner::Perlin(perlin_noise_layer) => perlin_noise_layer.bounds(hex_size),
         }
     }
@@ -68,7 +65,6 @@ impl LayerInnerImpl for LayerInner {
     fn draw(&self, renderer: &mut dyn RenderTarget) {
         match self {
             LayerInner::Tiles(sparse_tiles) => sparse_tiles.draw(renderer),
-            LayerInner::InvertedTiles(sparse_tiles) => sparse_tiles.draw(renderer),
             LayerInner::Perlin(perlin_noise_layer) => perlin_noise_layer.draw(renderer),
         }
     }

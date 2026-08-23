@@ -173,9 +173,7 @@ impl Scene {
             }
             SceneMessage::EditLayerFistColour(index, new_colour) => {
                 let before = match &self.inner.get(index)?.inner {
-                    LayerInner::Tiles(store) | LayerInner::InvertedTiles(store) => {
-                        store.get_colour()
-                    }
+                    LayerInner::Tiles(store) => store.get_colour(),
                     LayerInner::Perlin(_) => todo!(),
                 };
                 if before == new_colour {
@@ -282,12 +280,13 @@ impl Scene {
                 let active_index = self.active_layer?;
                 let layer = self.inner.get(active_index)?;
 
-                let (before, after) = match &layer.inner {
-                    LayerInner::Tiles(store) => (store.tiles.contains(&hex_coord), true),
-                    LayerInner::InvertedTiles(store) => (!store.tiles.contains(&hex_coord), false),
-                    // Noise layer cannot be drawn to
-                    LayerInner::Perlin(_) => return None,
+                // Noise layer cannot be drawn to
+                let LayerInner::Tiles(store) = &layer.inner else {
+                    return None;
                 };
+
+                let before = store.tiles.contains(&hex_coord) ^ store.is_inverted();
+                let after = true;
 
                 if before == after {
                     return None;
@@ -305,12 +304,13 @@ impl Scene {
                 let active_index = self.active_layer?;
                 let layer = self.inner.get(active_index)?;
 
-                let (before, after) = match &layer.inner {
-                    LayerInner::Tiles(store) => (store.tiles.contains(&hex_coord), false),
-                    LayerInner::InvertedTiles(store) => (!store.tiles.contains(&hex_coord), true),
-                    // Noise layer cannot be drawn to
-                    LayerInner::Perlin(_) => return None,
+                // Noise layer cannot be drawn to
+                let LayerInner::Tiles(store) = &layer.inner else {
+                    return None;
                 };
+
+                let before = store.tiles.contains(&hex_coord) ^ store.is_inverted();
+                let after = false;
 
                 if before == after {
                     return None;
@@ -327,12 +327,11 @@ impl Scene {
             SceneMessage::FillFromHex(hex_coord) => {
                 let index = self.active_layer?;
                 let layer = self.inner.get(index)?;
-                let store = match &layer.inner {
-                    LayerInner::Tiles(store) | LayerInner::InvertedTiles(store) => store,
-                    LayerInner::Perlin(_) => return None,
+                let LayerInner::Tiles(store) = &layer.inner else {
+                    return None;
                 };
-                // Tiles layers fill by painting the region; InvertedTiles fill by erasing it.
-                let insert = matches!(layer.inner, LayerInner::Tiles(_));
+                // Non-inverted stores fill by painting the region; inverted stores fill by erasing it.
+                let insert = !store.is_inverted();
 
                 // If the layer is empty, short circuit and invert
                 let Some(bounds) = HexBounds::from_hexes(store.tiles.clone()) else {
@@ -391,18 +390,18 @@ impl Scene {
                 after,
             } => {
                 if let Some(store) = self.inner.get_mut(*layer).and_then(|l| match &mut l.inner {
-                    LayerInner::Tiles(store) | LayerInner::InvertedTiles(store) => Some(store),
+                    LayerInner::Tiles(store) => Some(store),
                     LayerInner::Perlin(_) => None,
                 }) {
-                    let is_tile_present = match forward {
+                    let new_state = match forward {
                         true => *after,
                         false => *before,
                     };
-                    if is_tile_present {
-                        store.tiles.insert(*coord);
-                    } else {
-                        store.tiles.remove(coord);
-                    }
+
+                    match new_state ^ store.is_inverted() {
+                        false => store.tiles.remove(coord),
+                        true => store.tiles.insert(*coord),
+                    };
                 }
             }
 
@@ -428,12 +427,12 @@ impl Scene {
                 }
             }
             Edit::LayerInverted { index } => {
-                if let Some(layer) = self.inner.get_mut(*index) {
-                    layer.inner = match &layer.inner {
-                        LayerInner::Tiles(store) => LayerInner::InvertedTiles(store.clone()),
-                        LayerInner::InvertedTiles(store) => LayerInner::Tiles(store.clone()),
-                        LayerInner::Perlin(_) => return,
-                    };
+                if let Some(Layer {
+                    inner: LayerInner::Tiles(store),
+                    ..
+                }) = self.inner.get_mut(*index)
+                {
+                    store.invert();
                 }
             }
 
@@ -467,9 +466,7 @@ impl Scene {
                 if let Some(layer) = self.inner.get_mut(*index) {
                     let colour = if forward { *after } else { *before };
                     match &mut layer.inner {
-                        LayerInner::Tiles(store) | LayerInner::InvertedTiles(store) => {
-                            store.set_colour(colour)
-                        }
+                        LayerInner::Tiles(store) => store.set_colour(colour),
                         LayerInner::Perlin(_) => (),
                     }
                 }

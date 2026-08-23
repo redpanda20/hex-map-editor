@@ -121,8 +121,10 @@ fn layer_preview<'a>(
     } = layer;
 
     let thumbnail = match inner {
+        LayerInner::Tiles(sparse_tiles) if sparse_tiles.is_inverted() => {
+            thumbnail_invert_tiles(sparse_tiles)
+        }
         LayerInner::Tiles(sparse_tiles) => thumbnail_tiles(sparse_tiles),
-        LayerInner::InvertedTiles(sparse_tiles) => thumbnail_invert_tiles(sparse_tiles),
         LayerInner::Perlin(perlin_noise_layer) => thumbnail_noise(perlin_noise_layer),
     };
 

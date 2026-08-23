@@ -133,7 +133,6 @@ pub enum Edit {
         a: usize,
         b: usize,
     },
-    /// Flip between `LayerInner::Tiles` <-> `LayerInner::InvertedTiles`. Self-inverse.
     LayerInverted {
         index: usize,
     },
