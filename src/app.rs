@@ -4,13 +4,13 @@ use iced::{
 };
 
 use crate::{
-    domain::{History, HistoryCommand, Scene, SceneMessage},
+    domain::{History, Scene, Tool, edit::EditCommand, id::LayerId},
     infrastructure::{
         IoProcess, SceneV1, export_png, load_project_async, save_bytes_async, save_project_async,
     },
     ui::{
-        Inspector, InspectorMessage, KeybindMessage, Keybinds, Layers, LayersMessage, Panes,
-        PanesMessage, ToastMessage, Toasts, Toolbar, ToolbarMessage, canvas_panel,
+        CanvasEvent, Inspector, InspectorMessage, KeybindMessage, Keybinds, Layers, LayersMessage,
+        Panes, PanesMessage, ToastMessage, Toasts, Toolbar, ToolbarMessage, canvas_panel,
     },
 };
 
@@ -18,6 +18,9 @@ use crate::{
 pub struct App {
     pub scene: Scene,
     pub history: History,
+
+    pub tool: Tool,
+    pub current_layer: Option<LayerId>,
 
     pub toolbar: Toolbar,
     pub layers: Layers,
@@ -28,11 +31,23 @@ pub struct App {
     pub panes: Panes,
 }
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum Action {
+    SetTool(Tool),
+    SetLayer(Option<LayerId>),
+    Undo,
+    Redo,
+    Save,
+    Load,
+    ExportPng,
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
-    Scene(SceneMessage),
-    History(HistoryCommand),
+    Action(Action),
+    Scene(Box<dyn EditCommand>),
 
+    Canvas(CanvasEvent),
     Inspector(InspectorMessage),
     Layers(LayersMessage),
     Toolbar(ToolbarMessage),
@@ -80,11 +95,7 @@ impl App {
             Message::Layers(message) => return self.layers.update(message),
             Message::Toolbar(message) => return self.toolbar.update(message),
 
-            Message::Scene(message) => {
-                let edit = self.scene.update(message);
-                self.history.apply(edit);
-            }
-            Message::History(command) => return self.history.update(command, &mut self.scene),
+            Message::Scene(command) => self.history.apply(&mut self.scene, command),
 
             Message::Export(process) => match process {
                 IoProcess::Start => return save_bytes_async(export_png(&self.scene), "hexmap.png"),
@@ -109,19 +120,35 @@ impl App {
                 }
                 IoProcess::Finished(Err(err)) => eprintln!("Project load failed: {err}"),
             },
+
+            Message::Action(action) => match action {
+                Action::SetTool(tool) => self.tool = tool,
+                Action::SetLayer(layer) => self.current_layer = layer,
+                Action::Undo => {
+                    self.history.undo(&mut self.scene);
+                }
+                Action::Redo => {
+                    self.history.redo(&mut self.scene);
+                }
+                Action::Save => return Task::done(Message::Save(IoProcess::Start)),
+                Action::Load => return Task::done(Message::Load(IoProcess::Start)),
+                Action::ExportPng => return Task::done(Message::Export(IoProcess::Start)),
+            },
+            Message::Canvas(event) => return event.into_task(&self.current_layer, &self.tool),
         }
 
         Task::none()
     }
 
     pub fn view<'a>(&'a self) -> Element<'a, Message> {
-        let inspector = |scene| self.inspector.view(scene);
-        let layers = |scene| self.layers.view(scene);
-        let toolbar = |scene| self.toolbar.view(scene, &self.history);
+        let inspector = |scene| self.inspector.view(scene, self.current_layer);
+        let layers = |scene| self.layers.view(scene, self.current_layer);
+        let toolbar = |_| self.toolbar.view(self.tool, &self.history);
+        let canvas = |scene| canvas_panel(scene, self.tool);
 
         let grid = self
             .panes
-            .view(&self.scene, canvas_panel, inspector, layers, toolbar);
+            .view(&self.scene, canvas, inspector, layers, toolbar);
 
         let toasts = self.toasts.view().map(Message::Toasts);
 

@@ -3,8 +3,12 @@ use std::collections::HashSet;
 use iced::Color;
 
 use crate::domain::{
-    Layer, Scene,
-    layer_inner::{LayerInner, NoiseOctaves, PerlinNoiseLayer, SparseTiles},
+    Layer, LayerInner, Scene,
+    id::LayerId,
+    layer::{
+        noise::{NoiseOctaves, PerlinNoiseLayer},
+        tiles::SparseTiles,
+    },
 };
 
 use super::schema::{ColourV1, HexCoordV1, LayerKindV1, LayerV1, NoiseOctavesV1, SceneV1};
@@ -139,7 +143,7 @@ impl From<&Layer> for LayerV1 {
         LayerV1 {
             name: layer.name.clone(),
             visible: layer.visible,
-            kind: (&layer.inner).into(),
+            kind: (&layer.kind).into(),
         }
     }
 }
@@ -147,9 +151,10 @@ impl From<&Layer> for LayerV1 {
 impl From<LayerV1> for Layer {
     fn from(layer: LayerV1) -> Self {
         Layer {
+            id: LayerId::next(),
             name: layer.name,
             visible: layer.visible,
-            inner: layer.kind.into(),
+            kind: layer.kind.into(),
         }
     }
 }

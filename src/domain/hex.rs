@@ -204,12 +204,9 @@ const FLOOD_FILL_TILE_CAP: usize = 5_000;
 ///
 /// Returns `None` if the region is effectively unbounded.
 /// This is the case when the fill reaches the bounds or exceeds the tile cap
-pub fn flood_fill(
-    start: HexCoord,
-    tiles: &HashSet<HexCoord>,
-    bounds: HexBounds,
-) -> Option<HashSet<HexCoord>> {
+pub fn flood_fill(start: HexCoord, tiles: &HashSet<HexCoord>) -> Option<HashSet<HexCoord>> {
     let target_state = tiles.contains(&start);
+    let bounds = HexBounds::from_hexes(tiles.clone())?;
 
     let mut visited = HashSet::new();
     let mut stack = vec![start];

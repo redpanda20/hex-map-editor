@@ -4,7 +4,7 @@ use iced::{Color, Rectangle};
 
 use crate::domain::{HexBounds, HexCoord, RenderTarget};
 
-use super::{LayerInnerImpl, LayerKind};
+use super::LayerInnerImpl;
 
 #[derive(Debug, Clone)]
 pub struct SparseTiles {
@@ -38,6 +38,32 @@ impl SparseTiles {
         self.colour = colour
     }
 
+    pub fn paint(&mut self, coord: HexCoord) -> bool {
+        self.tiles.insert(coord)
+    }
+
+    pub fn erase(&mut self, coord: HexCoord) -> bool {
+        self.tiles.remove(&coord)
+    }
+
+    /// Paints all coords in the other set.
+    /// Returns all modified tiles
+    pub fn paint_multiple(&mut self, other: HashSet<HexCoord>) -> HashSet<HexCoord> {
+        other
+            .into_iter()
+            .filter(|coord| self.tiles.insert(*coord))
+            .collect()
+    }
+
+    /// Erases all coords in the other set.
+    /// Returns all modified tiles
+    pub fn erase_multiple(&mut self, other: HashSet<HexCoord>) -> HashSet<HexCoord> {
+        other
+            .into_iter()
+            .filter(|coord| self.tiles.remove(coord))
+            .collect()
+    }
+
     pub fn is_inverted(&self) -> bool {
         self.inverted
     }
@@ -50,7 +76,7 @@ impl SparseTiles {
         self.tiles.is_empty()
     }
 
-    // Used for flood fill
+    // Used for convert
     pub fn get_all_tiles(&self) -> &HashSet<HexCoord> {
         &self.tiles
     }
@@ -80,10 +106,6 @@ impl SparseTiles {
 }
 
 impl LayerInnerImpl for SparseTiles {
-    fn kind(&self) -> LayerKind {
-        LayerKind::Tiles
-    }
-
     fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
         self.get_bounding_box(hex_size)
     }

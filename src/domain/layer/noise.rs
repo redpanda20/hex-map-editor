@@ -5,7 +5,7 @@ use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use crate::domain::{HexBounds, RenderTarget};
 
-use super::{LayerInnerImpl, LayerKind};
+use super::LayerInnerImpl;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NoiseOctaves {
@@ -164,10 +164,6 @@ impl PerlinNoiseLayer {
 }
 
 impl LayerInnerImpl for PerlinNoiseLayer {
-    fn kind(&self) -> LayerKind {
-        LayerKind::PerlinNoise
-    }
-
     fn bounds(&self, _hex_size: f32) -> Option<Rectangle> {
         None
     }

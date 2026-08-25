@@ -1,8 +1,7 @@
 use iced::Color;
 
-use crate::domain::{HexBounds, layer_inner::LayerInnerImpl};
-
-use super::LayerKind;
+use super::LayerInnerImpl;
+use crate::domain::HexBounds;
 
 /// An entirely empty layer that is used to draw the hex grid overlay.
 #[derive(Debug, Clone, Copy)]
@@ -39,10 +38,6 @@ impl HexGridOverlay {
 }
 
 impl LayerInnerImpl for HexGridOverlay {
-    fn kind(&self) -> LayerKind {
-        LayerKind::Utility
-    }
-
     fn bounds(&self, _hex_size: f32) -> Option<iced::Rectangle> {
         None
     }

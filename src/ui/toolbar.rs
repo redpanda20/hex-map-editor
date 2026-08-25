@@ -5,9 +5,8 @@ use iced::{
 use iced_fonts::bootstrap;
 
 use crate::{
-    app::Message,
-    domain::{History, HistoryCommand, Scene, SceneMessage, Tool},
-    infrastructure::IoProcess,
+    app::{Action, Message},
+    domain::{History, Tool},
 };
 
 #[derive(Debug, Clone)]
@@ -21,131 +20,89 @@ impl Toolbar {
         Task::none()
     }
 
-    pub fn view<'a>(&self, scene: &'a Scene, history: &'a History) -> Element<'a, Message> {
-        let brush_tool = button(bootstrap::brush())
-            .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Paint)))
-            .style(move |theme, mut status| {
-                if scene.tool == Tool::Paint {
-                    status = button::Status::Disabled
-                };
-                button::background(theme, status)
-            });
-        let brush_tool = tooltip(
-            brush_tool,
-            container("Brush tool (Ctrl + B)")
-                .padding(4.0)
-                .style(container::bordered_box),
-            tooltip::Position::Right,
+    pub fn view<'a>(&self, tool: Tool, history: &'a History) -> Element<'a, Message> {
+        let tool_button = |icon, selected, message, tooltip_text| {
+            tooltip(
+                button(icon)
+                    .on_press(Message::Action(message))
+                    .style(move |theme, status| {
+                        button::background(
+                            theme,
+                            if selected {
+                                button::Status::Disabled
+                            } else {
+                                status
+                            },
+                        )
+                    }),
+                container(tooltip_text)
+                    .padding(4.0)
+                    .style(container::bordered_box),
+                tooltip::Position::Right,
+            )
+        };
+
+        let brush_tool = tool_button(
+            bootstrap::brush(),
+            tool == Tool::Paint,
+            Action::SetTool(Tool::Paint),
+            "Brush tool (Ctrl + B)",
         );
 
-        let move_tool = button(bootstrap::arrows_move())
-            .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Pan)))
-            .style(move |theme, mut status| {
-                if scene.tool == Tool::Pan {
-                    status = button::Status::Disabled
-                };
-                button::background(theme, status)
-            });
-        let move_tool = tooltip(
-            move_tool,
-            container("Move tool (Ctrl + M)")
-                .padding(4.0)
-                .style(container::bordered_box),
-            tooltip::Position::Right,
+        let move_tool = tool_button(
+            bootstrap::arrows_move(),
+            tool == Tool::Pan,
+            Action::SetTool(Tool::Pan),
+            "Move tool (Ctrl + M)",
         );
 
-        let erase_tool = button(bootstrap::eraser_fill())
-            .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Erase)))
-            .style(move |theme, mut status| {
-                if scene.tool == Tool::Erase {
-                    status = button::Status::Disabled
-                };
-                button::background(theme, status)
-            });
-        let erase_tool = tooltip(
-            erase_tool,
-            container("Erase tool (Ctrl + E)")
-                .padding(4.0)
-                .style(container::bordered_box),
-            tooltip::Position::Right,
+        let erase_tool = tool_button(
+            bootstrap::eraser_fill(),
+            tool == Tool::Erase,
+            Action::SetTool(Tool::Erase),
+            "Erase tool (Ctrl + E)",
         );
 
-        let paint_tool = button(bootstrap::paint_bucket())
-            .on_press(Message::Scene(SceneMessage::ChangeTool(Tool::Fill)))
-            .style(move |theme, mut status| {
-                if scene.tool == Tool::Fill {
-                    status = button::Status::Disabled
-                };
-                button::background(theme, status)
-            });
-        let paint_tool = tooltip(
-            paint_tool,
-            container("Bucket fill tool (Ctrl + B)")
-                .padding(4.0)
-                .style(container::bordered_box),
-            tooltip::Position::Right,
+        let bucket_tool = tool_button(
+            bootstrap::paint_bucket(),
+            tool == Tool::Fill,
+            Action::SetTool(Tool::Fill),
+            "Bucket fill tool (Ctrl + B)",
         );
 
-        let undo = button(bootstrap::arrow_counterclockwise())
-            .on_press(Message::History(HistoryCommand::Undo))
-            .style(move |theme, mut status| {
-                if !history.can_undo() {
-                    status = button::Status::Disabled
-                }
-                button::subtle(theme, status)
-            });
-        let undo = tooltip(
-            undo,
-            container("Undo last command (Ctrl + Z)")
-                .padding(4.0)
-                .style(container::bordered_box),
-            tooltip::Position::Right,
-        );
-        let redo = button(bootstrap::arrow_clockwise())
-            .on_press(Message::History(HistoryCommand::Redo))
-            .style(move |theme, mut status| {
-                if !history.can_redo() {
-                    status = button::Status::Disabled
-                }
-                button::subtle(theme, status)
-            });
-        let redo = tooltip(
-            redo,
-            container("Redo last command (Ctrl + Y)")
-                .padding(4.0)
-                .style(container::bordered_box),
-            tooltip::Position::Right,
+        let undo = tool_button(
+            bootstrap::arrow_counterclockwise(),
+            !history.can_undo(),
+            Action::Undo,
+            "Undo last command (Ctrl + Z)",
         );
 
-        let save_scene = button(bootstrap::floppy_fill())
-            .style(button::subtle)
-            .on_press(Message::Save(IoProcess::Start));
-        let save_scene = tooltip(
-            save_scene,
-            container("Save scene to file (Ctrl + S)")
-                .padding(4.0)
-                .style(container::bordered_box),
-            tooltip::Position::Right,
-        );
-        let load_scene = button(bootstrap::folder_fill())
-            .style(button::subtle)
-            .on_press(Message::Load(IoProcess::Start));
-        let load_scene = tooltip(
-            load_scene,
-            container("Load scene from file (Ctrl + O))")
-                .padding(4.0)
-                .style(container::bordered_box),
-            tooltip::Position::Right,
+        let redo = tool_button(
+            bootstrap::arrow_clockwise(),
+            !history.can_redo(),
+            Action::Redo,
+            "Redo last command (Ctrl + Y)",
         );
 
-        let export_png =
-            button(bootstrap::file_earmark_image()).on_press(Message::Export(IoProcess::Start));
-        let export_png = tooltip(
-            export_png,
-            container("Export scene as a PNG")
-                .padding(4.0)
-                .style(container::bordered_box),
-            tooltip::Position::Right,
+        let save_scene = tool_button(
+            bootstrap::floppy_fill(),
+            false,
+            Action::Save,
+            "Save scene to file (Ctrl + S)",
+        );
+
+        let load_scene = tool_button(
+            bootstrap::folder_fill(),
+            false,
+            Action::Load,
+            "Load scene from file (Ctrl + O)",
+        );
+
+        let export_png = tool_button(
+            bootstrap::file_earmark_image(),
+            false,
+            Action::ExportPng,
+            "Export scene as a PNG",
         );
 
         let content = column![
@@ -153,7 +110,7 @@ impl Toolbar {
             brush_tool,
             move_tool,
             erase_tool,
-            paint_tool,
+            bucket_tool,
             rule::horizontal(1),
             undo,
             redo,

@@ -3,7 +3,7 @@ mod png_export;
 use iced::Rectangle;
 use image::{ImageBuffer, Rgba};
 
-use crate::domain::{Scene, layer_inner::HexGridOverlay};
+use crate::domain::{Scene, layer::overlay::HexGridOverlay};
 use png_export::PngRenderTarget;
 
 const EXPORT_HEX_SIZE: f32 = 100.0;

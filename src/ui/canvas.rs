@@ -1,34 +1,73 @@
 use std::cell::Cell;
 
 use iced::{
-    Element, Length, Point, Rectangle, Theme, Vector, mouse, touch,
+    Element, Length, Point, Rectangle, Task, Theme, Vector, mouse, touch,
     widget::{
         Action,
         canvas::{self, Event, Fill, Frame, Geometry, Path, Program, Stroke},
     },
 };
 
+#[derive(Debug, Clone, Copy)]
+pub enum CanvasEvent {
+    PointerPressed { at: HexCoord },
+    PointerMoved { from: HexCoord, to: HexCoord },
+    PointerReleased,
+}
+
+impl CanvasEvent {
+    pub fn into_task(self, current_layer: &Option<LayerId>, tool: &Tool) -> Task<Message> {
+        let command: Box<dyn EditCommand> = match (*current_layer, tool, self) {
+            (Some(layer), Tool::Paint, CanvasEvent::PointerPressed { at }) => {
+                Box::new(PaintTile { layer, coord: at })
+            }
+            (Some(layer), Tool::Paint, CanvasEvent::PointerMoved { from: _, to }) => {
+                Box::new(PaintTile { layer, coord: to })
+            }
+
+            (Some(layer), Tool::Erase, CanvasEvent::PointerPressed { at }) => {
+                Box::new(EraseTile { layer, coord: at })
+            }
+            (Some(layer), Tool::Erase, CanvasEvent::PointerMoved { from: _, to }) => {
+                Box::new(EraseTile { layer, coord: to })
+            }
+
+            (Some(layer), Tool::Fill, CanvasEvent::PointerPressed { at }) => {
+                Box::new(BucketFill { layer, from: at })
+            }
+
+            _ => return Task::none(),
+        };
+        Task::done(Message::Scene(command))
+    }
+}
+
 use crate::{
     app::Message,
     domain::{
-        HexCoord, HistoryCommand, RenderTarget, Scene, SceneMessage, Tool,
-        layer_inner::HexGridOverlay,
+        EditCommand, HexCoord, RenderTarget, Scene, Tool,
+        edit::{BucketFill, EraseTile, PaintTile},
+        id::LayerId,
+        layer::overlay::HexGridOverlay,
     },
 };
 
 const HEX_SIZE: f32 = 16.0;
 
-pub fn canvas_panel<'a>(scene: &'a Scene) -> Element<'a, Message> {
-    let hex_canvas = HexCanvas { scene };
+pub fn canvas_panel<'a>(scene: &'a Scene, tool: Tool) -> Element<'a, Message> {
+    let hex_canvas = HexCanvas { scene, tool };
 
-    iced::widget::canvas(hex_canvas)
+    let element: Element<'_, CanvasEvent> = iced::widget::canvas(hex_canvas)
         .width(Length::Fill)
         .height(Length::Fill)
-        .into()
+        .into();
+
+    element.map(Message::Canvas)
 }
 
 pub struct HexCanvas<'a> {
     pub scene: &'a Scene,
+    pub tool: Tool,
 }
 
 #[derive(Debug)]
@@ -57,7 +96,7 @@ impl Default for CanvasState {
     }
 }
 
-impl<'a> Program<Message> for HexCanvas<'a> {
+impl<'a> Program<CanvasEvent> for HexCanvas<'a> {
     type State = CanvasState;
 
     fn draw(
@@ -100,7 +139,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         event: &Event,
         bounds: Rectangle,
         cursor: mouse::Cursor,
-    ) -> Option<Action<Message>> {
+    ) -> Option<Action<CanvasEvent>> {
         let Some(cursor_pos) = cursor.position_in(bounds) else {
             state.dragging = false;
             state.last_drag_pos = None;
@@ -112,20 +151,13 @@ impl<'a> Program<Message> for HexCanvas<'a> {
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
                 state.dragging = true;
                 state.last_drag_pos = Some(cursor_pos);
+
+                if self.tool == Tool::Pan {
+                    return Some(Action::capture());
+                }
+
                 let coord = self.screen_to_hex(state, cursor_pos);
-
-                let message = match self.scene.tool {
-                    Tool::Paint => Message::History(HistoryCommand::BeginTransaction(
-                        SceneMessage::PaintHex(coord),
-                    )),
-                    Tool::Erase => Message::History(HistoryCommand::BeginTransaction(
-                        SceneMessage::EraseHex(coord),
-                    )),
-                    Tool::Pan => return Some(Action::capture()),
-                    Tool::Fill => Message::Scene(SceneMessage::FillFromHex(coord)),
-                };
-
-                Some(Action::publish(message).and_capture())
+                Some(Action::publish(CanvasEvent::PointerPressed { at: coord }).and_capture())
             }
 
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
@@ -134,38 +166,37 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                 state.dragging = false;
                 state.last_drag_pos = None;
 
-                Some(
-                    Action::publish(Message::History(HistoryCommand::CommitTransaction))
-                        .and_capture(),
-                )
+                if self.tool == Tool::Pan {
+                    return None;
+                }
+
+                Some(Action::publish(CanvasEvent::PointerReleased).and_capture())
             }
 
             Event::Mouse(mouse::Event::CursorMoved { .. })
             | Event::Touch(touch::Event::FingerMoved { .. }) => {
                 if !state.dragging {
                     return Some(Action::request_redraw());
-                };
+                }
 
                 let last = state.last_drag_pos;
                 state.last_drag_pos = Some(cursor_pos);
+                let last = last?;
 
+                if self.tool == Tool::Pan {
+                    state.translation.x += cursor_pos.x - last.x;
+                    state.translation.y += cursor_pos.y - last.y;
+
+                    state.cache.clear();
+                    return Some(Action::request_redraw().and_capture());
+                }
+
+                let last_coord = self.screen_to_hex(state, last);
                 let coord = self.screen_to_hex(state, cursor_pos);
 
-                let message = match self.scene.tool {
-                    Tool::Paint => Message::Scene(SceneMessage::PaintHex(coord)),
-                    Tool::Erase => Message::Scene(SceneMessage::EraseHex(coord)),
-                    // Bucket fill is explicitly disabled while dragging
-                    // This is to avoid triggering epilieptic seizures
-                    Tool::Fill => return None,
-                    Tool::Pan => match last {
-                        None => return None,
-                        Some(last) => {
-                            state.translation.x += cursor_pos.x - last.x;
-                            state.translation.y += cursor_pos.y - last.y;
-                            state.cache.clear();
-                            return Some(Action::request_redraw().and_capture());
-                        }
-                    },
+                let message = CanvasEvent::PointerMoved {
+                    from: last_coord,
+                    to: coord,
                 };
 
                 Some(Action::publish(message).and_capture())
@@ -177,6 +208,7 @@ impl<'a> Program<Message> for HexCanvas<'a> {
                     mouse::ScrollDelta::Pixels { x, y } => x + y,
                 };
                 state.zoom = f32::clamp(state.zoom + delta * 0.01, 0.4, 10.0);
+
                 state.cache.clear();
                 Some(Action::request_redraw().and_capture())
             }
@@ -192,15 +224,13 @@ impl<'a> Program<Message> for HexCanvas<'a> {
         cursor: mouse::Cursor,
     ) -> mouse::Interaction {
         if !cursor.is_over(bounds) {
-            return mouse::Interaction::Idle;
+            return mouse::Interaction::None;
         }
 
-        match self.scene.tool {
+        match self.tool {
             Tool::Pan if state.dragging => mouse::Interaction::Grabbing,
             Tool::Pan => mouse::Interaction::Grab,
-            Tool::Paint => mouse::Interaction::Crosshair,
-            Tool::Erase => mouse::Interaction::Crosshair,
-            Tool::Fill => mouse::Interaction::Crosshair,
+            Tool::Paint | Tool::Erase | Tool::Fill => mouse::Interaction::Crosshair,
         }
     }
 }

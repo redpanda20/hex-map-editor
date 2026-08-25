@@ -6,39 +6,9 @@ use iced::{
 };
 
 use crate::{
-    app::Message,
-    domain::{HistoryCommand, SceneMessage::ChangeTool, Tool},
-    infrastructure::IoProcess,
+    app::{Action, Message},
+    domain::Tool,
 };
-
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum KeybindAction {
-    Undo,
-    Redo,
-    PaintTool,
-    EraseTool,
-    PanTool,
-    FillTool,
-    Save,
-    Load,
-    ExportPng,
-}
-
-impl From<KeybindAction> for Message {
-    fn from(action: KeybindAction) -> Self {
-        match action {
-            KeybindAction::Undo => Message::History(HistoryCommand::Undo),
-            KeybindAction::Redo => Message::History(HistoryCommand::Redo),
-            KeybindAction::PaintTool => Message::Scene(ChangeTool(Tool::Paint)),
-            KeybindAction::EraseTool => Message::Scene(ChangeTool(Tool::Erase)),
-            KeybindAction::PanTool => Message::Scene(ChangeTool(Tool::Pan)),
-            KeybindAction::FillTool => Message::Scene(ChangeTool(Tool::Fill)),
-            KeybindAction::Save => Message::Save(IoProcess::Start),
-            KeybindAction::Load => Message::Load(IoProcess::Start),
-            KeybindAction::ExportPng => Message::Export(IoProcess::Start),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Binding {
@@ -72,18 +42,13 @@ impl Binding {
 
 #[derive(Debug, Clone)]
 pub enum KeybindMessage {
-    Bind {
-        binding: Binding,
-        action: KeybindAction,
-    },
-    Unbind {
-        binding: Binding,
-    },
+    Bind { binding: Binding, action: Action },
+    Unbind { binding: Binding },
 }
 
 #[derive(Debug, Clone)]
 pub struct Keybinds {
-    bindings: HashMap<Binding, KeybindAction>,
+    bindings: HashMap<Binding, Action>,
     /// Changed whenever the bindings change.
     /// Used by iced subscriptions for cache invalidation
     revision: u64,
@@ -100,7 +65,7 @@ impl Hash for KeybindsWrapper {
 
 impl Keybinds {
     /// Create a new keybind layout with existing bindings
-    pub fn new_with(bindings: HashMap<Binding, KeybindAction>) -> Self {
+    pub fn new_with(bindings: HashMap<Binding, Action>) -> Self {
         Self {
             bindings,
             revision: 0,
@@ -108,12 +73,12 @@ impl Keybinds {
     }
 
     /// Get the action corresponding to a binding, if it exists
-    pub fn action_for(&self, binding: Binding) -> Option<KeybindAction> {
+    pub fn action_for(&self, binding: Binding) -> Option<Action> {
         self.bindings.get(&binding).copied()
     }
 
     /// Set a binding safely
-    pub fn set_binding(&mut self, binding: Binding, action: KeybindAction) {
+    pub fn set_binding(&mut self, binding: Binding, action: Action) {
         self.bindings.insert(binding, action);
         self.revision = self.revision.wrapping_add(1);
     }
@@ -131,7 +96,7 @@ impl Keybinds {
             .filter_map(Binding::from_event)
             .with(KeybindsWrapper(self.clone()))
             .filter_map(|(keybinds, binding)| keybinds.0.action_for(binding))
-            .map(Message::from)
+            .map(Message::Action)
     }
 
     pub fn update(&mut self, message: KeybindMessage) {
@@ -147,14 +112,14 @@ impl Keybinds {
 impl Default for Keybinds {
     fn default() -> Self {
         let bindings = HashMap::from([
-            (Binding::ctrl("z"), KeybindAction::Undo),
-            (Binding::ctrl_shift("z"), KeybindAction::Redo),
-            (Binding::ctrl("y"), KeybindAction::Redo),
-            (Binding::ctrl("b"), KeybindAction::PaintTool),
-            (Binding::ctrl("e"), KeybindAction::EraseTool),
-            (Binding::ctrl("m"), KeybindAction::PanTool),
-            (Binding::ctrl("s"), KeybindAction::Save),
-            (Binding::ctrl("o"), KeybindAction::Load),
+            (Binding::ctrl("z"), Action::Undo),
+            (Binding::ctrl_shift("z"), Action::Redo),
+            (Binding::ctrl("y"), Action::Redo),
+            (Binding::ctrl("b"), Action::SetTool(Tool::Paint)),
+            (Binding::ctrl("e"), Action::SetTool(Tool::Erase)),
+            (Binding::ctrl("m"), Action::SetTool(Tool::Pan)),
+            (Binding::ctrl("s"), Action::Save),
+            (Binding::ctrl("o"), Action::Load),
         ]);
         Self::new_with(bindings)
     }
