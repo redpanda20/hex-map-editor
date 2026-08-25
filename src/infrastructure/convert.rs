@@ -102,6 +102,7 @@ impl From<&LayerInner> for LayerKindV1 {
                     },
                 },
             },
+            LayerInner::Image(image_layer) => todo!(),
         }
     }
 }

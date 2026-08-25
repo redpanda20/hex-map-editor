@@ -12,6 +12,7 @@ use crate::{
         edit::{Rename, SetColour, SetNoiseParams, SetNoiseSeed, SetVisible},
         id::LayerId,
         layer::{
+            image::ImageLayer,
             noise::{NoiseParams, PerlinNoiseLayer},
             tiles::SparseTiles,
         },
@@ -101,6 +102,7 @@ impl Inspector {
             match kind {
                 LayerInner::Tiles(tiles) => self.details_tiles(*id, tiles),
                 LayerInner::Perlin(noise) => self.details_noise(*id, noise),
+                LayerInner::Image(image) => self.details_image(*id, image),
             },
         ])
         .style(container::bordered_box)
@@ -292,5 +294,9 @@ impl Inspector {
         .spacing(4)
         .padding(8)
         .into()
+    }
+
+    fn details_image(&self, _id: LayerId, _tiles: &ImageLayer) -> Element<'_, Message> {
+        text("Not yet implemented").into()
     }
 }

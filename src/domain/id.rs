@@ -26,4 +26,4 @@ macro_rules! def_id {
 }
 
 def_id!(LayerId);
-// def_id!(ImageId);
+def_id!(ImageId);

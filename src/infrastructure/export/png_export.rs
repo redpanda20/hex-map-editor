@@ -1,18 +1,31 @@
 use iced::{Color, Point, Rectangle};
 use image::{ImageBuffer, Rgba};
 
-use crate::domain::{HexCoord, RenderTarget};
+use crate::domain::{
+    HexCoord, RenderTarget,
+    assets::{AssetStore, ImageAsset},
+    id::ImageId,
+};
 
 use super::EXPORT_HEX_SIZE;
 
 pub struct PngRenderTarget<'a> {
     image: &'a mut ImageBuffer<Rgba<u8>, Vec<u8>>,
     bounds: Rectangle,
+    assets: &'a AssetStore,
 }
 
 impl<'a> PngRenderTarget<'a> {
-    pub fn new(image: &'a mut ImageBuffer<Rgba<u8>, Vec<u8>>, bounds: Rectangle) -> Self {
-        Self { image, bounds }
+    pub fn new(
+        image: &'a mut ImageBuffer<Rgba<u8>, Vec<u8>>,
+        bounds: Rectangle,
+        assets: &'a AssetStore,
+    ) -> Self {
+        Self {
+            image,
+            bounds,
+            assets,
+        }
     }
 }
 
@@ -41,6 +54,74 @@ impl RenderTarget for PngRenderTarget<'_> {
         let vertices = hex_vertices_f(centre.x, centre.y);
 
         stroke_polygon(self.image, &vertices, colour.into_rgba8());
+    }
+
+    fn draw_image(&mut self, bounds: Rectangle, image_id: ImageId, opacity: f32) {
+        let Some(image) = self.assets.image(image_id).cloned() else {
+            return;
+        };
+
+        let ImageAsset {
+            data,
+            width,
+            height,
+        } = image;
+
+        let Some(src) = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, data) else {
+            return;
+        };
+
+        // `bounds` is in the same coordinate system as the other rendering
+        // operations, so translate it relative to the export image.
+        let x = (bounds.x - self.bounds.x).round() as i64;
+        let y = (bounds.y - self.bounds.y).round() as i64;
+
+        let dst_width = bounds.width.max(0.0).round() as u32;
+        let dst_height = bounds.height.max(0.0).round() as u32;
+
+        if dst_width == 0 || dst_height == 0 {
+            return;
+        }
+
+        // Resize only when necessary.
+        let src = if src.width() != dst_width || src.height() != dst_height {
+            image::imageops::resize(
+                &src,
+                dst_width,
+                dst_height,
+                image::imageops::FilterType::Lanczos3,
+            )
+        } else {
+            src
+        };
+
+        let opacity = opacity.clamp(0.0, 1.0);
+
+        for (sx, sy, pixel) in src.enumerate_pixels() {
+            let dx = x + sx as i64;
+            let dy = y + sy as i64;
+
+            // Clip against the destination image.
+            if dx < 0
+                || dy < 0
+                || dx >= self.image.width() as i64
+                || dy >= self.image.height() as i64
+            {
+                continue;
+            }
+
+            let mut colour = pixel.0;
+
+            // Apply the requested opacity to the source alpha.
+            colour[3] = (colour[3] as f32 * opacity).round() as u8;
+
+            if colour[3] == 0 {
+                continue;
+            }
+
+            let dst = self.image.get_pixel_mut(dx as u32, dy as u32);
+            blend(dst, colour);
+        }
     }
 }
 
