@@ -125,7 +125,7 @@ impl<'a> Program<CanvasEvent> for HexCanvas<'a> {
         };
 
         // Don't draw hex indicator if user is panning
-        if Tool::Pan == self.scene.tool {
+        if Tool::Pan == self.tool {
             return vec![map];
         }
 

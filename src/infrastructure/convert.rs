@@ -170,7 +170,7 @@ impl From<&Scene> for SceneV1 {
     fn from(layers: &Scene) -> Self {
         SceneV1 {
             layers: layers.inner.iter().map(Into::into).collect(),
-            active_layer: layers.active_layer,
+            active_layer: None,
         }
     }
 }

@@ -4,7 +4,7 @@ use iced::Color;
 use rand::random;
 
 use crate::domain::{
-    HexCoord, Layer, LayerInner, LayerKind, Tool,
+    HexCoord, Layer, LayerInner, LayerKind,
     id::LayerId,
     layer::{LayerInnerImpl, noise::PerlinNoiseLayer, tiles::SparseTiles},
 };
@@ -21,20 +21,12 @@ const DEFAULT_COLORS: [Color; 5] = [
 pub struct Scene {
     pub inner: Vec<Layer>,
 
-    pub active_layer: Option<usize>,
-    pub tool: Tool,
-
     revision: u64,
 }
 
 impl Scene {
     pub fn from_layers(inner: Vec<Layer>) -> Self {
-        Self {
-            inner,
-            active_layer: None,
-            tool: Tool::default(),
-            revision: 1,
-        }
+        Self { inner, revision: 1 }
     }
 }
 
@@ -181,8 +173,6 @@ impl Default for Scene {
 
         Self {
             inner: vec![layer],
-            active_layer: Some(0),
-            tool: Tool::default(),
             revision: 0,
         }
     }
