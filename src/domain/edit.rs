@@ -1,7 +1,11 @@
 use std::collections::HashSet;
 
+use iced::Color;
+
 use crate::domain::{
-    HexCoord, LayerInner, LayerKind, Scene, flood_fill, id::LayerId, layer::Layer,
+    HexCoord, LayerInner, LayerKind, Scene, flood_fill,
+    id::LayerId,
+    layer::{Layer, noise::NoiseParams},
 };
 
 /// A standalone edit that can be made to a scene
@@ -110,6 +114,24 @@ pub struct BucketFill {
 #[derive(Debug, Clone)]
 pub struct InvertTiles {
     pub layer: LayerId,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetColour {
+    pub layer: LayerId,
+    pub colour: Color,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetNoiseSeed {
+    pub layer: LayerId,
+    pub seed: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetNoiseParams {
+    pub layer: LayerId,
+    pub params: NoiseParams,
 }
 
 impl EditCommand for NoOp {
@@ -295,6 +317,66 @@ impl EditCommand for BucketFill {
         Box::new(EraseTiles {
             layer: self.layer,
             coords: changes,
+        })
+    }
+}
+
+impl EditCommand for SetColour {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Tiles(tiles),
+            ..
+        }) = scene.get_layer_mut(self.layer)
+        else {
+            return Box::new(NoOp);
+        };
+
+        let prev = tiles.colour;
+        tiles.colour = self.colour;
+
+        Box::new(SetColour {
+            layer: self.layer,
+            colour: prev,
+        })
+    }
+}
+
+impl EditCommand for SetNoiseSeed {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Perlin(noise),
+            ..
+        }) = scene.get_layer_mut(self.layer)
+        else {
+            return Box::new(NoOp);
+        };
+
+        let seed = noise.get_seed();
+        noise.set_seed(self.seed);
+
+        Box::new(SetNoiseSeed {
+            layer: self.layer,
+            seed,
+        })
+    }
+}
+
+impl EditCommand for SetNoiseParams {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Perlin(noise),
+            ..
+        }) = scene.get_layer_mut(self.layer)
+        else {
+            return Box::new(NoOp);
+        };
+
+        let params = noise.get_params();
+        noise.set_params(&self.params);
+
+        Box::new(SetNoiseParams {
+            layer: self.layer,
+            params,
         })
     }
 }

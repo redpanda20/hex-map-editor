@@ -7,22 +7,25 @@ use crate::domain::{HexBounds, RenderTarget};
 
 use super::LayerInnerImpl;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum NoiseOctaves {
-    One,
-    Many { count: usize, persistence: f32 },
-}
-
 const TABLE_SIZE: usize = 64;
+
+#[derive(Debug, Clone, Copy)]
+pub struct NoiseParams {
+    pub threshold: f32,
+    pub frequency: f32,
+    pub octaves: usize,
+    pub persistence: f32,
+}
 
 #[derive(Debug, Clone)]
 pub struct PerlinNoiseLayer {
-    pub seed: u64,
+    seed: u64,
     gradient_table: [Vector; TABLE_SIZE],
 
     pub threshold: f32,
     pub frequency: f32,
-    pub octaves: NoiseOctaves,
+    pub octaves: usize,
+    pub persistence: f32,
 }
 
 impl PerlinNoiseLayer {
@@ -40,33 +43,29 @@ impl PerlinNoiseLayer {
             gradient_table,
             threshold: 0.0,
             frequency: 5.0,
-            octaves: NoiseOctaves::One,
+            octaves: 1,
+            persistence: 0.5,
         }
     }
 
     fn sample(&self, x: f32, y: f32) -> f32 {
-        match self.octaves {
-            NoiseOctaves::One => self.sample_octave(x, y, 1.0),
-            NoiseOctaves::Many { count, persistence } => {
-                let mut total = 0.0;
-                let mut frequency = 1.0;
-                let mut amplitude = 1.0;
-                let mut max_amplitude = 0.0;
+        let mut total = 0.0;
+        let mut frequency = 1.0;
+        let mut amplitude = 1.0;
+        let mut max_amplitude = 0.0;
 
-                for _ in 0..count {
-                    total += self.sample_octave(x, y, frequency) * amplitude;
-                    max_amplitude += amplitude;
+        for _ in 0..self.octaves {
+            total += self.sample_octave(x, y, frequency) * amplitude;
+            max_amplitude += amplitude;
 
-                    amplitude *= persistence;
-                    frequency *= 2.0;
-                }
+            amplitude *= self.persistence;
+            frequency *= 2.0;
+        }
 
-                if max_amplitude > 0.0 {
-                    total / max_amplitude
-                } else {
-                    total
-                }
-            }
+        if max_amplitude > 0.0 {
+            total / max_amplitude
+        } else {
+            total
         }
     }
 
@@ -132,6 +131,10 @@ fn dot(lhs: Vector, rhs: Vector) -> f32 {
 }
 
 impl PerlinNoiseLayer {
+    pub fn get_seed(&self) -> u64 {
+        self.seed
+    }
+
     pub fn set_seed(&mut self, seed: u64) {
         let mut rng = SmallRng::seed_from_u64(seed);
         let gradient_table: [Vector; TABLE_SIZE] = std::array::from_fn(|_| {
@@ -145,21 +148,33 @@ impl PerlinNoiseLayer {
         self.gradient_table = gradient_table
     }
 
-    pub fn set_frequency(&mut self, frequency: f32) {
-        self.frequency = frequency
+    pub fn get_params(&self) -> NoiseParams {
+        let Self {
+            threshold,
+            frequency,
+            octaves,
+            persistence,
+            ..
+        } = *self;
+        NoiseParams {
+            threshold,
+            frequency,
+            octaves,
+            persistence,
+        }
     }
+    pub fn set_params(&mut self, params: &NoiseParams) {
+        let NoiseParams {
+            threshold,
+            frequency,
+            octaves,
+            persistence,
+        } = *params;
 
-    /// Expects a threshold between 0 and 1 inclusive
-    pub fn set_threshold(&mut self, threshold: f32) {
-        self.threshold = threshold
-    }
-
-    pub fn set_single_octave(&mut self) {
-        self.octaves = NoiseOctaves::One
-    }
-
-    pub fn set_octaves(&mut self, count: usize, persistence: f32) {
-        self.octaves = NoiseOctaves::Many { count, persistence }
+        self.threshold = threshold;
+        self.frequency = frequency;
+        self.octaves = octaves;
+        self.persistence = persistence;
     }
 }
 

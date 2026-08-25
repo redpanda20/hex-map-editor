@@ -9,7 +9,7 @@ use super::LayerInnerImpl;
 #[derive(Debug, Clone)]
 pub struct SparseTiles {
     pub tiles: HashSet<HexCoord>,
-    colour: Color,
+    pub colour: Color,
     inverted: bool,
 }
 
@@ -28,14 +28,6 @@ impl SparseTiles {
             colour,
             inverted: false,
         }
-    }
-
-    pub fn get_colour(&self) -> Color {
-        self.colour
-    }
-
-    pub fn set_colour(&mut self, colour: Color) {
-        self.colour = colour
     }
 
     pub fn paint(&mut self, coord: HexCoord) -> bool {

@@ -18,5 +18,5 @@ pub use keybinds::{Binding, KeybindMessage, Keybinds};
 pub use toasts::{ToastMessage, Toasts};
 
 // Widgets
-mod colour_picker;
-use colour_picker::colour_picker;
+mod widget;
+use widget::colour_picker;

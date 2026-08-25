@@ -167,7 +167,7 @@ fn thumbnail<'a>(kind: &LayerInner) -> Text<'a> {
             (true, _) => bootstrap::hexagon(),
             (false, _) => bootstrap::hexagon(),
         }
-        .color(tiles.get_colour().opaque()),
+        .color(tiles.colour.opaque()),
         LayerInner::Perlin(_) => bootstrap::sliderstwo(),
     }
 }

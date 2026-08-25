@@ -5,10 +5,7 @@ use iced::Color;
 use crate::domain::{
     Layer, LayerInner, Scene,
     id::LayerId,
-    layer::{
-        noise::{NoiseOctaves, PerlinNoiseLayer},
-        tiles::SparseTiles,
-    },
+    layer::{noise::PerlinNoiseLayer, tiles::SparseTiles},
 };
 
 use super::schema::{ColourV1, HexCoordV1, LayerKindV1, LayerV1, NoiseOctavesV1, SceneV1};
@@ -58,17 +55,17 @@ impl From<ColourV1> for Color {
     }
 }
 
-impl From<&NoiseOctaves> for NoiseOctavesV1 {
-    fn from(octaves: &NoiseOctaves) -> Self {
-        match octaves {
-            NoiseOctaves::One => NoiseOctavesV1::One,
-            NoiseOctaves::Many { count, persistence } => NoiseOctavesV1::Many {
-                count: *count,
-                persistence: *persistence,
-            },
-        }
-    }
-}
+// impl From<&NoiseOctaves> for NoiseOctavesV1 {
+//     fn from(octaves: &NoiseOctaves) -> Self {
+//         match octaves {
+//             NoiseOctaves::One => NoiseOctavesV1::One,
+//             NoiseOctaves::Many { count, persistence } => NoiseOctavesV1::Many {
+//                 count: *count,
+//                 persistence: *persistence,
+//             },
+//         }
+//     }
+// }
 
 // ---------------------------------------------------------------------------
 // Layers
@@ -86,18 +83,24 @@ impl From<&LayerInner> for LayerKindV1 {
     fn from(inner: &LayerInner) -> Self {
         match inner {
             LayerInner::Tiles(store) if store.is_inverted() => LayerKindV1::InvertedTiles {
-                colour: store.get_colour().into(),
+                colour: store.colour.into(),
                 tiles: tiles_to_v1(store.get_all_tiles()),
             },
             LayerInner::Tiles(store) => LayerKindV1::Tiles {
-                colour: store.get_colour().into(),
+                colour: store.colour.into(),
                 tiles: tiles_to_v1(store.get_all_tiles()),
             },
             LayerInner::Perlin(perlin) => LayerKindV1::Perlin {
-                seed: perlin.seed,
+                seed: perlin.get_seed(),
                 threshold: perlin.threshold,
                 frequency: perlin.frequency,
-                octaves: (&perlin.octaves).into(),
+                octaves: match perlin.octaves {
+                    1 => NoiseOctavesV1::One,
+                    count => NoiseOctavesV1::Many {
+                        count,
+                        persistence: perlin.persistence,
+                    },
+                },
             },
         }
     }
@@ -124,14 +127,14 @@ impl From<LayerKindV1> for LayerInner {
                 // table from the seed, so reconstructing via `new` + setters
                 // exactly reproduces the original layer.
                 let mut perlin = PerlinNoiseLayer::new(seed);
-                perlin.set_threshold(threshold);
-                perlin.set_frequency(frequency);
-                match octaves {
-                    NoiseOctavesV1::One => perlin.set_single_octave(),
-                    NoiseOctavesV1::Many { count, persistence } => {
-                        perlin.set_octaves(count, persistence)
-                    }
-                }
+                perlin.threshold = threshold;
+                perlin.frequency = frequency;
+                let (octaves, persistence) = match octaves {
+                    NoiseOctavesV1::One => (1, 0.5),
+                    NoiseOctavesV1::Many { count, persistence } => (count, persistence),
+                };
+                perlin.octaves = octaves;
+                perlin.persistence = persistence;
                 LayerInner::Perlin(perlin)
             }
         }

@@ -449,7 +449,7 @@ impl<T: Picker> canvas::Program<Message> for PickerProgram<T> {
                 state.selected_point = relative_pos;
                 state.is_selecting = false;
 
-                return Some(Action::publish((self.0.on_change())(new_colour)).and_capture());
+                return Some(Action::publish((self.0.on_commit())(new_colour)).and_capture());
             }
 
             state.is_selecting = false;
