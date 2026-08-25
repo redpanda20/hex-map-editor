@@ -46,8 +46,9 @@ use crate::{
     app::Message,
     domain::{
         EditCommand, HexCoord, RenderTarget, Scene, Tool,
+        assets::AssetStore,
         edit::{BucketFill, EraseTile, PaintTile},
-        id::LayerId,
+        id::{ImageId, LayerId},
         layer::overlay::HexGridOverlay,
     },
 };
@@ -270,14 +271,18 @@ impl<'a> HexCanvas<'a> {
         let relative_bounds =
             Rectangle::with_size(bounds.size()) * inv_scale - state.translation * inv_scale;
 
-        let target: &mut dyn RenderTarget = &mut (frame, relative_bounds);
+        let mut target = CanvasRenderTarget {
+            frame,
+            bounds: relative_bounds,
+            assets: &self.scene.assets,
+        };
 
         let mut layers = self.scene.get_visible_layers();
         let overlay = HexGridOverlay::new_light();
         layers.push(&overlay);
 
         for layer in layers {
-            layer.draw(target);
+            layer.draw(&mut target);
         }
     }
 
@@ -309,7 +314,13 @@ fn hex_path(hex_size: f32) -> Path {
     builder.build()
 }
 
-impl RenderTarget for (&mut Frame, Rectangle) {
+struct CanvasRenderTarget<'a> {
+    frame: &'a mut Frame,
+    bounds: Rectangle,
+    assets: &'a AssetStore,
+}
+
+impl<'a> RenderTarget for CanvasRenderTarget<'a> {
     fn hex_to_point(&self, coord: &HexCoord) -> Point {
         let point = coord.to_cartesian();
 
@@ -317,13 +328,13 @@ impl RenderTarget for (&mut Frame, Rectangle) {
     }
 
     fn get_bounds(&self) -> Rectangle {
-        self.1
+        self.bounds
     }
 
     fn fill_polygon(&mut self, point: &Point, fill: iced::Color) {
         let path = hex_path(HEX_SIZE);
 
-        self.0.with_save(|frame| {
+        self.frame.with_save(|frame| {
             frame.translate(Vector::new(point.x, point.y));
             frame.fill(&path, Fill::from(fill));
         });
@@ -332,11 +343,18 @@ impl RenderTarget for (&mut Frame, Rectangle) {
     fn stroke_polygon(&mut self, point: &Point, colour: iced::Color) {
         let path = hex_path(HEX_SIZE);
 
-        self.0.with_save(|frame| {
+        self.frame.with_save(|frame| {
             frame.translate(Vector::new(point.x, point.y));
 
             let stroke = Stroke::default().with_color(colour);
             frame.stroke(&path, stroke);
         });
+    }
+
+    fn draw_image(&mut self, bounds: Rectangle, image: ImageId, opacity: f32) {
+        if let Some(handle) = self.assets.image_data(image).cloned() {
+            let image = iced::advanced::image::Image::new(handle).opacity(opacity);
+            self.frame.draw_image(bounds, image);
+        }
     }
 }

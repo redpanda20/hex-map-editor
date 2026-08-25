@@ -169,6 +169,7 @@ fn thumbnail<'a>(kind: &LayerInner) -> Text<'a> {
         }
         .color(tiles.colour.opaque()),
         LayerInner::Perlin(_) => bootstrap::sliderstwo(),
+        LayerInner::Image(_) => bootstrap::image(),
     }
 }
 
@@ -200,7 +201,7 @@ fn add_layer_button<'a>(layers: &Layers) -> Element<'a, Message> {
     })));
 
     let add_layer_list = pick_list(
-        [LayerKind::Tiles, LayerKind::Noise],
+        [LayerKind::Tiles, LayerKind::Noise, LayerKind::Image],
         Some(layers.active_layer_type),
         |kind| Message::Layers(LayersMessage::ChangeLayerType { kind }),
     );

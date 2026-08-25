@@ -1,10 +1,14 @@
+use std::io::Cursor;
+
 use iced::Task;
-use image::EncodableLayout;
+use iced::futures::FutureExt;
+use image::{EncodableLayout, ImageReader};
 use rfd::AsyncFileDialog;
 
-use crate::app::Message;
 use crate::domain::Scene;
+use crate::domain::id::LayerId;
 use crate::infrastructure::IoProcess;
+use crate::{app::Message, domain::assets::ImageAsset};
 
 use super::schema::{self, LoadError, SceneV1};
 
@@ -74,6 +78,29 @@ pub fn load_project_async() -> Task<Message> {
     })
 }
 
+/// Opens a load dialog and parses the chosen file into an image asset.
+pub fn load_image_async(caller: LayerId) -> Task<Message> {
+    Task::future(
+        AsyncFileDialog::new()
+            .add_filter("Image", &["png"])
+            .set_title("Load image")
+            .pick_file()
+            .map(move |handle| (caller, handle)),
+    )
+    .then(|(caller, handle)| match handle {
+        Some(file_handle) => {
+            Task::perform(read_image(file_handle), move |content| Message::LoadAsset {
+                caller,
+                process: IoProcess::Finished(content),
+            })
+        }
+        None => Task::done(Message::LoadAsset {
+            caller,
+            process: IoProcess::Cancelled,
+        }),
+    })
+}
+
 async fn read_future(handle: rfd::FileHandle) -> Result<SceneV1, String> {
     let bytes = handle.read().await;
     schema::deserialize(&bytes).map_err(|err: LoadError| err.to_string())
@@ -84,4 +111,23 @@ async fn write_future(handle: rfd::FileHandle, bytes: Vec<u8>) -> Result<(), Str
         .write(bytes.as_bytes())
         .await
         .map_err(|err| err.to_string())
+}
+
+async fn read_image(handle: rfd::FileHandle) -> Result<ImageAsset, String> {
+    let bytes = handle.read().await;
+    let image = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|err| err.to_string())?
+        .decode()
+        .map_err(|err| err.to_string())?;
+
+    let width = image.width();
+    let height = image.height();
+
+    Ok(ImageAsset {
+        data: image.into_bytes(),
+        width,
+        height,
+        name: handle.file_name(),
+    })
 }

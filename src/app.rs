@@ -4,9 +4,15 @@ use iced::{
 };
 
 use crate::{
-    domain::{History, Scene, Tool, edit::EditCommand, id::LayerId},
+    domain::{
+        History, Scene, Tool,
+        assets::ImageAsset,
+        edit::{EditCommand, SetImage},
+        id::LayerId,
+    },
     infrastructure::{
-        IoProcess, SceneV1, export_png, load_project_async, save_bytes_async, save_project_async,
+        IoProcess, SceneV1, export_png, load_image_async, load_project_async, save_bytes_async,
+        save_project_async,
     },
     ui::{
         CanvasEvent, Inspector, InspectorMessage, KeybindMessage, Keybinds, Layers, LayersMessage,
@@ -56,6 +62,10 @@ pub enum Message {
     Keybinds(KeybindMessage),
     Panes(PanesMessage),
 
+    LoadAsset {
+        caller: LayerId,
+        process: IoProcess<ImageAsset>,
+    },
     Load(IoProcess<SceneV1>),
     Save(IoProcess<()>),
     Export(IoProcess<()>),
@@ -119,6 +129,20 @@ impl App {
                     eprintln!("Project load succeeded")
                 }
                 IoProcess::Finished(Err(err)) => eprintln!("Project load failed: {err}"),
+            },
+
+            Message::LoadAsset { caller, process } => match process {
+                IoProcess::Start => return load_image_async(caller),
+                IoProcess::Cancelled => eprintln!("Asset load cancelled"),
+                IoProcess::Finished(Ok(asset)) => {
+                    let id = self.scene.assets.register_image(asset);
+                    let edit = SetImage {
+                        layer: caller,
+                        image: id,
+                    };
+                    return Task::done(Message::Scene(Box::new(edit)));
+                }
+                IoProcess::Finished(Err(err)) => eprintln!("Asset load failed: {err}"),
             },
 
             Message::Action(action) => match action {

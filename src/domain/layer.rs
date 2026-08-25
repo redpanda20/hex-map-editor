@@ -1,3 +1,4 @@
+pub mod image;
 pub mod noise;
 pub mod overlay;
 pub mod tiles;
@@ -9,7 +10,7 @@ use iced::Rectangle;
 use crate::domain::{
     RenderTarget,
     id::LayerId,
-    layer::{noise::PerlinNoiseLayer, tiles::SparseTiles},
+    layer::{image::ImageLayer, noise::PerlinNoiseLayer, tiles::SparseTiles},
 };
 
 #[derive(Debug, Clone)]
@@ -37,12 +38,14 @@ pub enum LayerKind {
     #[default]
     Tiles,
     Noise,
+    Image,
 }
 impl Display for LayerKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LayerKind::Tiles => write!(f, "Tiles"),
             LayerKind::Noise => write!(f, "Noise"),
+            LayerKind::Image => write!(f, "Image"),
         }
     }
 }
@@ -51,15 +54,7 @@ impl Display for LayerKind {
 pub enum LayerInner {
     Tiles(SparseTiles),
     Perlin(PerlinNoiseLayer),
-}
-
-impl LayerInner {
-    pub fn type_name(&self) -> &'static str {
-        match self {
-            LayerInner::Tiles(_) => "tiles",
-            LayerInner::Perlin(_) => "noise",
-        }
-    }
+    Image(ImageLayer),
 }
 
 impl LayerInnerImpl for LayerInner {
@@ -67,6 +62,7 @@ impl LayerInnerImpl for LayerInner {
         match self {
             LayerInner::Tiles(inner) => inner.bounds(hex_size),
             LayerInner::Perlin(inner) => inner.bounds(hex_size),
+            LayerInner::Image(inner) => inner.bounds(hex_size),
         }
     }
 
@@ -74,6 +70,7 @@ impl LayerInnerImpl for LayerInner {
         match self {
             LayerInner::Tiles(inner) => inner.draw(renderer),
             LayerInner::Perlin(inner) => inner.draw(renderer),
+            LayerInner::Image(inner) => inner.draw(renderer),
         }
     }
 }

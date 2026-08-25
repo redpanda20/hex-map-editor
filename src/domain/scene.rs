@@ -5,8 +5,9 @@ use rand::random;
 
 use crate::domain::{
     HexCoord, Layer, LayerInner, LayerKind,
+    assets::AssetStore,
     id::LayerId,
-    layer::{LayerInnerImpl, noise::PerlinNoiseLayer, tiles::SparseTiles},
+    layer::{LayerInnerImpl, image::ImageLayer, noise::PerlinNoiseLayer, tiles::SparseTiles},
 };
 
 const DEFAULT_COLORS: [Color; 5] = [
@@ -20,13 +21,17 @@ const DEFAULT_COLORS: [Color; 5] = [
 #[derive(Debug, Clone)]
 pub struct Scene {
     pub inner: Vec<Layer>,
-
+    pub assets: AssetStore,
     revision: u64,
 }
 
 impl Scene {
     pub fn from_layers(inner: Vec<Layer>) -> Self {
-        Self { inner, revision: 1 }
+        Self {
+            inner,
+            revision: 1,
+            assets: AssetStore::default(),
+        }
     }
 }
 
@@ -47,6 +52,7 @@ impl Scene {
                 LayerInner::Tiles(SparseTiles::new(DEFAULT_COLORS[self.inner.len() % 5]))
             }
             LayerKind::Noise => LayerInner::Perlin(PerlinNoiseLayer::new(random())),
+            LayerKind::Image => LayerInner::Image(ImageLayer::new()),
         }
     }
 
@@ -174,6 +180,7 @@ impl Default for Scene {
         Self {
             inner: vec![layer],
             revision: 0,
+            assets: AssetStore::default(),
         }
     }
 }

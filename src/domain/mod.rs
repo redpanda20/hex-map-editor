@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod colour;
 pub mod edit;
 mod hex;
