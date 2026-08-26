@@ -72,8 +72,11 @@ impl RenderTarget for PngRenderTarget<'_> {
         let x = (bounds.x - self.bounds.x).round() as i64;
         let y = (bounds.y - self.bounds.y).round() as i64;
 
-        let dst_width = bounds.width.max(0.0).round() as u32;
-        let dst_height = bounds.height.max(0.0).round() as u32;
+        // Technically this shouldn't be known, but image will look different to the main applicaiton otherwise
+        const RELATIVE_EXPORT_SIZE: f32 = EXPORT_HEX_SIZE / 16.0;
+
+        let dst_width = (bounds.width * RELATIVE_EXPORT_SIZE).max(0.0).round() as u32;
+        let dst_height = (bounds.height * RELATIVE_EXPORT_SIZE).max(0.0).round() as u32;
 
         if dst_width == 0 || dst_height == 0 {
             return;
