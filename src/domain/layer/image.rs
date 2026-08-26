@@ -2,17 +2,25 @@ use iced::Rectangle;
 
 use crate::domain::{RenderTarget, id::ImageId, layer::LayerInnerImpl};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct ImageLayer {
-    pub image: ImageId,
+    pub image: Option<ImageId>,
     pub bounds: Rectangle,
     opacity: f32,
 }
 
 impl ImageLayer {
-    pub fn new(image: ImageId) -> Self {
+    pub fn new() -> Self {
         Self {
-            image,
+            image: None,
+            bounds: Rectangle::default(),
+            opacity: 1.0,
+        }
+    }
+
+    pub fn new_with(image: ImageId) -> Self {
+        Self {
+            image: Some(image),
             bounds: Rectangle::default(),
             opacity: 1.0,
         }
@@ -33,6 +41,8 @@ impl LayerInnerImpl for ImageLayer {
     }
 
     fn draw(&self, renderer: &mut dyn RenderTarget) {
-        renderer.draw_image(self.bounds, self.image, self.opacity);
+        if let Some(image) = self.image {
+            renderer.draw_image(self.bounds, image, self.opacity);
+        }
     }
 }

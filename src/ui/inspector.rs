@@ -1,6 +1,6 @@
 use iced::{
     Alignment, Color, Element, Length, Task, alignment,
-    widget::{Row, button, column, container, row, rule, slider, space, text, text_input},
+    widget::{Row, button, column, container, image, row, rule, slider, space, text, text_input},
 };
 use iced_fonts::bootstrap;
 use rand::random;
@@ -17,11 +17,14 @@ use crate::{
             tiles::SparseTiles,
         },
     },
+    infrastructure::IoProcess,
     ui::colour_picker,
 };
 
 #[derive(Debug, Clone)]
 pub enum InspectorMessage {
+    Clear,
+
     LayerRename(Option<String>),
     LayerRenameCommit { id: LayerId },
     LayerRenameStart(String),
@@ -43,28 +46,45 @@ pub struct Inspector {
 impl Inspector {
     pub fn update(&mut self, message: InspectorMessage) -> Task<Message> {
         match message {
+            InspectorMessage::Clear => {
+                self.active_layer_name = None;
+                self.active_colour = None;
+                self.active_noise_params = None
+            }
             InspectorMessage::LayerRename(new_name) => self.active_layer_name = new_name,
             InspectorMessage::LayerRenameStart(name) => self.active_layer_name = Some(name),
             InspectorMessage::LayerRenameCommit { id } => {
-                if let Some(name) = self.active_layer_name.take() {
-                    let edit = Box::new(Rename { id, name });
-                    return Task::done(Message::Scene(edit));
+                if let Some(name) = &self.active_layer_name {
+                    let edit = Box::new(Rename {
+                        id,
+                        name: name.to_string(),
+                    });
+                    return Task::done(Message::Scene(edit))
+                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
                 }
             }
             InspectorMessage::ColourChange { colour } => self.active_colour = Some(colour),
             InspectorMessage::ColourCommit { id } => {
-                if let Some(colour) = self.active_colour.take() {
-                    let edit = Box::new(SetColour { layer: id, colour });
-                    return Task::done(Message::Scene(edit));
+                if let Some(colour) = &self.active_colour {
+                    let edit = Box::new(SetColour {
+                        layer: id,
+                        colour: *colour,
+                    });
+                    return Task::done(Message::Scene(edit))
+                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
                 }
             }
             InspectorMessage::NoiseParamsChange { params } => {
                 self.active_noise_params = Some(params)
             }
             InspectorMessage::NoiseParamCommit { id } => {
-                if let Some(params) = self.active_noise_params.take() {
-                    let edit = Box::new(SetNoiseParams { layer: id, params });
-                    return Task::done(Message::Scene(edit));
+                if let Some(params) = &self.active_noise_params {
+                    let edit = Box::new(SetNoiseParams {
+                        layer: id,
+                        params: *params,
+                    });
+                    return Task::done(Message::Scene(edit))
+                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
                 }
             }
         }
@@ -296,7 +316,16 @@ impl Inspector {
         .into()
     }
 
-    fn details_image(&self, _id: LayerId, _tiles: &ImageLayer) -> Element<'_, Message> {
-        text("Not yet implemented").into()
+    fn details_image(&self, id: LayerId, layer: &ImageLayer) -> Element<'_, Message> {
+        column![
+            text("Not yet implemented"),
+            button("Load image").on_press(Message::LoadAsset {
+                caller: id,
+                process: IoProcess::Start
+            })
+        ]
+        .spacing(4)
+        .padding(8)
+        .into()
     }
 }

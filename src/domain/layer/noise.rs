@@ -20,7 +20,7 @@ pub struct NoiseParams {
 #[derive(Debug, Clone)]
 pub struct PerlinNoiseLayer {
     seed: u64,
-    gradient_table: [Vector; TABLE_SIZE],
+    gradient_table: Box<[Vector; TABLE_SIZE]>,
 
     pub threshold: f32,
     pub frequency: f32,
@@ -40,7 +40,7 @@ impl PerlinNoiseLayer {
 
         Self {
             seed,
-            gradient_table,
+            gradient_table: Box::new(gradient_table),
             threshold: 0.0,
             frequency: 5.0,
             octaves: 1,
@@ -145,7 +145,7 @@ impl PerlinNoiseLayer {
         });
 
         self.seed = seed;
-        self.gradient_table = gradient_table
+        *self.gradient_table = gradient_table
     }
 
     pub fn get_params(&self) -> NoiseParams {

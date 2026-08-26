@@ -4,7 +4,7 @@ use iced::Color;
 
 use crate::domain::{
     HexCoord, LayerInner, LayerKind, Scene, flood_fill,
-    id::LayerId,
+    id::{ImageId, LayerId},
     layer::{Layer, noise::NoiseParams},
 };
 
@@ -132,6 +132,12 @@ pub struct SetNoiseSeed {
 pub struct SetNoiseParams {
     pub layer: LayerId,
     pub params: NoiseParams,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetImage {
+    pub layer: LayerId,
+    pub image: ImageId,
 }
 
 impl EditCommand for NoOp {
@@ -378,6 +384,38 @@ impl EditCommand for SetNoiseParams {
             layer: self.layer,
             params,
         })
+    }
+}
+
+impl EditCommand for SetImage {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        // Get image size from store
+        let (width, height) = {
+            let Some(image) = scene.assets.image(self.image) else {
+                return Box::new(NoOp);
+            };
+            (
+                image.width.cast_signed() as f32,
+                image.height.cast_signed() as f32,
+            )
+        };
+
+        // Get mutable access to layer
+        let Some(Layer {
+            kind: LayerInner::Image(layer),
+            ..
+        }) = scene.get_layer_mut(self.layer)
+        else {
+            return Box::new(NoOp);
+        };
+
+        layer.image = Some(self.image);
+        layer.bounds.width = width;
+        layer.bounds.height = height;
+
+        // Irreversable edit
+        // TODO: Make reversable
+        Box::new(NoOp)
     }
 }
 

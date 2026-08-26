@@ -7,7 +7,7 @@ use crate::domain::{
     HexCoord, Layer, LayerInner, LayerKind,
     assets::AssetStore,
     id::LayerId,
-    layer::{LayerInnerImpl, noise::PerlinNoiseLayer, tiles::SparseTiles},
+    layer::{LayerInnerImpl, image::ImageLayer, noise::PerlinNoiseLayer, tiles::SparseTiles},
 };
 
 const DEFAULT_COLORS: [Color; 5] = [
@@ -176,8 +176,11 @@ impl Default for Scene {
         let kind = LayerInner::Tiles(SparseTiles::new(DEFAULT_COLORS[0]));
         let layer = Layer::new("Layer 1", kind);
 
+        let image_kind = LayerInner::Image(ImageLayer::new());
+        let image_layer = Layer::new("Image layer", image_kind);
+
         Self {
-            inner: vec![layer],
+            inner: vec![layer, image_layer],
             revision: 0,
             assets: AssetStore::default(),
         }
