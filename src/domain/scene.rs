@@ -176,11 +176,8 @@ impl Default for Scene {
         let kind = LayerInner::Tiles(SparseTiles::new(DEFAULT_COLORS[0]));
         let layer = Layer::new("Layer 1", kind);
 
-        let image_kind = LayerInner::Image(ImageLayer::new());
-        let image_layer = Layer::new("Image layer", image_kind);
-
         Self {
-            inner: vec![layer, image_layer],
+            inner: vec![layer],
             revision: 0,
             assets: AssetStore::default(),
         }
