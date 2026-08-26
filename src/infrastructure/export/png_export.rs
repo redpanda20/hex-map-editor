@@ -44,7 +44,8 @@ impl RenderTarget for PngRenderTarget<'_> {
         fill_polygon(self.image, &vertices, fill.into_rgba8());
     }
 
-    fn stroke_polygon(&mut self, point: &Point, colour: Color) {
+    // Strokes are drawn with minimum thickness when exporting
+    fn stroke_polygon(&mut self, point: &Point, colour: Color, _stroke_width: f32) {
         let centre = Point::new(point.x - self.bounds.x, point.y - self.bounds.y);
 
         let vertices = hex_vertices_f(centre.x, centre.y);

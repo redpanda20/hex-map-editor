@@ -36,8 +36,12 @@ impl ImageLayer {
 }
 
 impl LayerInnerImpl for ImageLayer {
-    fn bounds(&self, _hex_size: f32) -> Option<Rectangle> {
-        Some(self.bounds)
+    fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
+        // Technically this shouldn't be known,
+        // exports are currently broken otherwise
+        const EDITOR_HEX_SIZE: f32 = 16.0;
+        let relative_size = hex_size / EDITOR_HEX_SIZE;
+        Some(self.bounds * relative_size)
     }
 
     fn draw(&self, renderer: &mut dyn RenderTarget) {

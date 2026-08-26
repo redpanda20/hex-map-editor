@@ -1,12 +1,14 @@
-use std::cell::Cell;
+mod gpu;
+
+use std::cell::{Cell, RefCell};
+use std::sync::Arc;
 
 use iced::{
-    Element, Length, Point, Rectangle, Task, Theme, Vector, mouse, touch,
-    widget::{
-        Action,
-        canvas::{self, Event, Fill, Frame, Geometry, Path, Program, Stroke},
-    },
+    Color, Element, Event, Length, Point, Rectangle, Task, Vector, mouse, touch,
+    widget::{Action, shader},
 };
+
+use gpu::{DrawCommand, HexMapPrimitive, push_hex_fill, push_hex_stroke, quad_vertices};
 
 #[derive(Debug, Clone, Copy)]
 pub enum CanvasEvent {
@@ -42,6 +44,7 @@ impl CanvasEvent {
     }
 }
 
+use crate::domain::layer::LayerInnerImpl;
 use crate::{
     app::Message,
     domain::{
@@ -55,10 +58,24 @@ use crate::{
 
 const HEX_SIZE: f32 = 16.0;
 
+/// Accent color used for the cursor-hover hex outline.
+///
+/// The old `canvas::Program::draw` received a `&Theme` and pulled
+/// `theme.extended_palette().primary.base.color` from it; `shader::Program::draw`
+/// does not receive a theme at all, so this is hardcoded for now. If you want
+/// this theme-aware again, thread a `Color` into `HexCanvas`/`canvas_panel`
+/// from wherever `view()` has access to the active `Theme`.
+const CURSOR_HEX_COLOR: Color = Color {
+    r: 0.35,
+    g: 0.55,
+    b: 0.95,
+    a: 1.0,
+};
+
 pub fn canvas_panel<'a>(scene: &'a Scene, tool: Tool) -> Element<'a, Message> {
     let hex_canvas = HexCanvas { scene, tool };
 
-    let element: Element<'_, CanvasEvent> = iced::widget::canvas(hex_canvas)
+    let element: Element<'_, CanvasEvent> = iced::widget::shader(hex_canvas)
         .width(Length::Fill)
         .height(Length::Fill)
         .into();
@@ -73,10 +90,11 @@ pub struct HexCanvas<'a> {
 
 #[derive(Debug)]
 pub struct CanvasState {
-    cache: canvas::Cache,
-    // Tracks the `Layers` revision that `cache` was last drawn from. Wrapped
-    // in a `Cell` so it can be updated from `Program::draw`, which only
-    // hands us a `&CanvasState` (see `HexCanvas::draw`).
+    // Cache of the map's draw commands, keyed by `Scene::revision`. Reused
+    // (by `Arc` pointer) across frames whenever the scene hasn't changed, so
+    // the GPU pipeline can skip re-uploading vertex/texture buffers on pure
+    // pan/zoom/hover frames - see `HexMapPipeline::upload`.
+    cached_commands: RefCell<Option<Arc<Vec<DrawCommand>>>>,
     cached_layers_revision: Cell<u64>,
     dragging: bool,
     last_drag_pos: Option<Point>,
@@ -87,7 +105,7 @@ pub struct CanvasState {
 impl Default for CanvasState {
     fn default() -> Self {
         Self {
-            cache: Default::default(),
+            cached_commands: RefCell::new(None),
             cached_layers_revision: Cell::new(0),
             dragging: false,
             last_drag_pos: None,
@@ -97,41 +115,35 @@ impl Default for CanvasState {
     }
 }
 
-impl<'a> Program<CanvasEvent> for HexCanvas<'a> {
+impl<'a> shader::Program<CanvasEvent> for HexCanvas<'a> {
     type State = CanvasState;
+    type Primitive = HexMapPrimitive;
 
     fn draw(
         &self,
         state: &CanvasState,
-        renderer: &iced::Renderer,
-        theme: &Theme,
-        bounds: Rectangle,
         cursor: mouse::Cursor,
-    ) -> Vec<Geometry> {
-        // Invalidate render cache if the state of Layers has changed.
+        bounds: Rectangle,
+    ) -> HexMapPrimitive {
         let current_revision = self.scene.revision();
-        if state.cached_layers_revision.get() != current_revision {
-            state.cache.clear();
-            state.cached_layers_revision.set(current_revision);
+
+        {
+            let mut cached = state.cached_commands.borrow_mut();
+            if cached.is_none() || state.cached_layers_revision.get() != current_revision {
+                *cached = Some(Arc::new(self.build_base_commands(state, bounds)));
+                state.cached_layers_revision.set(current_revision);
+            }
         }
+        let base = Arc::clone(state.cached_commands.borrow().as_ref().unwrap());
 
-        // Cache map drawing
-        let map = state.cache.draw(renderer, bounds.size(), |frame| {
-            self.draw_map(state, theme, frame, bounds);
-        });
+        let overlay = self.build_overlay_commands(state, cursor.position_in(bounds), bounds);
 
-        // Get cursor pos. Otherwise just draw map by itself
-        let Some(cursor_pos) = cursor.position_in(bounds) else {
-            return vec![map];
-        };
-
-        // Don't draw hex indicator if user is panning
-        if Tool::Pan == self.tool {
-            return vec![map];
+        HexMapPrimitive {
+            base,
+            overlay: Arc::new(overlay),
+            translation: state.translation,
+            zoom: state.zoom,
         }
-
-        let mouse = self.draw_cursor_hex(renderer, theme, bounds, state, cursor_pos);
-        vec![map, mouse]
     }
 
     fn update(
@@ -188,7 +200,6 @@ impl<'a> Program<CanvasEvent> for HexCanvas<'a> {
                     state.translation.x += cursor_pos.x - last.x;
                     state.translation.y += cursor_pos.y - last.y;
 
-                    state.cache.clear();
                     return Some(Action::request_redraw().and_capture());
                 }
 
@@ -210,7 +221,6 @@ impl<'a> Program<CanvasEvent> for HexCanvas<'a> {
                 };
                 state.zoom = f32::clamp(state.zoom + delta * 0.01, 0.4, 10.0);
 
-                state.cache.clear();
                 Some(Action::request_redraw().and_capture())
             }
 
@@ -237,53 +247,48 @@ impl<'a> Program<CanvasEvent> for HexCanvas<'a> {
 }
 
 impl<'a> HexCanvas<'a> {
-    fn draw_cursor_hex(
-        &self,
-        renderer: &iced::Renderer,
-        theme: &Theme,
-        bounds: Rectangle,
-        state: &CanvasState,
-        cursor_pos: Point,
-    ) -> Geometry {
-        let mut frame = Frame::new(renderer, bounds.size());
-
-        let hex = self.screen_to_hex(state, cursor_pos);
-        let coord = hex.to_cartesian() * HEX_SIZE * state.zoom + state.translation;
-
-        frame.translate(coord);
-        frame.scale(state.zoom);
-
-        let stroke = Stroke {
-            style: canvas::Style::Solid(theme.extended_palette().primary.base.color),
-            width: 2.0 / state.zoom,
-            ..Stroke::default()
-        };
-
-        frame.stroke(&hex_path(HEX_SIZE), stroke);
-        frame.into_geometry()
-    }
-
-    fn draw_map(&self, state: &CanvasState, _theme: &Theme, frame: &mut Frame, bounds: Rectangle) {
-        frame.translate(state.translation);
-        frame.scale(state.zoom);
-
+    /// Builds ordered draw commands for every visible layer.
+    /// Updated only when `Scene` cache is invalidated.
+    fn build_base_commands(&self, state: &CanvasState, bounds: Rectangle) -> Vec<DrawCommand> {
         let inv_scale = 1.0 / HEX_SIZE / state.zoom;
         let relative_bounds =
             Rectangle::with_size(bounds.size()) * inv_scale - state.translation * inv_scale;
+        let mut target = GpuRenderTarget::new(relative_bounds, &self.scene.assets);
 
-        let mut target = CanvasRenderTarget {
-            frame,
-            bounds: relative_bounds,
-            assets: &self.scene.assets,
-        };
-
-        let mut layers = self.scene.get_visible_layers();
-        let overlay = HexGridOverlay::new_light();
-        layers.push(&overlay);
-
-        for layer in layers {
+        for layer in self.scene.get_visible_layers() {
             layer.draw(&mut target);
         }
+
+        target.finish()
+    }
+
+    /// Builds draw commands for overlays.
+    /// Updated every frame to keep overlay responsive and sharp.
+    fn build_overlay_commands(
+        &self,
+        state: &CanvasState,
+        cursor_pos: Option<Point>,
+        bounds: Rectangle,
+    ) -> Vec<DrawCommand> {
+        let inv_scale = 1.0 / HEX_SIZE / state.zoom;
+        let relative_bounds =
+            Rectangle::with_size(bounds.size()) * inv_scale - state.translation * inv_scale;
+        let mut target = GpuRenderTarget::new(relative_bounds, &self.scene.assets);
+
+        // Draw hex grid overlay
+        let overlay = HexGridOverlay::new_light(1.5 / state.zoom);
+        overlay.draw(&mut target);
+
+        // Draw cursor highlight
+        if let Some(cursor_pos) = cursor_pos {
+            let hex = self.screen_to_hex(state, cursor_pos);
+            let world = hex.to_cartesian() * HEX_SIZE;
+            let center = Point::new(world.x, world.y);
+
+            target.stroke_polygon(&center, CURSOR_HEX_COLOR, 2.0 / state.zoom);
+        }
+
+        target.finish()
     }
 
     fn screen_to_hex(&self, state: &CanvasState, screen: Point) -> HexCoord {
@@ -298,32 +303,42 @@ impl<'a> HexCanvas<'a> {
     }
 }
 
-fn hex_path(hex_size: f32) -> Path {
-    let mut builder = canvas::path::Builder::new();
-    for i in 0..6 {
-        let angle = std::f32::consts::PI / 180.0 * (60.0 * i as f32);
-        let px = hex_size * angle.cos();
-        let py = hex_size * angle.sin();
-        if i == 0 {
-            builder.move_to(Point::new(px, py));
-        } else {
-            builder.line_to(Point::new(px, py));
-        }
-    }
-    builder.close();
-    builder.build()
-}
-
-struct CanvasRenderTarget<'a> {
-    frame: &'a mut Frame,
+/// Data that `RenderTarget` is implemented against.
+///
+/// Batches draw calls to preserve layer order.
+struct GpuRenderTarget<'a> {
     bounds: Rectangle,
     assets: &'a AssetStore,
+    commands: Vec<DrawCommand>,
+    current_mesh: Vec<gpu::MeshVertex>,
 }
 
-impl<'a> RenderTarget for CanvasRenderTarget<'a> {
+impl<'a> GpuRenderTarget<'a> {
+    fn new(bounds: Rectangle, assets: &'a AssetStore) -> Self {
+        Self {
+            bounds,
+            assets,
+            commands: Vec::new(),
+            current_mesh: Vec::new(),
+        }
+    }
+
+    fn flush_mesh(&mut self) {
+        if !self.current_mesh.is_empty() {
+            self.commands
+                .push(DrawCommand::Mesh(std::mem::take(&mut self.current_mesh)));
+        }
+    }
+
+    fn finish(mut self) -> Vec<DrawCommand> {
+        self.flush_mesh();
+        self.commands
+    }
+}
+
+impl RenderTarget for GpuRenderTarget<'_> {
     fn hex_to_point(&self, coord: &HexCoord) -> Point {
         let point = coord.to_cartesian();
-
         Point::new(point.x * HEX_SIZE, point.y * HEX_SIZE)
     }
 
@@ -331,30 +346,41 @@ impl<'a> RenderTarget for CanvasRenderTarget<'a> {
         self.bounds
     }
 
-    fn fill_polygon(&mut self, point: &Point, fill: iced::Color) {
-        let path = hex_path(HEX_SIZE);
-
-        self.frame.with_save(|frame| {
-            frame.translate(Vector::new(point.x, point.y));
-            frame.fill(&path, Fill::from(fill));
-        });
+    fn fill_polygon(&mut self, point: &Point, fill: Color) {
+        push_hex_fill(&mut self.current_mesh, *point, HEX_SIZE, fill);
     }
 
-    fn stroke_polygon(&mut self, point: &Point, colour: iced::Color) {
-        let path = hex_path(HEX_SIZE);
-
-        self.frame.with_save(|frame| {
-            frame.translate(Vector::new(point.x, point.y));
-
-            let stroke = Stroke::default().with_color(colour);
-            frame.stroke(&path, stroke);
-        });
+    fn stroke_polygon(&mut self, point: &Point, colour: Color, width: f32) {
+        push_hex_stroke(&mut self.current_mesh, *point, HEX_SIZE, colour, width);
     }
 
     fn draw_image(&mut self, bounds: Rectangle, image: ImageId, opacity: f32) {
-        if let Some(handle) = self.assets.image_data(image).cloned() {
-            let image = iced::advanced::image::Image::new(handle).opacity(opacity);
-            self.frame.draw_image(bounds, image);
-        }
+        self.flush_mesh();
+
+        let Some(handle) = self.assets.image_data(image) else {
+            return;
+        };
+
+        let raw = match handle {
+            iced::advanced::image::Handle::Rgba {
+                width,
+                height,
+                pixels,
+                ..
+            } => Arc::new(gpu::RawImage {
+                width: *width,
+                height: *height,
+                pixels: pixels.as_ref().to_vec(),
+            }),
+            _ => {
+                return;
+            }
+        };
+
+        self.commands.push(DrawCommand::Image {
+            image,
+            vertices: quad_vertices(bounds, opacity),
+            raw,
+        });
     }
 }

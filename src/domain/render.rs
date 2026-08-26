@@ -12,7 +12,7 @@ pub trait RenderTarget {
 
     fn fill_polygon(&mut self, point: &Point, fill: Color);
 
-    fn stroke_polygon(&mut self, point: &Point, colour: Color);
+    fn stroke_polygon(&mut self, point: &Point, colour: Color, stroke_width: f32);
 
     fn draw_image(&mut self, bounds: Rectangle, image: ImageId, opacity: f32);
 
