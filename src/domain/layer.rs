@@ -38,12 +38,14 @@ pub enum LayerKind {
     #[default]
     Tiles,
     Noise,
+    Image,
 }
 impl Display for LayerKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LayerKind::Tiles => write!(f, "Tiles"),
             LayerKind::Noise => write!(f, "Noise"),
+            LayerKind::Image => write!(f, "Image"),
         }
     }
 }

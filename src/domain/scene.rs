@@ -52,6 +52,7 @@ impl Scene {
                 LayerInner::Tiles(SparseTiles::new(DEFAULT_COLORS[self.inner.len() % 5]))
             }
             LayerKind::Noise => LayerInner::Perlin(PerlinNoiseLayer::new(random())),
+            LayerKind::Image => LayerInner::Image(ImageLayer::new()),
         }
     }
 
