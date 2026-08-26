@@ -352,7 +352,7 @@ impl<'a> RenderTarget for CanvasRenderTarget<'a> {
     }
 
     fn draw_image(&mut self, bounds: Rectangle, image: ImageId, opacity: f32) {
-        if let Some(handle) = self.assets.image(image).cloned() {
+        if let Some(handle) = self.assets.image_data(image).cloned() {
             let image = iced::advanced::image::Image::new(handle).opacity(opacity);
             self.frame.draw_image(bounds, image);
         }

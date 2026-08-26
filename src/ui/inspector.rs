@@ -1,6 +1,6 @@
 use iced::{
-    Alignment, Color, Element, Length, Task, alignment,
-    widget::{Row, button, column, container, image, row, rule, slider, space, text, text_input},
+    Alignment, Color, Element, Length, Padding, Rectangle, Task, alignment,
+    widget::{Row, button, column, container, row, rule, slider, space, text, text_input},
 };
 use iced_fonts::bootstrap;
 use rand::random;
@@ -9,7 +9,10 @@ use crate::{
     app::Message,
     domain::{
         Layer, LayerInner, Scene,
-        edit::{Rename, SetColour, SetNoiseParams, SetNoiseSeed, SetVisible},
+        edit::{
+            Rename, SetColour, SetImageBounds, SetImageOpacity, SetNoiseParams, SetNoiseSeed,
+            SetVisible,
+        },
         id::LayerId,
         layer::{
             image::ImageLayer,
@@ -26,14 +29,48 @@ pub enum InspectorMessage {
     Clear,
 
     LayerRename(Option<String>),
-    LayerRenameCommit { id: LayerId },
+    LayerRenameCommit {
+        id: LayerId,
+    },
     LayerRenameStart(String),
 
-    ColourChange { colour: Color },
-    ColourCommit { id: LayerId },
+    ColourChange {
+        colour: Color,
+    },
+    ColourCommit {
+        id: LayerId,
+    },
 
-    NoiseParamsChange { params: NoiseParams },
-    NoiseParamCommit { id: LayerId },
+    NoiseParamsChange {
+        params: NoiseParams,
+    },
+    NoiseParamCommit {
+        id: LayerId,
+    },
+
+    ImageOpacityChange {
+        opacity: f32,
+    },
+    ImageOpacityCommit {
+        id: LayerId,
+    },
+
+    ImageXChange {
+        x_maybe: String,
+    },
+    ImageYChange {
+        y_maybe: String,
+    },
+    ImageWChange {
+        w_maybe: String,
+    },
+    ImageHChange {
+        h_maybe: String,
+    },
+    ImageBoundsCommit {
+        id: LayerId,
+        starting_bounds: Rectangle,
+    },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -41,6 +78,11 @@ pub struct Inspector {
     active_layer_name: Option<String>,
     active_colour: Option<Color>,
     active_noise_params: Option<NoiseParams>,
+    active_opacity: Option<f32>,
+    active_x: Option<f32>,
+    active_y: Option<f32>,
+    active_w: Option<f32>,
+    active_h: Option<f32>,
 }
 
 impl Inspector {
@@ -86,6 +128,52 @@ impl Inspector {
                     return Task::done(Message::Scene(edit))
                         .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
                 }
+            }
+
+            InspectorMessage::ImageOpacityChange { opacity } => self.active_opacity = Some(opacity),
+            InspectorMessage::ImageOpacityCommit { id } => {
+                if let Some(opacity) = &self.active_opacity {
+                    let edit = Box::new(SetImageOpacity {
+                        layer: id,
+                        opacity: *opacity,
+                    });
+                    return Task::done(Message::Scene(edit))
+                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+                }
+            }
+
+            InspectorMessage::ImageBoundsCommit {
+                id,
+                starting_bounds,
+            } => {
+                let x = self.active_x.unwrap_or(starting_bounds.x);
+                let y = self.active_y.unwrap_or(starting_bounds.y);
+                let width = self.active_w.unwrap_or(starting_bounds.width);
+                let height = self.active_h.unwrap_or(starting_bounds.height);
+
+                let edit = Box::new(SetImageBounds {
+                    layer: id,
+                    bounds: Rectangle {
+                        x,
+                        y,
+                        width,
+                        height,
+                    },
+                });
+                return Task::done(Message::Scene(edit))
+                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+            }
+            InspectorMessage::ImageXChange { x_maybe } => {
+                self.active_x = x_maybe.parse::<f32>().ok()
+            }
+            InspectorMessage::ImageYChange { y_maybe } => {
+                self.active_y = y_maybe.parse::<f32>().ok()
+            }
+            InspectorMessage::ImageWChange { w_maybe } => {
+                self.active_w = w_maybe.parse::<f32>().ok()
+            }
+            InspectorMessage::ImageHChange { h_maybe } => {
+                self.active_h = h_maybe.parse::<f32>().ok()
             }
         }
 
@@ -317,12 +405,123 @@ impl Inspector {
     }
 
     fn details_image(&self, id: LayerId, layer: &ImageLayer) -> Element<'_, Message> {
-        column![
-            text("Not yet implemented"),
-            button("Load image").on_press(Message::LoadAsset {
+        let x = self.active_x.unwrap_or(layer.bounds.x);
+        let y = self.active_y.unwrap_or(layer.bounds.y);
+        let width = self.active_w.unwrap_or(layer.bounds.width);
+        let height = self.active_h.unwrap_or(layer.bounds.height);
+        let opacity = self.active_opacity.unwrap_or(layer.get_opacity());
+
+        let image_control = row![
+            text(
+                layer
+                    .image
+                    .map(|id| format!("{id:?}"))
+                    .unwrap_or("No image loaded".into())
+            )
+            .style(text::secondary),
+            button("Load").on_press(Message::LoadAsset {
                 caller: id,
                 process: IoProcess::Start
             })
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center)
+        .padding(Padding::default().bottom(8));
+
+        let opacity_control = row![
+            text!("{opacity:.2} / 1.00").style(text::secondary),
+            slider(0.0..=1.0, opacity, |opacity| Message::Inspector(
+                InspectorMessage::ImageOpacityChange { opacity }
+            ))
+            .step(0.01)
+            .on_release(Message::Inspector(InspectorMessage::ImageOpacityCommit {
+                id
+            }))
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center);
+
+        let x_control = text_input("0.0", &x.to_string())
+            .on_input(|x_maybe| Message::Inspector(InspectorMessage::ImageXChange { x_maybe }))
+            .on_submit(Message::Inspector(InspectorMessage::ImageBoundsCommit {
+                id,
+                starting_bounds: Rectangle {
+                    x,
+                    y,
+                    width,
+                    height,
+                },
+            }))
+            .width(Length::Fill);
+
+        let y_control = text_input("0.0", &y.to_string())
+            .on_input(|y_maybe| Message::Inspector(InspectorMessage::ImageYChange { y_maybe }))
+            .on_submit(Message::Inspector(InspectorMessage::ImageBoundsCommit {
+                id,
+                starting_bounds: Rectangle {
+                    x,
+                    y,
+                    width,
+                    height,
+                },
+            }))
+            .width(Length::Fill);
+
+        let position_control = row![
+            text("X:").style(text::secondary),
+            x_control,
+            text("Y:").style(text::secondary),
+            y_control
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center)
+        .padding(Padding::default().bottom(8));
+
+        let width_control = text_input("0.0", &width.to_string())
+            .on_input(|w_maybe| Message::Inspector(InspectorMessage::ImageWChange { w_maybe }))
+            .on_submit(Message::Inspector(InspectorMessage::ImageBoundsCommit {
+                id,
+                starting_bounds: Rectangle {
+                    x,
+                    y,
+                    width,
+                    height,
+                },
+            }))
+            .width(Length::Fill);
+
+        let height_control = text_input("0.0", &height.to_string())
+            .on_input(|h_maybe| Message::Inspector(InspectorMessage::ImageHChange { h_maybe }))
+            .on_submit(Message::Inspector(InspectorMessage::ImageBoundsCommit {
+                id,
+                starting_bounds: Rectangle {
+                    x,
+                    y,
+                    width,
+                    height,
+                },
+            }))
+            .width(Length::Fill);
+
+        let size_control = row![
+            text("Width:").style(text::secondary),
+            width_control,
+            text("Height:").style(text::secondary),
+            height_control
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center)
+        .padding(Padding::default().bottom(8));
+
+        column![
+            image_control,
+            text("Opacity:"),
+            opacity_control,
+            text("Position:"),
+            position_control,
+            text("Size:"),
+            size_control,
+            text("Warning! image layers are not currently persisted")
         ]
         .spacing(4)
         .padding(8)

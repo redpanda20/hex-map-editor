@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use iced::{Color, widget::image::Handle};
+use iced::{Color, Rectangle, widget::image::Handle};
 
 use crate::domain::{
     HexCoord, LayerInner, LayerKind, Scene, flood_fill,
@@ -138,6 +138,18 @@ pub struct SetNoiseParams {
 pub struct SetImage {
     pub layer: LayerId,
     pub image: ImageId,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetImageBounds {
+    pub layer: LayerId,
+    pub bounds: Rectangle,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetImageOpacity {
+    pub layer: LayerId,
+    pub opacity: f32,
 }
 
 impl EditCommand for NoOp {
@@ -396,7 +408,7 @@ impl EditCommand for SetImage {
                 width,
                 height,
                 pixels: _,
-            }) = scene.assets.image(self.image)
+            }) = scene.assets.image_data(self.image)
             else {
                 return Box::new(NoOp);
             };
@@ -419,6 +431,46 @@ impl EditCommand for SetImage {
         // Irreversable edit
         // TODO: Make reversable
         Box::new(NoOp)
+    }
+}
+
+impl EditCommand for SetImageBounds {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Image(layer),
+            ..
+        }) = scene.get_layer_mut(self.layer)
+        else {
+            return Box::new(NoOp);
+        };
+
+        let prev = layer.bounds;
+        layer.bounds = self.bounds;
+
+        Box::new(SetImageBounds {
+            layer: self.layer,
+            bounds: prev,
+        })
+    }
+}
+
+impl EditCommand for SetImageOpacity {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Image(layer),
+            ..
+        }) = scene.get_layer_mut(self.layer)
+        else {
+            return Box::new(NoOp);
+        };
+
+        let prev = layer.get_opacity();
+        layer.set_opacity(self.opacity);
+
+        Box::new(SetImageOpacity {
+            layer: self.layer,
+            opacity: prev,
+        })
     }
 }
 

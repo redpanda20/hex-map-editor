@@ -79,9 +79,11 @@ fn tiles_from_v1(tiles: Vec<HexCoordV1>) -> HashSet<HexCoord> {
     tiles.into_iter().map(Into::into).collect()
 }
 
-impl From<&LayerInner> for LayerKindV1 {
-    fn from(inner: &LayerInner) -> Self {
-        match inner {
+impl TryFrom<&LayerInner> for LayerKindV1 {
+    type Error = &'static str;
+
+    fn try_from(inner: &LayerInner) -> Result<Self, Self::Error> {
+        let inner = match inner {
             LayerInner::Tiles(store) if store.is_inverted() => LayerKindV1::InvertedTiles {
                 colour: store.colour.into(),
                 tiles: tiles_to_v1(store.get_all_tiles()),
@@ -102,8 +104,9 @@ impl From<&LayerInner> for LayerKindV1 {
                     },
                 },
             },
-            LayerInner::Image(image_layer) => todo!(),
-        }
+            LayerInner::Image(_) => return Err("Not implemented"),
+        };
+        Ok(inner)
     }
 }
 
@@ -142,13 +145,16 @@ impl From<LayerKindV1> for LayerInner {
     }
 }
 
-impl From<&Layer> for LayerV1 {
-    fn from(layer: &Layer) -> Self {
-        LayerV1 {
+impl TryFrom<&Layer> for LayerV1 {
+    type Error = &'static str;
+
+    fn try_from(layer: &Layer) -> Result<Self, Self::Error> {
+        let kind: LayerKindV1 = (&layer.kind).try_into()?;
+        Ok(LayerV1 {
             name: layer.name.clone(),
             visible: layer.visible,
-            kind: (&layer.kind).into(),
-        }
+            kind,
+        })
     }
 }
 
@@ -170,7 +176,12 @@ impl From<LayerV1> for Layer {
 impl From<&Scene> for SceneV1 {
     fn from(layers: &Scene) -> Self {
         SceneV1 {
-            layers: layers.inner.iter().map(Into::into).collect(),
+            layers: layers
+                .inner
+                .iter()
+                .map(TryInto::try_into)
+                .filter_map(Result::ok)
+                .collect(),
             active_layer: None,
         }
     }

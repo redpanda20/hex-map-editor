@@ -58,7 +58,7 @@ impl RenderTarget for PngRenderTarget<'_> {
             width,
             height,
             pixels,
-        }) = self.assets.image(image_id).cloned()
+        }) = self.assets.image_data(image_id).cloned()
         else {
             return;
         };

@@ -128,5 +128,6 @@ async fn read_image(handle: rfd::FileHandle) -> Result<ImageAsset, String> {
         data: image.into_bytes(),
         width,
         height,
+        name: handle.file_name(),
     })
 }
