@@ -340,7 +340,7 @@ impl Inspector {
                     }
                 }
             ))
-            .step(0.01)
+            .step(0.01_f32)
             .on_release(Message::Inspector(InspectorMessage::NoiseParamCommit {
                 id
             }))
@@ -379,7 +379,7 @@ impl Inspector {
                     },
                 })
             })
-            .step(0.01)
+            .step(0.01_f32)
             .on_release(Message::Inspector(InspectorMessage::NoiseParamCommit {
                 id
             }))
@@ -433,7 +433,7 @@ impl Inspector {
             slider(0.0..=1.0, opacity, |opacity| Message::Inspector(
                 InspectorMessage::ImageOpacityChange { opacity }
             ))
-            .step(0.01)
+            .step(0.01_f32)
             .on_release(Message::Inspector(InspectorMessage::ImageOpacityCommit {
                 id
             }))
