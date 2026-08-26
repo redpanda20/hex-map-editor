@@ -1,11 +1,7 @@
-use iced::{Color, Point, Rectangle};
+use iced::{Color, Point, Rectangle, advanced::image::Handle};
 use image::{ImageBuffer, Rgba};
 
-use crate::domain::{
-    HexCoord, RenderTarget,
-    assets::{AssetStore, ImageAsset},
-    id::ImageId,
-};
+use crate::domain::{HexCoord, RenderTarget, assets::AssetStore, id::ImageId};
 
 use super::EXPORT_HEX_SIZE;
 
@@ -57,17 +53,17 @@ impl RenderTarget for PngRenderTarget<'_> {
     }
 
     fn draw_image(&mut self, bounds: Rectangle, image_id: ImageId, opacity: f32) {
-        let Some(image) = self.assets.image(image_id).cloned() else {
+        let Some(Handle::Rgba {
+            id: _,
+            width,
+            height,
+            pixels,
+        }) = self.assets.image(image_id).cloned()
+        else {
             return;
         };
 
-        let ImageAsset {
-            data,
-            width,
-            height,
-        } = image;
-
-        let Some(src) = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, data) else {
+        let Some(src) = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, pixels.into()) else {
             return;
         };
 

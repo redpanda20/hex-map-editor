@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use iced::Color;
+use iced::{Color, widget::image::Handle};
 
 use crate::domain::{
     HexCoord, LayerInner, LayerKind, Scene, flood_fill,
@@ -391,13 +391,16 @@ impl EditCommand for SetImage {
     fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
         // Get image size from store
         let (width, height) = {
-            let Some(image) = scene.assets.image(self.image) else {
+            let Some(Handle::Rgba {
+                id: _,
+                width,
+                height,
+                pixels: _,
+            }) = scene.assets.image(self.image)
+            else {
                 return Box::new(NoOp);
             };
-            (
-                image.width.cast_signed() as f32,
-                image.height.cast_signed() as f32,
-            )
+            (width.cast_signed() as f32, height.cast_signed() as f32)
         };
 
         // Get mutable access to layer

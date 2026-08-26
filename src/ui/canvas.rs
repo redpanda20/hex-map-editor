@@ -1,9 +1,7 @@
 use std::cell::Cell;
 
 use iced::{
-    Element, Length, Point, Rectangle, Task, Theme, Vector,
-    advanced::image::Handle,
-    mouse, touch,
+    Element, Length, Point, Rectangle, Task, Theme, Vector, mouse, touch,
     widget::{
         Action,
         canvas::{self, Event, Fill, Frame, Geometry, Path, Program, Stroke},
@@ -48,7 +46,7 @@ use crate::{
     app::Message,
     domain::{
         EditCommand, HexCoord, RenderTarget, Scene, Tool,
-        assets::{AssetStore, ImageAsset},
+        assets::AssetStore,
         edit::{BucketFill, EraseTile, PaintTile},
         id::{ImageId, LayerId},
         layer::overlay::HexGridOverlay,
@@ -354,13 +352,7 @@ impl<'a> RenderTarget for CanvasRenderTarget<'a> {
     }
 
     fn draw_image(&mut self, bounds: Rectangle, image: ImageId, opacity: f32) {
-        if let Some(ImageAsset {
-            data,
-            width,
-            height,
-        }) = self.assets.image(image).cloned()
-        {
-            let handle = Handle::from_rgba(width, height, data);
+        if let Some(handle) = self.assets.image(image).cloned() {
             let image = iced::advanced::image::Image::new(handle).opacity(opacity);
             self.frame.draw_image(bounds, image);
         }
