@@ -8,9 +8,13 @@ macro_rules! def_id {
         pub struct $name(u64);
 
         impl $name {
-            pub(crate) fn next() -> Self {
+            fn counter() -> &'static AtomicU64 {
                 static COUNTER: AtomicU64 = AtomicU64::new(1);
-                Self(COUNTER.fetch_add(1, Ordering::Relaxed))
+                &COUNTER
+            }
+
+            pub(crate) fn next() -> Self {
+                Self(Self::counter().fetch_add(1, Ordering::Relaxed))
             }
 
             /// Escape hatch for (de)serialization at the wasm boundary.
@@ -20,6 +24,13 @@ macro_rules! def_id {
 
             pub fn from_raw(v: u64) -> Self {
                 Self(v)
+            }
+
+            /// Sets a minimum value for the counter to start from.
+            /// Called while restoring persisted ids,
+            /// ensuring new ids can not collide with existing ids.
+            pub(crate) fn ensure_next_after(v: u64) {
+                Self::counter().fetch_max(v.saturating_add(1), Ordering::Relaxed);
             }
         }
     };

@@ -170,6 +170,7 @@ fn thumbnail<'a>(kind: &LayerInner) -> Text<'a> {
         .color(tiles.colour.opaque()),
         LayerInner::Perlin(_) => bootstrap::sliderstwo(),
         LayerInner::Image(_) => bootstrap::image(),
+        LayerInner::Unknown(_) => bootstrap::question_diamond(),
     }
 }
 

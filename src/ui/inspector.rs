@@ -211,6 +211,11 @@ impl Inspector {
                 LayerInner::Tiles(tiles) => self.details_tiles(*id, tiles),
                 LayerInner::Perlin(noise) => self.details_noise(*id, noise),
                 LayerInner::Image(image) => self.details_image(*id, image),
+                LayerInner::Unknown(unknown) => text(format!(
+                    "Unsupported layer (kind: \"{}\"). It will be kept as-is when you save.",
+                    unknown.kind
+                ))
+                .into(),
             },
         ])
         .style(container::bordered_box)

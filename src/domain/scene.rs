@@ -26,11 +26,12 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn from_layers(inner: Vec<Layer>) -> Self {
+    /// Load a scene with a existing Layers & AssetStore.
+    pub fn from_layers_with_assets(inner: Vec<Layer>, assets: AssetStore) -> Self {
         Self {
             inner,
             revision: 1,
-            assets: AssetStore::default(),
+            assets,
         }
     }
 }

@@ -2,6 +2,7 @@ pub mod image;
 pub mod noise;
 pub mod overlay;
 pub mod tiles;
+pub mod unknown;
 
 use std::fmt::Display;
 
@@ -10,7 +11,9 @@ use iced::Rectangle;
 use crate::domain::{
     RenderTarget,
     id::LayerId,
-    layer::{image::ImageLayer, noise::PerlinNoiseLayer, tiles::SparseTiles},
+    layer::{
+        image::ImageLayer, noise::PerlinNoiseLayer, tiles::SparseTiles, unknown::UnknownLayer,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -55,6 +58,8 @@ pub enum LayerInner {
     Tiles(SparseTiles),
     Perlin(PerlinNoiseLayer),
     Image(ImageLayer),
+    /// A layer kind this build doesn't recognise - see [`UnknownLayer`].
+    Unknown(UnknownLayer),
 }
 
 impl LayerInnerImpl for LayerInner {
@@ -63,6 +68,7 @@ impl LayerInnerImpl for LayerInner {
             LayerInner::Tiles(inner) => inner.bounds(hex_size),
             LayerInner::Perlin(inner) => inner.bounds(hex_size),
             LayerInner::Image(inner) => inner.bounds(hex_size),
+            LayerInner::Unknown(inner) => inner.bounds(hex_size),
         }
     }
 
@@ -71,6 +77,7 @@ impl LayerInnerImpl for LayerInner {
             LayerInner::Tiles(inner) => inner.draw(renderer),
             LayerInner::Perlin(inner) => inner.draw(renderer),
             LayerInner::Image(inner) => inner.draw(renderer),
+            LayerInner::Unknown(inner) => inner.draw(renderer),
         }
     }
 }

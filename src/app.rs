@@ -11,7 +11,7 @@ use crate::{
         id::LayerId,
     },
     infrastructure::{
-        IoProcess, SceneV1, export_png, load_image_async, load_project_async, save_bytes_async,
+        Document, IoProcess, export_png, load_image_async, load_project_async, save_bytes_async,
         save_project_async,
     },
     ui::{
@@ -66,7 +66,7 @@ pub enum Message {
         caller: LayerId,
         process: IoProcess<ImageAsset>,
     },
-    Load(IoProcess<SceneV1>),
+    Load(IoProcess<Document>),
     Save(IoProcess<()>),
     Export(IoProcess<()>),
 }
@@ -125,7 +125,7 @@ impl App {
                 IoProcess::Start => return load_project_async(),
                 IoProcess::Cancelled => eprintln!("Project load cancelled"),
                 IoProcess::Finished(Ok(document)) => {
-                    self.scene = Scene::from(document);
+                    self.scene = document.into_scene();
                     eprintln!("Project load succeeded")
                 }
                 IoProcess::Finished(Err(err)) => eprintln!("Project load failed: {err}"),

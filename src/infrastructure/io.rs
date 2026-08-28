@@ -1,23 +1,29 @@
-use std::io::Cursor;
-
 use iced::Task;
 use iced::futures::FutureExt;
-use image::{EncodableLayout, ImageReader};
 use rfd::AsyncFileDialog;
 
 use crate::domain::Scene;
 use crate::domain::id::LayerId;
-use crate::infrastructure::IoProcess;
+use crate::infrastructure::image_codec::decode_image_asset;
 use crate::{app::Message, domain::assets::ImageAsset};
 
-use super::schema::{self, LoadError, SceneV1};
+use super::schema::{self, Document, LoadError};
 
 const DEFAULT_FILE_NAME: &str = "map.hexmap";
 const FILE_EXTENSIONS: &[&str] = &["hexmap"];
 
+#[derive(Debug, Clone, Hash)]
+pub enum IoProcess<T> {
+    Start,
+    Cancelled,
+    Finished(Result<T, String>),
+}
+
 /// Opens a save dialog and writes the current layers to the chosen file.
 pub fn save_project_async(layers: &Scene) -> Task<Message> {
-    let document = SceneV1::from(layers);
+    // `name` isn't tracked anywhere yet - a natural hook for a future
+    // "project name" field in the UI.
+    let document = Document::from_scene(layers, None);
 
     let bytes = match schema::serialize(&document) {
         Ok(bytes) => bytes,
@@ -82,7 +88,7 @@ pub fn load_project_async() -> Task<Message> {
 pub fn load_image_async(caller: LayerId) -> Task<Message> {
     Task::future(
         AsyncFileDialog::new()
-            .add_filter("Image", &["png"])
+            .add_filter("Image", &["png", "webp"])
             .set_title("Load image")
             .pick_file()
             .map(move |handle| (caller, handle)),
@@ -101,33 +107,19 @@ pub fn load_image_async(caller: LayerId) -> Task<Message> {
     })
 }
 
-async fn read_future(handle: rfd::FileHandle) -> Result<SceneV1, String> {
+async fn read_future(handle: rfd::FileHandle) -> Result<Document, String> {
     let bytes = handle.read().await;
     schema::deserialize(&bytes).map_err(|err: LoadError| err.to_string())
 }
 
 async fn write_future(handle: rfd::FileHandle, bytes: Vec<u8>) -> Result<(), String> {
     handle
-        .write(bytes.as_bytes())
+        .write(bytes.as_slice())
         .await
         .map_err(|err| err.to_string())
 }
 
 async fn read_image(handle: rfd::FileHandle) -> Result<ImageAsset, String> {
     let bytes = handle.read().await;
-    let image = ImageReader::new(Cursor::new(bytes))
-        .with_guessed_format()
-        .map_err(|err| err.to_string())?
-        .decode()
-        .map_err(|err| err.to_string())?;
-
-    let width = image.width();
-    let height = image.height();
-
-    Ok(ImageAsset {
-        data: image.into_bytes(),
-        width,
-        height,
-        name: handle.file_name(),
-    })
+    decode_image_asset(bytes, handle.file_name())
 }
