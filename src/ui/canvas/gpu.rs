@@ -255,17 +255,38 @@ impl HexMapPipeline {
     ) -> Vec<DrawCall> {
         let mut calls = Vec::with_capacity(commands.len());
 
+        // `TriangleList` topology means every group of 3 vertices is an
+        // independent triangle, so it's safe to split a vertex list across
+        // multiple buffers/draw calls at any multiple-of-3 boundary without
+        // corrupting the geometry - it doesn't need to land on hex
+        // boundaries. This keeps any single `create_buffer` call within
+        // what the device actually supports (see `ensure_texture` for the
+        // matching image-texture guard, and its comment for *why* this
+        // matters on the WebGPU backend).
+        let max_verts_per_buffer = {
+            let max_bytes = device.limits().max_buffer_size;
+            let per_vertex = std::mem::size_of::<MeshVertex>() as u64;
+            // Clamp to u32::MAX before the `as usize` below: `usize` is only
+            // guaranteed to be 32 bits wide (true on wasm32), while
+            // `max_buffer_size` is a `u64` that could in principle exceed
+            // that on a native 64-bit build with a very generous device.
+            let verts = (max_bytes / per_vertex).max(3).min(u32::MAX as u64);
+            (verts - verts % 3) as usize
+        };
+
         for command in commands {
             match command {
                 DrawCommand::Mesh(vertices) => {
                     if vertices.is_empty() {
                         continue;
                     }
-                    let buffer = upload_vertices(device, queue, "hexmap-mesh-vertices", vertices);
-                    calls.push(DrawCall::Mesh {
-                        buffer,
-                        count: vertices.len() as u32,
-                    });
+                    for chunk in vertices.chunks(max_verts_per_buffer.max(3)) {
+                        let buffer = upload_vertices(device, queue, "hexmap-mesh-vertices", chunk);
+                        calls.push(DrawCall::Mesh {
+                            buffer,
+                            count: chunk.len() as u32,
+                        });
+                    }
                 }
                 DrawCommand::Image {
                     image,
@@ -296,9 +317,13 @@ impl HexMapPipeline {
             return;
         }
 
+        // Clamp image to maximum size supported by WebGPU device.
+        let max_dim = device.limits().max_texture_dimension_2d;
+        let (width, height, pixels) = clamp_raw_image(raw, max_dim);
+
         let size = wgpu::Extent3d {
-            width: raw.width,
-            height: raw.height,
+            width,
+            height,
             depth_or_array_layers: 1,
         };
 
@@ -320,11 +345,11 @@ impl HexMapPipeline {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &raw.pixels,
+            pixels.as_ref(),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * raw.width),
-                rows_per_image: Some(raw.height),
+                bytes_per_row: Some(4 * width),
+                rows_per_image: Some(height),
             },
             size,
         );
@@ -370,6 +395,44 @@ impl HexMapPipeline {
             }
         }
     }
+}
+
+/// Downscales image, if necessary, to fit within WebGPU buffer.
+fn clamp_raw_image(raw: &RawImage, max_dim: u32) -> (u32, u32, std::borrow::Cow<'_, [u8]>) {
+    if raw.width <= max_dim && raw.height <= max_dim {
+        return (
+            raw.width,
+            raw.height,
+            std::borrow::Cow::Borrowed(&raw.pixels),
+        );
+    }
+
+    let scale = (max_dim as f32 / raw.width as f32).min(max_dim as f32 / raw.height as f32);
+    let new_width = ((raw.width as f32 * scale).floor() as u32).max(1);
+    let new_height = ((raw.height as f32 * scale).floor() as u32).max(1);
+
+    let Some(buffer) = image::ImageBuffer::<image::Rgba<u8>, _>::from_raw(
+        raw.width,
+        raw.height,
+        raw.pixels.as_slice(),
+    ) else {
+        // Should never happen, but better to log the problem and continue.
+        eprintln!("Error: Expected length of `pixels` to be width * height * 4");
+        return (1, 1, std::borrow::Cow::Owned(vec![0, 0, 0, 0]));
+    };
+
+    let resized = image::imageops::resize(
+        &buffer,
+        new_width,
+        new_height,
+        image::imageops::FilterType::Triangle,
+    );
+
+    (
+        new_width,
+        new_height,
+        std::borrow::Cow::Owned(resized.into_raw()),
+    )
 }
 
 fn upload_vertices<V: bytemuck::Pod>(
