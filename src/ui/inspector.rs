@@ -526,7 +526,6 @@ impl Inspector {
             position_control,
             text("Size:"),
             size_control,
-            text("Warning! image layers are not currently persisted")
         ]
         .spacing(4)
         .padding(8)
