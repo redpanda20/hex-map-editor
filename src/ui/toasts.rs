@@ -4,7 +4,10 @@ use iced::{
 };
 use iced_fonts::bootstrap;
 
-use crate::infrastructure::{Duration, Instant};
+use crate::infrastructure::{
+    Duration, Instant,
+    IoProcess::{Cancelled, Finished},
+};
 use crate::{app::Message, infrastructure::IoProcess};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -30,60 +33,52 @@ pub struct Toasts {
 impl Toasts {
     pub fn listen_to_events(&mut self, message: &Message) {
         match message {
-            Message::Export(IoProcess::Start) => self.add_toast(
-                "Exporting".to_string(),
-                "Exporting map to PNG...".to_string(),
-            ),
-            Message::Export(IoProcess::Cancelled) => self.add_toast(
-                "Export Cancelled".to_string(),
-                "Export cancelled by user.".to_string(),
-            ),
-            Message::Export(IoProcess::Finished(Ok(_))) => self.add_toast(
-                "Export Complete".to_string(),
-                "Map exported successfully.".to_string(),
-            ),
-            Message::Export(IoProcess::Finished(Err(err))) => {
-                self.add_toast("Export Failed".to_string(), err.clone())
-            }
+            Message::Export(process) => match process {
+                IoProcess::Start => self.add_toast("Exporting", "Exporting map to PNG..."),
+                IoProcess::Cancelled => {
+                    self.add_toast("Export cancelled", "Export cancelled by user.")
+                }
+                IoProcess::Finished(Ok(_)) => {
+                    self.add_toast("Export complete", "Map exported successfully.")
+                }
+                IoProcess::Finished(Err(err)) => self.add_toast("Export failed", err),
+            },
 
-            // TODO: Evaluate if Finished(Err) is needed
-            Message::Save(IoProcess::Start) => {
-                self.add_toast("Saving".to_string(), "Saving project...".to_string())
-            }
-            Message::Save(IoProcess::Cancelled) => self.add_toast(
-                "Save Cancelled".to_string(),
-                "Save cancelled by user.".to_string(),
-            ),
-            Message::Save(IoProcess::Finished(Ok(_))) => self.add_toast(
-                "Save Complete".to_string(),
-                "Project saved successfully.".to_string(),
-            ),
-            Message::Save(IoProcess::Finished(Err(err))) => {
-                self.add_toast("Save Failed".to_string(), err.clone())
-            }
+            Message::Save(process) => match process {
+                IoProcess::Start => self.add_toast("Saving", "Saving project..."),
+                IoProcess::Cancelled => self.add_toast("Save cancelled", "Save cancelled by user."),
+                IoProcess::Finished(Ok(_)) => {
+                    self.add_toast("Save complete", "Project saved successfully.")
+                }
+                IoProcess::Finished(Err(err)) => self.add_toast("Save Failed", err),
+            },
 
-            Message::Load(IoProcess::Start) => {
-                self.add_toast("Opening".to_string(), "Opening project...".to_string())
-            }
-            Message::Load(IoProcess::Cancelled) => self.add_toast(
-                "Open Cancelled".to_string(),
-                "Open cancelled by user.".to_string(),
-            ),
-            Message::Load(IoProcess::Finished(Ok(_))) => self.add_toast(
-                "Project Loaded".to_string(),
-                "Project loaded successfully.".to_string(),
-            ),
-            Message::Load(IoProcess::Finished(Err(err))) => {
-                self.add_toast("Open Failed".to_string(), err.clone())
-            }
+            Message::Load(process) => match process {
+                IoProcess::Start => self.add_toast("Opening", "Opening project..."),
+                Cancelled => self.add_toast("Open cancelled", "Open cancelled by user."),
+                Finished(Err(err)) => self.add_toast("Project load failed", err),
+                // Finished(Ok) ommited. Loading a project visually changes the active scene
+                Finished(Ok(_)) => {}
+            },
+
+            Message::LoadAsset { caller: _, process } => match process {
+                IoProcess::Start => self.add_toast("Opening asset", "Opening user asset..."),
+                Cancelled => {
+                    self.add_toast("Asset upload cancelled", "User cancelled loading asset.")
+                }
+                Finished(Err(err)) => self.add_toast("Failed to load asset", err),
+                // Case omitted. Loaded asset immediately binds to image layer
+                Finished(Ok(_)) => {}
+            },
+
             _ => (),
         }
     }
 
-    pub fn add_toast(&mut self, title: String, body: String) {
+    pub fn add_toast(&mut self, title: impl Into<String>, body: impl Into<String>) {
         self.toasts.push(Toast {
-            title,
-            body,
+            title: title.into(),
+            body: body.into(),
             lifetime: Instant::now() + self.timeout,
         });
     }
