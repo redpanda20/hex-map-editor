@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use iced::Color;
 use rand::random;
 
@@ -138,7 +136,11 @@ impl Scene {
 
     /// Paints multiple tiles in once pass on a given layer
     /// Returns all tiles modified by the operation
-    pub fn paint_tiles(&mut self, id: LayerId, coords: HashSet<HexCoord>) -> HashSet<HexCoord> {
+    pub fn paint_tiles(
+        &mut self,
+        id: LayerId,
+        coords: impl IntoIterator<Item = HexCoord>,
+    ) -> Vec<HexCoord> {
         let result = match self
             .inner
             .iter_mut()
@@ -146,7 +148,7 @@ impl Scene {
             .map(|layer| &mut layer.kind)
         {
             Some(LayerInner::Tiles(t)) => t.paint_multiple(coords),
-            _ => HashSet::new(),
+            _ => Vec::new(),
         };
         if !result.is_empty() {
             self.change_revision();
@@ -156,7 +158,11 @@ impl Scene {
 
     /// Erases multiple tiles in once pass on a given layer
     /// Returns true if the operation caused a change.
-    pub fn erase_tiles(&mut self, id: LayerId, coords: HashSet<HexCoord>) -> HashSet<HexCoord> {
+    pub fn erase_tiles(
+        &mut self,
+        id: LayerId,
+        coords: impl IntoIterator<Item = HexCoord>,
+    ) -> Vec<HexCoord> {
         let result = match self
             .inner
             .iter_mut()
@@ -164,7 +170,7 @@ impl Scene {
             .map(|layer| &mut layer.kind)
         {
             Some(LayerInner::Tiles(t)) => t.erase_multiple(coords),
-            _ => HashSet::new(),
+            _ => Vec::new(),
         };
         if !result.is_empty() {
             self.change_revision();

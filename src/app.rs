@@ -1,5 +1,5 @@
 use iced::{
-    Element, Subscription, Task, Theme,
+    Element, Size, Subscription, Task, Theme,
     widget::{container, stack},
 };
 
@@ -7,7 +7,7 @@ use crate::{
     domain::{
         History, Scene, Tool,
         assets::ImageAsset,
-        edit::{EditCommand, SetImage},
+        edit::{EditCommand, SetImageAndSize},
         id::LayerId,
     },
     infrastructure::{
@@ -145,10 +145,16 @@ impl App {
                 IoProcess::Start => return load_image_async(caller),
                 IoProcess::Cancelled => eprintln!("Asset load cancelled"),
                 IoProcess::Finished(Ok(asset)) => {
+                    let size = Size {
+                        width: asset.width as f32,
+                        height: asset.height as f32,
+                    };
                     let id = self.scene.assets.register_image(asset);
-                    let edit = SetImage {
+
+                    let edit = SetImageAndSize {
                         layer: caller,
-                        image: id,
+                        image: Some(id),
+                        size,
                     };
                     return Task::done(Message::Scene(Box::new(edit)));
                 }

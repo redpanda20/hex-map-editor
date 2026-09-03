@@ -11,7 +11,7 @@ use crate::{
     app::{Action::SetLayer, Message},
     domain::{
         Layer, LayerInner, LayerKind, Scene,
-        edit::{PushLayer, RemoveLayer, SetVisible, SwapLayers},
+        edit::{MoveLayerTo, PushLayer, RemoveLayer, SetVisible},
         id::LayerId,
     },
 };
@@ -39,7 +39,7 @@ impl Layers {
             LayersMessage::DragLayerDropped { dropped } => {
                 if let Some(picked) = self.dragged_layer.take() {
                     return Task::done(
-                        SwapLayers {
+                        MoveLayerTo {
                             id: picked,
                             to: dropped,
                         }

@@ -38,18 +38,18 @@ impl SparseTiles {
         self.tiles.remove(&coord)
     }
 
-    /// Paints all coords in the other set.
+    /// Paints many coords.
     /// Returns all modified tiles
-    pub fn paint_multiple(&mut self, other: HashSet<HexCoord>) -> HashSet<HexCoord> {
+    pub fn paint_multiple(&mut self, other: impl IntoIterator<Item = HexCoord>) -> Vec<HexCoord> {
         other
             .into_iter()
             .filter(|coord| self.tiles.insert(*coord))
             .collect()
     }
 
-    /// Erases all coords in the other set.
+    /// Erases many coords.
     /// Returns all modified tiles
-    pub fn erase_multiple(&mut self, other: HashSet<HexCoord>) -> HashSet<HexCoord> {
+    pub fn erase_multiple(&mut self, other: impl IntoIterator<Item = HexCoord>) -> Vec<HexCoord> {
         other
             .into_iter()
             .filter(|coord| self.tiles.remove(coord))
