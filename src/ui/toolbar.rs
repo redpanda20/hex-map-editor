@@ -105,6 +105,16 @@ impl Toolbar {
             "Export scene as a PNG",
         );
 
+        let open_about = tooltip(
+            button(bootstrap::file_richtext_fill())
+                .on_press(Message::About(crate::ui::AboutMessage::Show))
+                .style(button::text),
+            container("About this application.")
+                .padding(4.0)
+                .style(container::bordered_box),
+            tooltip::Position::Right,
+        );
+
         let content = column![
             rule::horizontal(1),
             brush_tool,
@@ -117,7 +127,8 @@ impl Toolbar {
             space::vertical(),
             save_scene,
             load_scene,
-            export_png
+            export_png,
+            open_about
         ]
         .spacing(8.0)
         .padding(8.0);

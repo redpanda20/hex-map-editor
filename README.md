@@ -58,6 +58,10 @@ The code is split into three layers:
 
   Depends on the [Rust](https://rust-lang.org/) toolchain, the `wasm32-unknown-unknown` target, and [Trunk](https://trunk-rs.github.io/trunk/) to be installed.
 
+- Notices: `cargo about generate about.hbs > license-notices.json`
+
+  Depends on [cargo-about](https://github.com/EmbarkStudios/cargo-about/tree/main). Notices need to be rebuilt whenever dependencies are modified.
+
 ## License
 
 Source-available under the [PolyForm Noncommercial License 1.0.0](./LICENSE.md).

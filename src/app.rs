@@ -15,8 +15,9 @@ use crate::{
         save_project_async,
     },
     ui::{
-        CanvasEvent, Inspector, InspectorMessage, KeybindMessage, Keybinds, Layers, LayersMessage,
-        Panes, PanesMessage, ToastMessage, Toasts, Toolbar, ToolbarMessage, canvas_panel,
+        About, AboutMessage, CanvasEvent, Inspector, InspectorMessage, KeybindMessage, Keybinds,
+        Layers, LayersMessage, Panes, PanesMessage, ToastMessage, Toasts, Toolbar, ToolbarMessage,
+        canvas_panel,
     },
 };
 
@@ -33,6 +34,7 @@ pub struct App {
     pub inspector: Inspector,
 
     pub toasts: Toasts,
+    pub about: About,
     pub keybinds: Keybinds,
     pub panes: Panes,
 }
@@ -59,6 +61,7 @@ pub enum Message {
     Toolbar(ToolbarMessage),
 
     Toasts(ToastMessage),
+    About(AboutMessage),
     Keybinds(KeybindMessage),
     Panes(PanesMessage),
 
@@ -105,6 +108,7 @@ impl App {
         match message {
             Message::Panes(message) => self.panes.update(message),
             Message::Toasts(message) => return self.toasts.update(message),
+            Message::About(message) => self.about.update(message),
             Message::Keybinds(message) => self.keybinds.update(message),
 
             Message::Inspector(message) => return self.inspector.update(message),
@@ -181,8 +185,9 @@ impl App {
             .view(&self.scene, canvas, inspector, layers, toolbar);
 
         let toasts = self.toasts.view().map(Message::Toasts);
+        let about = self.about.view();
 
-        container(stack!(grid, toasts))
+        container(stack!(grid, about, toasts))
             .padding(2)
             .style(|theme| container::background(theme.extended_palette().background.base.color))
             .into()

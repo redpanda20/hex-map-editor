@@ -1,3 +1,4 @@
+mod about;
 mod canvas;
 mod inspector;
 mod keybinds;
@@ -14,6 +15,7 @@ pub use panes::{Panes, PanesMessage};
 pub use toolbar::{Toolbar, ToolbarMessage};
 
 // Sub elements
+pub use about::{About, AboutMessage};
 pub use keybinds::{Binding, KeybindMessage, Keybinds};
 pub use toasts::{ToastMessage, Toasts};
 

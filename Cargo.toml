@@ -2,6 +2,8 @@
 name = "hex-map-editor"
 version = "0.8.0"
 edition = "2024"
+license = "PolyForm-Noncommercial-1.0.0"
+publish = false
 
 [dependencies]
 bytemuck = { version = "1", features = ["derive"] }
