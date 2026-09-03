@@ -91,9 +91,6 @@ impl App {
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        #[cfg(debug_assertions)]
-        println!("{message:?}");
-
         self.toasts.listen_to_events(&message);
 
         match message {

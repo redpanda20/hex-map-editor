@@ -2,6 +2,7 @@ pub mod assets;
 pub mod colour;
 pub mod edit;
 mod hex;
+pub mod history;
 pub mod id;
 pub mod layer;
 mod render;
@@ -14,6 +15,7 @@ pub use scene::Scene;
 
 pub use tool::Tool;
 
-pub use edit::{EditCommand, History};
+pub use edit::EditCommand;
+pub use history::History;
 pub use layer::{Layer, LayerInner, LayerKind};
 pub use render::RenderTarget;

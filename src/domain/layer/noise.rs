@@ -1,4 +1,7 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::{
+    fmt::Debug,
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 use iced::{Color, Rectangle, Vector};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
@@ -17,7 +20,7 @@ pub struct NoiseParams {
     pub persistence: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PerlinNoiseLayer {
     seed: u64,
     gradient_table: Box<[Vector; TABLE_SIZE]>,
@@ -199,5 +202,18 @@ impl LayerInnerImpl for PerlinNoiseLayer {
                 renderer.fill_polygon(&point, fill);
             }
         }
+    }
+}
+
+impl Debug for PerlinNoiseLayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PerlinNoiseLayer")
+            .field("seed", &self.seed)
+            .field("gradient_table_size", &self.gradient_table.len())
+            .field("threshold", &self.threshold)
+            .field("frequency", &self.frequency)
+            .field("octaves", &self.octaves)
+            .field("persistence", &self.persistence)
+            .finish()
     }
 }
