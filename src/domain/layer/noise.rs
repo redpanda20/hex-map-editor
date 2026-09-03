@@ -12,7 +12,7 @@ use super::LayerInnerImpl;
 
 const TABLE_SIZE: usize = 64;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct NoiseParams {
     pub threshold: f32,
     pub frequency: f32,

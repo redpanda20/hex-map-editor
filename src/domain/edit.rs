@@ -1,6 +1,4 @@
-use std::collections::HashSet;
-
-use iced::{Color, Rectangle, widget::image::Handle};
+use iced::{Color, Rectangle, Size, widget::image::Handle};
 
 use crate::domain::{
     HexCoord, LayerInner, LayerKind, Scene, flood_fill,
@@ -58,7 +56,7 @@ pub struct RemoveLayer {
 }
 
 #[derive(Debug, Clone)]
-pub struct SwapLayers {
+pub struct MoveLayerTo {
     pub id: LayerId,
     pub to: LayerId,
 }
@@ -96,13 +94,13 @@ pub struct EraseTile {
 #[derive(Debug, Clone)]
 pub struct PaintTiles {
     pub layer: LayerId,
-    pub coords: HashSet<HexCoord>,
+    pub coords: Vec<HexCoord>,
 }
 
 #[derive(Debug, Clone)]
 pub struct EraseTiles {
     pub layer: LayerId,
-    pub coords: HashSet<HexCoord>,
+    pub coords: Vec<HexCoord>,
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +130,13 @@ pub struct SetNoiseSeed {
 pub struct SetNoiseParams {
     pub layer: LayerId,
     pub params: NoiseParams,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetImageAndSize {
+    pub layer: LayerId,
+    pub image: Option<ImageId>,
+    pub size: Size,
 }
 
 #[derive(Debug, Clone)]
@@ -189,7 +194,7 @@ impl EditCommand for RemoveLayer {
     }
 }
 
-impl EditCommand for SwapLayers {
+impl EditCommand for MoveLayerTo {
     fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
         let to = scene
             .inner
@@ -197,6 +202,7 @@ impl EditCommand for SwapLayers {
             .position(|layer| layer.id == self.to)
             .expect("Layer `to` doesn't exist");
         let from = scene.move_layer(self.id, to).expect("Move failed");
+
         Box::new(MoveLayer {
             id: self.id,
             to: from,
@@ -217,6 +223,10 @@ impl EditCommand for MoveLayer {
 impl EditCommand for SetVisible {
     fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
         let layer = scene.get_layer_mut(self.id).expect("Layer not found");
+        if self.visible == layer.visible {
+            return Box::new(NoOp);
+        }
+
         let previous = layer.visible;
         layer.visible = self.visible;
 
@@ -230,6 +240,10 @@ impl EditCommand for SetVisible {
 impl EditCommand for Rename {
     fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
         let layer = scene.get_layer_mut(self.id).expect("Layer not found");
+        if self.name == layer.name {
+            return Box::new(NoOp);
+        }
+
         let previous = layer.name.clone();
         layer.name = self.name;
 
@@ -348,6 +362,9 @@ impl EditCommand for SetColour {
         else {
             return Box::new(NoOp);
         };
+        if self.colour == tiles.colour {
+            return Box::new(NoOp);
+        }
 
         let prev = tiles.colour;
         tiles.colour = self.colour;
@@ -368,6 +385,9 @@ impl EditCommand for SetNoiseSeed {
         else {
             return Box::new(NoOp);
         };
+        if self.seed == noise.get_seed() {
+            return Box::new(NoOp);
+        }
 
         let seed = noise.get_seed();
         noise.set_seed(self.seed);
@@ -388,6 +408,9 @@ impl EditCommand for SetNoiseParams {
         else {
             return Box::new(NoOp);
         };
+        if self.params == noise.get_params() {
+            return Box::new(NoOp);
+        }
 
         let params = noise.get_params();
         noise.set_params(&self.params);
@@ -395,6 +418,32 @@ impl EditCommand for SetNoiseParams {
         Box::new(SetNoiseParams {
             layer: self.layer,
             params,
+        })
+    }
+}
+
+impl EditCommand for SetImageAndSize {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        // Get mutable access to layer
+        let Some(Layer {
+            kind: LayerInner::Image(layer),
+            ..
+        }) = scene.get_layer_mut(self.layer)
+        else {
+            return Box::new(NoOp);
+        };
+
+        let prev_image = layer.image;
+        let prev_size = layer.bounds.size();
+
+        layer.bounds.width = self.size.width;
+        layer.bounds.height = self.size.height;
+        layer.image = self.image;
+
+        Box::new(SetImageAndSize {
+            layer: self.layer,
+            image: prev_image,
+            size: prev_size,
         })
     }
 }
@@ -424,13 +473,18 @@ impl EditCommand for SetImage {
             return Box::new(NoOp);
         };
 
+        let prev_image = layer.image;
+        let prev_size = layer.bounds.size();
+
         layer.image = Some(self.image);
         layer.bounds.width = width;
         layer.bounds.height = height;
 
-        // Irreversable edit
-        // TODO: Make reversable
-        Box::new(NoOp)
+        Box::new(SetImageAndSize {
+            layer: self.layer,
+            image: prev_image,
+            size: prev_size,
+        })
     }
 }
 
@@ -443,6 +497,9 @@ impl EditCommand for SetImageBounds {
         else {
             return Box::new(NoOp);
         };
+        if self.bounds == layer.bounds {
+            return Box::new(NoOp);
+        }
 
         let prev = layer.bounds;
         layer.bounds = self.bounds;
@@ -463,6 +520,9 @@ impl EditCommand for SetImageOpacity {
         else {
             return Box::new(NoOp);
         };
+        if self.opacity == layer.get_opacity() {
+            return Box::new(NoOp);
+        }
 
         let prev = layer.get_opacity();
         layer.set_opacity(self.opacity);
