@@ -135,6 +135,13 @@ pub struct SetNoiseParams {
 }
 
 #[derive(Debug, Clone)]
+pub struct SetImageAndBounds {
+    pub layer: LayerId,
+    pub image: Option<ImageId>,
+    pub bounds: Rectangle,
+}
+
+#[derive(Debug, Clone)]
 pub struct SetImage {
     pub layer: LayerId,
     pub image: ImageId,
@@ -399,6 +406,31 @@ impl EditCommand for SetNoiseParams {
     }
 }
 
+impl EditCommand for SetImageAndBounds {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        // Get mutable access to layer
+        let Some(Layer {
+            kind: LayerInner::Image(layer),
+            ..
+        }) = scene.get_layer_mut(self.layer)
+        else {
+            return Box::new(NoOp);
+        };
+
+        let prev_image = layer.image;
+        let prev_bounds = layer.bounds;
+
+        layer.bounds = self.bounds;
+        layer.image = self.image;
+
+        Box::new(SetImageAndBounds {
+            layer: self.layer,
+            image: prev_image,
+            bounds: prev_bounds,
+        })
+    }
+}
+
 impl EditCommand for SetImage {
     fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
         // Get image size from store
@@ -424,13 +456,18 @@ impl EditCommand for SetImage {
             return Box::new(NoOp);
         };
 
+        let prev_image = layer.image;
+        let prev_bounds = layer.bounds;
+
         layer.image = Some(self.image);
         layer.bounds.width = width;
         layer.bounds.height = height;
 
-        // Irreversable edit
-        // TODO: Make reversable
-        Box::new(NoOp)
+        Box::new(SetImageAndBounds {
+            layer: self.layer,
+            image: prev_image,
+            bounds: prev_bounds,
+        })
     }
 }
 
