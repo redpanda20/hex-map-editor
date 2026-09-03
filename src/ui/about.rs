@@ -1,5 +1,3 @@
-use std::collections::{HashMap, hash_map::Entry};
-
 use iced::{
     Alignment, Color, Element, Length,
     widget::{button, column, container, row, scrollable, space, text, text_input},
@@ -13,6 +11,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, serde::Deserialize)]
 struct License {
+    #[allow(unused)]
     id: String,
     name: String,
     #[serde(rename = "text")]
@@ -28,24 +27,13 @@ struct Crate {
 }
 
 fn get_license_notices() -> Vec<License> {
-    let licenses: Vec<License> =
+    let mut licenses: Vec<License> =
         serde_json::from_str(LICENSE_NOTICES).expect("Invalid license-notices.json");
 
-    // Malformed crate licenses cause duplication in licenses.
-    let mut deduplicated: HashMap<String, License> = HashMap::new();
-    for license in licenses {
-        match deduplicated.entry(license.id.clone()) {
-            Entry::Occupied(mut existing) => {
-                existing.get_mut().crates.extend(license.crates);
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(license);
-            }
-        }
-    }
+    // TODO: Consider reducing redundant license information. Need to check the legality
 
-    let mut licenses: Vec<License> = deduplicated.into_values().collect();
     licenses.sort_by(|a, b| a.name.cmp(&b.name));
+
     licenses
 }
 
