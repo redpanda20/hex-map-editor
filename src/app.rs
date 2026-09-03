@@ -71,6 +71,15 @@ pub enum Message {
     Export(IoProcess<()>),
 }
 
+impl<T> From<T> for Message
+where
+    T: EditCommand + 'static,
+{
+    fn from(value: T) -> Self {
+        Self::Scene(Box::new(value))
+    }
+}
+
 impl App {
     pub fn boot() -> (Self, Task<Message>) {
         (App::default(), Task::none())

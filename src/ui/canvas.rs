@@ -19,28 +19,30 @@ pub enum CanvasEvent {
 
 impl CanvasEvent {
     pub fn into_task(self, current_layer: &Option<LayerId>, tool: &Tool) -> Task<Message> {
-        let command: Box<dyn EditCommand> = match (*current_layer, tool, self) {
+        let command: Message = match (*current_layer, tool, self) {
             (Some(layer), Tool::Paint, CanvasEvent::PointerPressed { at }) => {
-                Box::new(PaintTile { layer, coord: at })
+                PaintTile { layer, coord: at }.into()
             }
+
             (Some(layer), Tool::Paint, CanvasEvent::PointerMoved { from: _, to }) => {
-                Box::new(PaintTile { layer, coord: to })
+                PaintTile { layer, coord: to }.into()
             }
 
             (Some(layer), Tool::Erase, CanvasEvent::PointerPressed { at }) => {
-                Box::new(EraseTile { layer, coord: at })
+                EraseTile { layer, coord: at }.into()
             }
+
             (Some(layer), Tool::Erase, CanvasEvent::PointerMoved { from: _, to }) => {
-                Box::new(EraseTile { layer, coord: to })
+                EraseTile { layer, coord: to }.into()
             }
 
             (Some(layer), Tool::Fill, CanvasEvent::PointerPressed { at }) => {
-                Box::new(BucketFill { layer, from: at })
+                BucketFill { layer, from: at }.into()
             }
 
             _ => return Task::none(),
         };
-        Task::done(Message::Scene(command))
+        Task::done(command)
     }
 }
 
@@ -48,7 +50,7 @@ use crate::domain::layer::LayerInnerImpl;
 use crate::{
     app::Message,
     domain::{
-        EditCommand, HexCoord, RenderTarget, Scene, Tool,
+        HexCoord, RenderTarget, Scene, Tool,
         assets::AssetStore,
         edit::{BucketFill, EraseTile, PaintTile},
         id::{ImageId, LayerId},

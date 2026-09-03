@@ -38,12 +38,13 @@ impl Layers {
             LayersMessage::DragLayerCancelled => self.dragged_layer = None,
             LayersMessage::DragLayerDropped { dropped } => {
                 if let Some(picked) = self.dragged_layer.take() {
-                    let swap = SwapLayers {
-                        id: picked,
-                        to: dropped,
-                    };
-
-                    return Task::done(Message::Scene(Box::new(swap)));
+                    return Task::done(
+                        SwapLayers {
+                            id: picked,
+                            to: dropped,
+                        }
+                        .into(),
+                    );
                 }
             }
         }
@@ -145,18 +146,18 @@ fn visible_toggle<'a>(id: &LayerId, visible: &bool) -> Button<'a, Message> {
         false => bootstrap::eye_slash(),
     }
     .style(text::secondary);
-    button(inner)
-        .style(button::text)
-        .padding(0)
-        .on_press(Message::Scene(Box::new(SetVisible {
+    button(inner).style(button::text).padding(0).on_press(
+        SetVisible {
             id: *id,
             visible: !*visible,
-        })))
+        }
+        .into(),
+    )
 }
 
 fn delete_button<'a>(id: &LayerId) -> Button<'a, Message> {
     button(bootstrap::trash_fill())
-        .on_press(Message::Scene(Box::new(RemoveLayer { id: *id })))
+        .on_press(RemoveLayer { id: *id }.into())
         .style(button::danger)
 }
 
@@ -196,10 +197,13 @@ fn add_layer_button<'a>(layers: &Layers) -> Element<'a, Message> {
             .align_y(alignment::Vertical::Center),
     )
     .width(Length::Fill)
-    .on_press(Message::Scene(Box::new(PushLayer {
-        name: "New layer".to_string(),
-        kind: layers.active_layer_type,
-    })));
+    .on_press(
+        PushLayer {
+            name: "New layer".to_string(),
+            kind: layers.active_layer_type,
+        }
+        .into(),
+    );
 
     let add_layer_list = pick_list(
         [LayerKind::Tiles, LayerKind::Noise, LayerKind::Image],

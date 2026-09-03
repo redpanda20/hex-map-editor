@@ -97,23 +97,27 @@ impl Inspector {
             InspectorMessage::LayerRenameStart(name) => self.active_layer_name = Some(name),
             InspectorMessage::LayerRenameCommit { id } => {
                 if let Some(name) = &self.active_layer_name {
-                    let edit = Box::new(Rename {
-                        id,
-                        name: name.to_string(),
-                    });
-                    return Task::done(Message::Scene(edit))
-                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+                    return Task::done(
+                        Rename {
+                            id,
+                            name: name.to_string(),
+                        }
+                        .into(),
+                    )
+                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
                 }
             }
             InspectorMessage::ColourChange { colour } => self.active_colour = Some(colour),
             InspectorMessage::ColourCommit { id } => {
                 if let Some(colour) = &self.active_colour {
-                    let edit = Box::new(SetColour {
-                        layer: id,
-                        colour: *colour,
-                    });
-                    return Task::done(Message::Scene(edit))
-                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+                    return Task::done(
+                        SetColour {
+                            layer: id,
+                            colour: *colour,
+                        }
+                        .into(),
+                    )
+                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
                 }
             }
             InspectorMessage::NoiseParamsChange { params } => {
@@ -121,24 +125,28 @@ impl Inspector {
             }
             InspectorMessage::NoiseParamCommit { id } => {
                 if let Some(params) = &self.active_noise_params {
-                    let edit = Box::new(SetNoiseParams {
-                        layer: id,
-                        params: *params,
-                    });
-                    return Task::done(Message::Scene(edit))
-                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+                    return Task::done(
+                        SetNoiseParams {
+                            layer: id,
+                            params: *params,
+                        }
+                        .into(),
+                    )
+                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
                 }
             }
 
             InspectorMessage::ImageOpacityChange { opacity } => self.active_opacity = Some(opacity),
             InspectorMessage::ImageOpacityCommit { id } => {
                 if let Some(opacity) = &self.active_opacity {
-                    let edit = Box::new(SetImageOpacity {
-                        layer: id,
-                        opacity: *opacity,
-                    });
-                    return Task::done(Message::Scene(edit))
-                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+                    return Task::done(
+                        SetImageOpacity {
+                            layer: id,
+                            opacity: *opacity,
+                        }
+                        .into(),
+                    )
+                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
                 }
             }
 
@@ -151,17 +159,19 @@ impl Inspector {
                 let width = self.active_w.unwrap_or(starting_bounds.width);
                 let height = self.active_h.unwrap_or(starting_bounds.height);
 
-                let edit = Box::new(SetImageBounds {
-                    layer: id,
-                    bounds: Rectangle {
-                        x,
-                        y,
-                        width,
-                        height,
-                    },
-                });
-                return Task::done(Message::Scene(edit))
-                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+                return Task::done(
+                    SetImageBounds {
+                        layer: id,
+                        bounds: Rectangle {
+                            x,
+                            y,
+                            width,
+                            height,
+                        },
+                    }
+                    .into(),
+                )
+                .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
             }
             InspectorMessage::ImageXChange { x_maybe } => {
                 self.active_x = x_maybe.parse::<f32>().ok()
