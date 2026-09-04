@@ -20,10 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,11 +34,60 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Download and install Trunk binary
-        run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+      - name: Install clippy
+        run: rustup component add clippy
+
+      - name: Check
+        run: cargo check --target wasm32-unknown-unknown
+
+      - name: Clippy
+        run: cargo clippy --target wasm32-unknown-unknown
+
+
+  deploy:
+    needs: check
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check for license-relevant changes
+        uses: dorny/paths-filter@v3
+        id: license-filter
+        with:
+          filters: |
+            license:
+              - 'about.hbs'
+              - 'about.toml'
+              - 'Cargo.lock'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install cargo-about
+        if: steps.license-filter.outputs.license == 'true'
+        run: cargo binstall cargo-about@0.8.4 --no-confirm
+
+      - name: Install Trunk
+        run: cargo binstall trunk --no-confirm
+
+      - name: Generate license notices
+        if: steps.license-filter.outputs.license == 'true'
+        run: cargo about generate about.hbs > license-notices.json
 
       - name: Trunk build
-        run: ./trunk build --release --public-url ./
+        run: trunk build --release --public-url ./
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
