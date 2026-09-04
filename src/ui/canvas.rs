@@ -136,7 +136,13 @@ impl<'a> shader::Program<CanvasEvent> for HexCanvas<'a> {
                 state.cached_layers_revision.set(current_revision);
             }
         }
-        let base = Arc::clone(state.cached_commands.borrow().as_ref().unwrap());
+        let base = Arc::clone(
+            state
+                .cached_commands
+                .borrow()
+                .as_ref()
+                .expect("Value set above"),
+        );
 
         let overlay = self.build_overlay_commands(state, cursor.position_in(bounds), bounds);
 
