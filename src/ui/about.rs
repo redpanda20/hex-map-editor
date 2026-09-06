@@ -30,8 +30,6 @@ fn get_license_notices() -> Vec<License> {
     let mut licenses: Vec<License> =
         serde_json::from_str(LICENSE_NOTICES).expect("Invalid license-notices.json");
 
-    // TODO: Consider reducing redundant license information. Need to check the legality
-
     licenses.sort_by(|a, b| a.name.cmp(&b.name));
 
     licenses
