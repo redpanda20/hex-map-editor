@@ -30,18 +30,16 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+          components: clippy
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Install clippy
-        run: rustup component add clippy
-
-      - name: Check
-        run: cargo check --target wasm32-unknown-unknown
+      - name: Test
+        run: cargo test
 
       - name: Clippy
-        run: cargo clippy --target wasm32-unknown-unknown
+        run: cargo clippy -- -D warnings
 
 
   deploy:
