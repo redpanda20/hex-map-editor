@@ -217,3 +217,86 @@ impl Debug for PerlinNoiseLayer {
             .finish()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::render::MockRenderer;
+
+    #[test]
+    fn get_and_set_seed_round_trip() {
+        let mut layer = PerlinNoiseLayer::new(1);
+        assert_eq!(layer.get_seed(), 1);
+        layer.set_seed(42);
+        assert_eq!(layer.get_seed(), 42);
+    }
+
+    #[test]
+    fn get_and_set_params_round_trip() {
+        let mut layer = PerlinNoiseLayer::new(1);
+        let params = NoiseParams {
+            threshold: 0.3,
+            frequency: 8.0,
+            octaves: 4,
+            persistence: 0.6,
+        };
+        layer.set_params(&params);
+        assert_eq!(layer.get_params(), params);
+    }
+
+    #[test]
+    fn bounds_is_always_none() {
+        // Noise fills the whole viewport
+        let layer = PerlinNoiseLayer::new(1);
+        assert!(layer.bounds(16.0).is_none());
+    }
+
+    #[test]
+    fn draw_is_deterministic_for_a_given_seed() {
+        let bounds = HexBounds::new(-2, 2, -2, 2).into_rect();
+
+        let mut a = PerlinNoiseLayer::new(7);
+        a.threshold = -2.0; // always draw, so we're comparing fill colours
+        let mut renderer_a = MockRenderer::with_bounds(bounds);
+        a.draw(&mut renderer_a);
+
+        let mut b = PerlinNoiseLayer::new(7);
+        b.threshold = -2.0;
+        let mut renderer_b = MockRenderer::with_bounds(bounds);
+        b.draw(&mut renderer_b);
+
+        assert_eq!(renderer_a.fills.len(), renderer_b.fills.len());
+        for ((point_a, colour_a), (point_b, colour_b)) in
+            renderer_a.fills.iter().zip(renderer_b.fills.iter())
+        {
+            assert_eq!(point_a, point_b);
+            assert_eq!(colour_a, colour_b);
+        }
+    }
+
+    #[test]
+    fn draw_respects_the_threshold() {
+        let bounds = HexBounds::new(-2, 2, -2, 2).into_rect();
+
+        let mut always = PerlinNoiseLayer::new(7);
+        always.threshold = -2.0; // sample() is always >= -1, so this always passes
+        let mut renderer_always = MockRenderer::with_bounds(bounds);
+        always.draw(&mut renderer_always);
+
+        let mut never = PerlinNoiseLayer::new(7);
+        never.threshold = 2.0; // sample() is never above 1, so this never passes
+        let mut renderer_never = MockRenderer::with_bounds(bounds);
+        never.draw(&mut renderer_never);
+
+        assert!(!renderer_always.fills.is_empty());
+        assert!(renderer_never.fills.is_empty());
+    }
+
+    #[test]
+    fn seed_is_stored_distinctly_per_instance() {
+        let a = PerlinNoiseLayer::new(1);
+        let b = PerlinNoiseLayer::new(2);
+        assert_eq!(a.get_seed(), 1);
+        assert_eq!(b.get_seed(), 2);
+    }
+}

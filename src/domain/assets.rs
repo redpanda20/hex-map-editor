@@ -89,3 +89,88 @@ impl AssetStore {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn asset(name: &str) -> ImageAsset {
+        ImageAsset {
+            encoded: vec![9, 9, 9],
+            extension: "png".into(),
+            data: vec![0; 2 * 2 * 4], // a 2x2 RGBA image
+            width: 2,
+            height: 2,
+            name: name.into(),
+        }
+    }
+
+    #[test]
+    fn register_image_makes_it_retrievable() {
+        let mut store = AssetStore::default();
+        let id = store.register_image(asset("sprite.png"));
+
+        assert!(store.image_data(id).is_some());
+        assert_eq!(store.image_name(id), Some("sprite.png"));
+    }
+
+    #[test]
+    fn register_image_with_id_uses_the_given_id() {
+        let mut store = AssetStore::default();
+        let id = ImageId::from_raw(123);
+
+        store.register_image_with_id(id, asset("restored.png"));
+
+        assert_eq!(store.image_name(id), Some("restored.png"));
+    }
+
+    #[test]
+    fn remove_image_makes_it_unretrievable() {
+        let mut store = AssetStore::default();
+        let id = store.register_image(asset("sprite.png"));
+
+        assert!(store.remove_image(id).is_some());
+        assert!(store.image_data(id).is_none());
+        assert_eq!(store.image_name(id), None);
+    }
+
+    #[test]
+    fn remove_image_of_unknown_id_is_none() {
+        let mut store = AssetStore::default();
+        assert!(store.remove_image(ImageId::from_raw(u64::MAX)).is_none());
+    }
+
+    #[test]
+    fn each_registration_gets_a_distinct_id() {
+        let mut store = AssetStore::default();
+        let a = store.register_image(asset("a.png"));
+        let b = store.register_image(asset("b.png"));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn iter_images_yields_every_registered_image_once() {
+        let mut store = AssetStore::default();
+        let a = store.register_image(asset("a.png"));
+        let b = store.register_image(asset("b.png"));
+
+        let mut seen: Vec<ImageId> = store.iter_images().map(|(id, ..)| id).collect();
+        seen.sort_by_key(|id| id.raw());
+        let mut expected = vec![a, b];
+        expected.sort_by_key(|id| id.raw());
+
+        assert_eq!(seen, expected);
+    }
+
+    #[test]
+    fn iter_images_exposes_name_extension_and_encoded_bytes() {
+        let mut store = AssetStore::default();
+        let id = store.register_image(asset("sprite.png"));
+
+        let (found_id, name, extension, encoded) = store.iter_images().next().unwrap();
+        assert_eq!(found_id, id);
+        assert_eq!(name, "sprite.png");
+        assert_eq!(extension, "png");
+        assert_eq!(encoded, &[9, 9, 9]);
+    }
+}

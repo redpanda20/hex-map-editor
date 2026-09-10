@@ -100,3 +100,37 @@ where
         Box::new(self.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::layer::tiles::SparseTiles;
+
+    #[test]
+    fn layer_kind_display_matches_labels_used_in_the_ui() {
+        assert_eq!(LayerKind::Tiles.to_string(), "Tiles");
+        assert_eq!(LayerKind::Noise.to_string(), "Noise");
+        assert_eq!(LayerKind::Image.to_string(), "Image");
+    }
+
+    #[test]
+    fn layer_kind_default_is_tiles() {
+        assert_eq!(LayerKind::default(), LayerKind::Tiles);
+    }
+
+    #[test]
+    fn new_layer_is_visible_with_the_given_name() {
+        let kind = LayerInner::Tiles(SparseTiles::new(iced::Color::BLACK));
+        let layer = Layer::new("My Layer", kind);
+
+        assert_eq!(layer.name, "My Layer");
+        assert!(layer.visible);
+    }
+
+    #[test]
+    fn each_new_layer_gets_a_distinct_id() {
+        let a = Layer::new("A", LayerInner::Tiles(SparseTiles::new(iced::Color::BLACK)));
+        let b = Layer::new("B", LayerInner::Tiles(SparseTiles::new(iced::Color::BLACK)));
+        assert_ne!(a.id, b.id);
+    }
+}

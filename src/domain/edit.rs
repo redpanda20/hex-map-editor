@@ -533,3 +533,543 @@ impl EditCommand for SetImageOpacity {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use iced::{Color, Point, Rectangle, Size};
+
+    use super::*;
+    use crate::domain::assets::ImageAsset;
+
+    /// Applies a given command then applies the inverse.
+    /// This property should hold for all (valid) cases of `EditCommand`.
+    fn assert_apply_then_undo_is_identity(scene: &mut Scene, command: Box<dyn EditCommand>) {
+        // Only the layers of the `Scene` are compared, as revision counter should always break equality.
+        let before = format!("{:?}", scene.inner);
+        let inverse = command.apply(scene);
+        assert_ne!(
+            format!("{:?}", scene.inner),
+            before,
+            "command should have changed the scene"
+        );
+        inverse.apply(scene);
+        assert_eq!(
+            format!("{:?}", scene.inner),
+            before,
+            "applying the inverse should restore the original scene"
+        );
+    }
+
+    fn scene_with_tiles_layer() -> (Scene, LayerId) {
+        let scene = Scene::default();
+        let id = scene.inner[0].id;
+        (scene, id)
+    }
+
+    fn scene_with_noise_layer() -> (Scene, LayerId) {
+        let mut scene = Scene::default();
+        let layer = Layer::new("Noise", scene.new_kind(LayerKind::Noise));
+        let id = layer.id;
+        scene.insert_layer(layer, scene.inner.len());
+        (scene, id)
+    }
+
+    fn scene_with_image_layer() -> (Scene, LayerId) {
+        let mut scene = Scene::default();
+        let layer = Layer::new("Image", scene.new_kind(LayerKind::Image));
+        let id = layer.id;
+        scene.insert_layer(layer, scene.inner.len());
+        (scene, id)
+    }
+
+    fn register_test_image(scene: &mut Scene, width: u32, height: u32) -> ImageId {
+        let pixel_count = (width * height * 4) as usize;
+        scene.assets.register_image(ImageAsset {
+            encoded: vec![],
+            extension: "png".into(),
+            data: vec![0u8; pixel_count],
+            width,
+            height,
+            name: "test.png".into(),
+        })
+    }
+
+    // ---- NoOp ----
+
+    #[test]
+    fn noop_is_a_noop_and_applies_to_itself() {
+        let mut scene = Scene::default();
+        let before = format!("{scene:?}");
+        let inverse = Box::new(NoOp).apply(&mut scene);
+        assert!(inverse.is_noop());
+        assert_eq!(format!("{scene:?}"), before);
+    }
+
+    // ----  PushLayer / InsertLayer / RemoveLayer ----
+
+    #[test]
+    fn push_layer_adds_a_layer_and_undoes_cleanly() {
+        let mut scene = Scene::default();
+        let before_len = scene.inner.len();
+
+        let command = Box::new(PushLayer {
+            name: "New Layer".into(),
+            kind: LayerKind::Tiles,
+        });
+        let inverse = command.apply(&mut scene);
+        assert_eq!(scene.inner.len(), before_len + 1);
+        assert_eq!(scene.inner.last().unwrap().name, "New Layer");
+
+        inverse.apply(&mut scene);
+        assert_eq!(scene.inner.len(), before_len);
+    }
+
+    #[test]
+    fn remove_then_insert_layer_round_trips() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(RemoveLayer { id }));
+    }
+
+    #[test]
+    #[should_panic(expected = "Layer not found")]
+    fn remove_layer_of_missing_id_panics() {
+        let mut scene = Scene::default();
+        Box::new(RemoveLayer {
+            id: LayerId::from_raw(u64::MAX),
+        })
+        .apply(&mut scene);
+    }
+
+    // ---- MoveLayerTo / MoveLayer ----
+
+    #[test]
+    fn move_layer_to_round_trips() {
+        let mut scene = Scene::default();
+        let a = scene.inner[0].id;
+        let b = Layer::new("B", scene.new_kind(LayerKind::Tiles));
+        let b_id = b.id;
+        scene.insert_layer(b, 1);
+
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(MoveLayerTo { id: a, to: b_id }));
+    }
+
+    // ---- SetVisible / Rename ----
+
+    #[test]
+    fn set_visible_toggles_and_undoes() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        assert!(scene.get_layer(id).unwrap().visible);
+
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(SetVisible { id, visible: false }));
+    }
+
+    #[test]
+    fn set_visible_to_the_current_value_is_a_noop() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        let inverse = Box::new(SetVisible { id, visible: true }).apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn rename_round_trips_and_noops_on_identical_name() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        assert_apply_then_undo_is_identity(
+            &mut scene,
+            Box::new(Rename {
+                id,
+                name: "Renamed".into(),
+            }),
+        );
+
+        let current_name = scene.get_layer(id).unwrap().name.clone();
+        let inverse = Box::new(Rename {
+            id,
+            name: current_name,
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    // ---- PaintTile / EraseTile / PaintTiles / EraseTiles ----
+
+    #[test]
+    fn paint_tile_round_trips_and_noops_when_already_painted() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        let coord = HexCoord { col: 0, row: 0 };
+
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(PaintTile { layer: id, coord }));
+
+        scene.paint_tile(id, coord);
+        let inverse = Box::new(PaintTile { layer: id, coord }).apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn paint_tiles_round_trips() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        let coords = vec![
+            HexCoord { col: 0, row: 0 },
+            HexCoord { col: 1, row: 0 },
+            HexCoord { col: 0, row: 1 },
+        ];
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(PaintTiles { layer: id, coords }));
+    }
+
+    #[test]
+    fn paint_tiles_with_no_new_tiles_is_a_noop() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        let coord = HexCoord { col: 0, row: 0 };
+        scene.paint_tile(id, coord);
+
+        let inverse = Box::new(PaintTiles {
+            layer: id,
+            coords: vec![coord],
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn erase_tiles_round_trips() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        let coords = vec![HexCoord { col: 0, row: 0 }, HexCoord { col: 1, row: 0 }];
+        scene.paint_tiles(id, coords.clone());
+
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(EraseTiles { layer: id, coords }));
+    }
+
+    #[test]
+    fn erase_tile_noops_when_already_empty() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        let coord = HexCoord { col: 0, row: 0 };
+
+        let inverse = Box::new(EraseTile { layer: id, coord }).apply(&mut scene);
+
+        assert!(inverse.is_noop());
+    }
+
+    // ---- InvertTiles ----
+
+    #[test]
+    fn invert_tiles_is_its_own_inverse() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(InvertTiles { layer: id }));
+    }
+
+    #[test]
+    fn invert_tiles_on_non_tiles_layer_is_a_noop() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(InvertTiles { layer: id }).apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    // ---- BucketFill ----
+
+    #[test]
+    fn bucket_fill_paints_a_bounded_empty_region_and_undoes() {
+        // NOTE: this deliberately does *not* use
+        // `assert_apply_then_undo_is_identity`, because it compares scenes
+        // via `Debug`, and `HashSet`'s `Debug` order depends on its
+        // internal table capacity - which can grow (and won't shrink back)
+        // partway through this test. Comparing the `HashSet`s directly
+        // sidesteps that: `HashSet: PartialEq` is defined by set membership,
+        // not iteration order.
+        fn tile_set(scene: &Scene, id: LayerId) -> HashSet<HexCoord> {
+            let Some(Layer {
+                kind: LayerInner::Tiles(tiles),
+                ..
+            }) = scene.get_layer(id)
+            else {
+                panic!("expected tiles layer");
+            };
+            tiles.tiles.clone()
+        }
+
+        let (mut scene, id) = scene_with_tiles_layer();
+        // Paint a ring, leaving (0,0) as a bounded empty "hole".
+        let ring: Vec<HexCoord> = HexCoord { col: 0, row: 0 }.neighbors().to_vec();
+        scene.paint_tiles(id, ring);
+        let before = tile_set(&scene, id);
+        assert!(!before.contains(&HexCoord { col: 0, row: 0 }));
+
+        let inverse = Box::new(BucketFill {
+            layer: id,
+            from: HexCoord { col: 0, row: 0 },
+        })
+        .apply(&mut scene);
+
+        let after_fill = tile_set(&scene, id);
+        assert!(after_fill.contains(&HexCoord { col: 0, row: 0 }));
+        assert_eq!(after_fill.len(), before.len() + 1);
+
+        inverse.apply(&mut scene);
+        assert_eq!(
+            tile_set(&scene, id),
+            before,
+            "undo should restore the original tiles"
+        );
+    }
+
+    #[test]
+    fn bucket_fill_of_an_unbounded_region_inverts_the_layer_instead() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        // A single, distant painted tile: filling from empty space has no
+        // bounding box to contain it, so the whole layer is inverted.
+        scene.paint_tile(id, HexCoord { col: 0, row: 0 });
+
+        let inverse = Box::new(BucketFill {
+            layer: id,
+            from: HexCoord { col: 50, row: 50 },
+        })
+        .apply(&mut scene);
+
+        let Some(Layer {
+            kind: LayerInner::Tiles(tiles),
+            ..
+        }) = scene.get_layer(id)
+        else {
+            panic!("expected tiles layer");
+        };
+        assert!(tiles.is_inverted());
+
+        // The inverse is itself another InvertTiles, so re-applying it
+        // should flip the layer back to normal.
+        inverse.apply(&mut scene);
+        let Some(Layer {
+            kind: LayerInner::Tiles(tiles),
+            ..
+        }) = scene.get_layer(id)
+        else {
+            panic!("expected tiles layer");
+        };
+        assert!(!tiles.is_inverted());
+    }
+
+    #[test]
+    fn bucket_fill_on_non_tiles_layer_is_a_noop() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(BucketFill {
+            layer: id,
+            from: HexCoord { col: 0, row: 0 },
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    // ---- SetColour ----
+
+    #[test]
+    fn set_colour_round_trips_and_noops_on_identical_colour() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        assert_apply_then_undo_is_identity(
+            &mut scene,
+            Box::new(SetColour {
+                layer: id,
+                colour: Color::from_rgb(0.1, 0.2, 0.3),
+            }),
+        );
+
+        let current_colour = {
+            let Some(Layer {
+                kind: LayerInner::Tiles(tiles),
+                ..
+            }) = scene.get_layer(id)
+            else {
+                panic!("expected tiles layer");
+            };
+            tiles.colour
+        };
+        let inverse = Box::new(SetColour {
+            layer: id,
+            colour: current_colour,
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn set_colour_on_non_tiles_layer_is_a_noop() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(SetColour {
+            layer: id,
+            colour: Color::BLACK,
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    // ---- SetNoiseSeed / SetNoiseParams ----
+
+    #[test]
+    fn set_noise_seed_round_trips_and_noops_on_identical_seed() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let current_seed = {
+            let Some(Layer {
+                kind: LayerInner::Perlin(noise),
+                ..
+            }) = scene.get_layer(id)
+            else {
+                panic!("expected noise layer");
+            };
+            noise.get_seed()
+        };
+
+        assert_apply_then_undo_is_identity(
+            &mut scene,
+            Box::new(SetNoiseSeed {
+                layer: id,
+                seed: current_seed.wrapping_add(1),
+            }),
+        );
+
+        let inverse = Box::new(SetNoiseSeed {
+            layer: id,
+            seed: current_seed,
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn set_noise_seed_on_non_noise_layer_is_a_noop() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        let inverse = Box::new(SetNoiseSeed {
+            layer: id,
+            seed: 42,
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn set_noise_params_round_trips() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let new_params = NoiseParams {
+            threshold: 0.5,
+            frequency: 10.0,
+            octaves: 3,
+            persistence: 0.25,
+        };
+        assert_apply_then_undo_is_identity(
+            &mut scene,
+            Box::new(SetNoiseParams {
+                layer: id,
+                params: new_params,
+            }),
+        );
+    }
+
+    // -- SetImageAndSize / SetImage / SetImageBounds / SetImageOpacity --
+
+    #[test]
+    fn set_image_and_size_round_trips() {
+        let (mut scene, id) = scene_with_image_layer();
+        let image_id = register_test_image(&mut scene, 4, 4);
+
+        assert_apply_then_undo_is_identity(
+            &mut scene,
+            Box::new(SetImageAndSize {
+                layer: id,
+                image: Some(image_id),
+                size: Size::new(40.0, 40.0),
+            }),
+        );
+    }
+
+    #[test]
+    fn set_image_looks_up_dimensions_from_the_asset_store() {
+        let (mut scene, id) = scene_with_image_layer();
+        let image_id = register_test_image(&mut scene, 8, 6);
+
+        Box::new(SetImage {
+            layer: id,
+            image: image_id,
+        })
+        .apply(&mut scene);
+
+        let Some(Layer {
+            kind: LayerInner::Image(image_layer),
+            ..
+        }) = scene.get_layer(id)
+        else {
+            panic!("expected image layer");
+        };
+        assert_eq!(image_layer.image, Some(image_id));
+        assert_eq!(image_layer.bounds.width, 8.0);
+        assert_eq!(image_layer.bounds.height, 6.0);
+    }
+
+    #[test]
+    fn set_image_of_unregistered_asset_is_a_noop() {
+        let (mut scene, id) = scene_with_image_layer();
+        let inverse = Box::new(SetImage {
+            layer: id,
+            image: ImageId::from_raw(u64::MAX),
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn set_image_bounds_round_trips() {
+        let (mut scene, id) = scene_with_image_layer();
+        let bounds = Rectangle::new(Point::new(1.0, 2.0), Size::new(30.0, 40.0));
+
+        assert_apply_then_undo_is_identity(
+            &mut scene,
+            Box::new(SetImageBounds { layer: id, bounds }),
+        );
+    }
+
+    #[test]
+    fn set_image_bounds_noops_on_identical_bounds() {
+        let (mut scene, id) = scene_with_image_layer();
+        let bounds = Rectangle::new(Point::new(1.0, 2.0), Size::new(30.0, 40.0));
+
+        let _ = Box::new(SetImageBounds { layer: id, bounds }).apply(&mut scene);
+        let inverse = Box::new(SetImageBounds { layer: id, bounds }).apply(&mut scene);
+
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn set_image_opacity_round_trips_and_clamps() {
+        let (mut scene, id) = scene_with_image_layer();
+
+        assert_apply_then_undo_is_identity(
+            &mut scene,
+            Box::new(SetImageOpacity {
+                layer: id,
+                opacity: 0.4,
+            }),
+        );
+
+        // Over-range opacity should be clamped to 1.0 when applied.
+        Box::new(SetImageOpacity {
+            layer: id,
+            opacity: 5.0,
+        })
+        .apply(&mut scene);
+        let Some(Layer {
+            kind: LayerInner::Image(image_layer),
+            ..
+        }) = scene.get_layer(id)
+        else {
+            panic!("expected image layer");
+        };
+        assert_eq!(image_layer.get_opacity(), 1.0);
+    }
+
+    #[test]
+    fn set_image_opacity_on_non_image_layer_is_a_noop() {
+        let (mut scene, id) = scene_with_tiles_layer();
+        let inverse = Box::new(SetImageOpacity {
+            layer: id,
+            opacity: 0.5,
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+}

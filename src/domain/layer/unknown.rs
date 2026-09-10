@@ -23,3 +23,32 @@ impl LayerInnerImpl for UnknownLayer {
 
     fn draw(&self, _renderer: &mut dyn RenderTarget) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::render::MockRenderer;
+
+    #[test]
+    fn is_never_given_bounds() {
+        let layer = UnknownLayer {
+            kind: "future-layer-type".into(),
+            raw: vec![1, 2, 3],
+        };
+        assert!(layer.bounds(16.0).is_none());
+    }
+
+    #[test]
+    fn draw_is_a_true_no_op() {
+        let layer = UnknownLayer {
+            kind: "future-layer-type".into(),
+            raw: vec![],
+        };
+        let mut renderer = MockRenderer::default();
+        layer.draw(&mut renderer);
+
+        assert!(renderer.fills.is_empty());
+        assert!(renderer.strokes.is_empty());
+        assert!(renderer.images.is_empty());
+    }
+}

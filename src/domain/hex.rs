@@ -229,3 +229,150 @@ pub fn flood_fill(start: HexCoord, tiles: &HashSet<HexCoord>) -> Option<HashSet<
 
     Some(visited)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn c(col: i32, row: i32) -> HexCoord {
+        HexCoord { col, row }
+    }
+
+    #[test]
+    fn neighbors_use_the_documented_offsets() {
+        let got = c(0, 0).neighbors();
+        let expected = [c(1, 0), c(1, -1), c(0, -1), c(-1, 0), c(-1, 1), c(0, 1)];
+        assert_eq!(got, expected);
+
+        // Neighbors are relative, not absolute - check translation holds too.
+        let got = c(5, -3).neighbors();
+        let expected = [c(6, -3), c(6, -4), c(5, -4), c(4, -3), c(4, -2), c(5, -2)];
+        assert_eq!(got, expected);
+    }
+
+    #[test]
+    fn cartesian_round_trip_is_exact_for_integer_coords() {
+        for coord in [
+            c(0, 0),
+            c(1, 0),
+            c(0, 1),
+            c(-1, 2),
+            c(3, -2),
+            c(5, 5),
+            c(-4, -4),
+            c(10, -7),
+        ] {
+            let round_tripped = HexCoord::from_cartesian(coord.to_cartesian());
+            assert_eq!(
+                round_tripped, coord,
+                "round-trip failed for {coord:?} (got {round_tripped:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn from_cartesian_snaps_to_nearest_hex() {
+        // The centre of a hex should always map back to itself, and a point
+        // nudged slightly off-centre should still snap to that same hex.
+        let centre = c(2, -1).to_cartesian();
+        let nudged = iced::Vector::new(centre.x + 0.05, centre.y - 0.05);
+        assert_eq!(HexCoord::from_cartesian(nudged), c(2, -1));
+    }
+
+    #[test]
+    fn bounds_contains_is_inclusive_of_edges() {
+        let bounds = HexBounds::new(0, 2, 0, 2);
+        assert!(bounds.contains(c(0, 0)));
+        assert!(bounds.contains(c(2, 2)));
+        assert!(bounds.contains(c(1, 1)));
+        assert!(!bounds.contains(c(3, 1)));
+        assert!(!bounds.contains(c(1, -1)));
+    }
+
+    #[test]
+    fn bounds_union_covers_both_inputs() {
+        let a = HexBounds::new(0, 2, 0, 2);
+        let b = HexBounds::new(5, 7, -3, 1);
+        let union = a.union(&b);
+
+        assert!(union.contains(c(0, 0)));
+        assert!(union.contains(c(7, -3)));
+    }
+
+    #[test]
+    fn bounds_expand_grows_symmetrically_and_shrink_with_negative() {
+        let bounds = HexBounds::new(0, 2, 0, 2);
+        let grown = bounds.expand(1);
+        assert!(grown.contains(c(-1, -1)));
+        assert!(grown.contains(c(3, 3)));
+
+        let shrunk = bounds.expand(-1);
+        assert!(!shrunk.contains(c(0, 1)));
+        assert!(shrunk.contains(c(1, 1)));
+    }
+
+    #[test]
+    fn bounds_translate_x_only_moves_columns() {
+        let bounds = HexBounds::new(0, 2, 0, 2);
+        let moved = bounds.translate_x(3);
+        assert!(moved.contains(c(3, 0)));
+        assert!(moved.contains(c(5, 2)));
+        assert!(!moved.contains(c(0, 0)));
+    }
+
+    #[test]
+    fn from_hexes_computes_the_bounding_box() {
+        let bounds = HexBounds::from_hexes([c(0, 0), c(2, 3), c(-1, 5)]).unwrap();
+        assert!(bounds.contains(c(-1, 0)));
+        assert!(bounds.contains(c(2, 5)));
+        assert!(!bounds.contains(c(-2, 0)));
+        assert!(!bounds.contains(c(3, 0)));
+    }
+
+    #[test]
+    fn from_hexes_of_empty_iterator_is_none() {
+        assert!(HexBounds::from_hexes(std::iter::empty()).is_none());
+    }
+
+    #[test]
+    fn into_hexes_enumerates_every_cell_in_the_box() {
+        let hexes: Vec<_> = HexBounds::new(0, 1, 0, 1).into_hexes().collect();
+        assert_eq!(hexes, vec![c(0, 0), c(0, 1), c(1, 0), c(1, 1)]);
+    }
+
+    #[test]
+    fn flood_fill_of_empty_tile_set_is_none() {
+        let tiles: HashSet<HexCoord> = HashSet::new();
+        assert!(flood_fill(c(0, 0), &tiles).is_none());
+    }
+
+    #[test]
+    fn flood_fill_stops_at_a_bounded_hole() {
+        // A ring of painted tiles around an empty centre: filling from the
+        // centre should only ever touch the centre itself, since every
+        // neighbor is painted (a different "state") and the flood never
+        // needs to leave the ring's own bounding box.
+        let ring: HashSet<HexCoord> = c(0, 0).neighbors().into_iter().collect();
+
+        let filled = flood_fill(c(0, 0), &ring).expect("hole is bounded by the ring");
+        assert_eq!(filled, HashSet::from([c(0, 0)]));
+    }
+
+    #[test]
+    fn flood_fill_returns_none_when_it_escapes_the_bounding_box() {
+        // The painted set is a single, distant tile - its bounding box is
+        // just that one cell, so starting anywhere else immediately falls
+        // outside the bounds and the fill is reported as unbounded.
+        let tiles: HashSet<HexCoord> = HashSet::from([c(0, 0)]);
+        assert!(flood_fill(c(5, 5), &tiles).is_none());
+    }
+
+    #[test]
+    fn flood_fill_of_a_fully_painted_region_covers_it_exactly() {
+        // Filling from an already-painted tile should walk the whole
+        // painted region (its own bounding box) and nothing more.
+        let tiles: HashSet<HexCoord> = HashSet::from([c(0, 0), c(1, 0), c(1, -1)]);
+        let filled = flood_fill(c(0, 0), &tiles).expect("painted region is its own bounds");
+        assert_eq!(filled, tiles);
+    }
+}
