@@ -37,11 +37,12 @@ pub fn decode_image_asset(bytes: Vec<u8>, name: String) -> Result<ImageAsset, St
 
     let width = image.width();
     let height = image.height();
+    let data = image.into_rgba8().into_raw();
 
     Ok(ImageAsset {
         encoded: bytes,
         extension,
-        data: image.into_bytes(),
+        data,
         width,
         height,
         name,
