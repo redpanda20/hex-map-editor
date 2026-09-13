@@ -1,5 +1,5 @@
 use iced::{
-    Color, Element, Length, Task, alignment,
+    Element, Length, Padding, Task, alignment, color,
     widget::{
         Button, Text, button, column, container, mouse_area, pick_list, row, rule, scrollable,
         space, text,
@@ -11,14 +11,20 @@ use crate::{
     app::{Action::SetLayer, Message},
     domain::{
         Layer, LayerInner, LayerKind, Scene,
-        edit::{MoveLayerTo, PushLayer, RemoveLayer, SetVisible},
+        edit::{MoveLayerTo, PushLayer, RemoveLayer, Rename, SetVisible},
         id::LayerId,
     },
+    theme,
+    ui::widgets::text_field,
 };
 
 #[derive(Debug, Clone)]
 pub enum LayersMessage {
     ChangeLayerType { kind: LayerKind },
+
+    LayerEnter { layer: LayerId },
+    LayerExit { layer: LayerId },
+
     DragLayerPick { picked: LayerId },
     DragLayerDropped { dropped: LayerId },
     DragLayerCancelled,
@@ -28,12 +34,21 @@ pub enum LayersMessage {
 pub struct Layers {
     active_layer_type: LayerKind,
     dragged_layer: Option<LayerId>,
+    hovered_layer: Option<LayerId>,
 }
 
 impl Layers {
     pub fn update(&mut self, message: LayersMessage) -> Task<Message> {
         match message {
             LayersMessage::ChangeLayerType { kind } => self.active_layer_type = kind,
+
+            LayersMessage::LayerEnter { layer } => self.hovered_layer = Some(layer),
+            LayersMessage::LayerExit { layer } => {
+                if self.hovered_layer == Some(layer) {
+                    self.hovered_layer = None
+                }
+            }
+
             LayersMessage::DragLayerPick { picked } => self.dragged_layer = Some(picked),
             LayersMessage::DragLayerCancelled => self.dragged_layer = None,
             LayersMessage::DragLayerDropped { dropped } => {
@@ -57,12 +72,9 @@ impl Layers {
         active_layer: Option<LayerId>,
     ) -> Element<'a, Message> {
         // Draw a bar containing general layer info
-        let content = column(
-            scene
-                .inner
-                .iter()
-                .map(|layer| layer_preview(layer, active_layer, self.dragged_layer)),
-        )
+        let content = column(scene.inner.iter().map(|layer| {
+            layer_preview(layer, active_layer, self.dragged_layer, self.hovered_layer)
+        }))
         .spacing(4.0)
         .height(Length::Fill);
 
@@ -95,6 +107,7 @@ fn layer_preview<'a>(
     layer: &'a Layer,
     active_layer: Option<LayerId>,
     dragged_layer: Option<LayerId>,
+    hovered_layer: Option<LayerId>,
 ) -> Element<'a, Message> {
     let Layer {
         id,
@@ -105,17 +118,26 @@ fn layer_preview<'a>(
 
     let is_active = Some(*id) == active_layer;
     let is_dragged = Some(*id) == dragged_layer;
+    let is_hovered = Some(*id) == hovered_layer;
 
     let content = container(
         row![
-            drag_handle(id),
-            visible_toggle(id, visible),
+            if is_hovered {
+                Some(drag_handle(id))
+            } else {
+                None
+            },
             thumbnail(kind),
-            text(name),
+            text_field(name, move |value| Rename {
+                id: *id,
+                name: value.to_string()
+            }
+            .into()),
             space::horizontal(),
-            delete_button(id)
+            visible_toggle(id, visible),
         ]
         .align_y(alignment::Vertical::Center)
+        .padding(Padding::from([4, 8]))
         .spacing(8),
     )
     .style(match (is_active, is_dragged) {
@@ -126,6 +148,8 @@ fn layer_preview<'a>(
 
     mouse_area(content)
         .on_press(Message::Action(SetLayer(Some(*id))))
+        .on_enter(Message::Layers(LayersMessage::LayerEnter { layer: *id }))
+        .on_exit(Message::Layers(LayersMessage::LayerExit { layer: *id }))
         .on_release(Message::Layers(LayersMessage::DragLayerDropped {
             dropped: *id,
         }))
@@ -155,38 +179,18 @@ fn visible_toggle<'a>(id: &LayerId, visible: &bool) -> Button<'a, Message> {
     )
 }
 
-fn delete_button<'a>(id: &LayerId) -> Button<'a, Message> {
-    button(bootstrap::trash_fill())
-        .on_press(RemoveLayer { id: *id }.into())
-        .style(button::danger)
-}
+// fn delete_button<'a>(id: &LayerId) -> Button<'a, Message> {
+//     button(bootstrap::trash_fill())
+//         .on_press(RemoveLayer { id: *id }.into())
+//         .style(button::warning)
+// }
 
 fn thumbnail<'a>(kind: &LayerInner) -> Text<'a> {
     match kind {
-        LayerInner::Tiles(tiles) => match (tiles.is_empty(), tiles.is_inverted()) {
-            (_, true) => bootstrap::hexagon_fill(),
-            (true, _) => bootstrap::hexagon(),
-            (false, _) => bootstrap::hexagon(),
-        }
-        .color(tiles.colour.opaque()),
-        LayerInner::Perlin(_) => bootstrap::sliderstwo(),
+        LayerInner::Tiles(_) => bootstrap::grid_threexthree_gap_fill().color(color!(0xEF9F27)),
+        LayerInner::Perlin(_) => bootstrap::cloud().color(color!(0x7F77DD)),
         LayerInner::Image(_) => bootstrap::image(),
-        LayerInner::Unknown(_) => bootstrap::question_diamond(),
-    }
-}
-
-trait ColorExt {
-    fn opaque(self) -> Self;
-}
-
-impl ColorExt for Color {
-    fn opaque(self) -> Self {
-        Color {
-            r: self.r,
-            g: self.g,
-            b: self.b,
-            a: 1.0,
-        }
+        LayerInner::Unknown(_) => bootstrap::question_diamond().color(theme::raw::DANGER),
     }
 }
 

@@ -4,7 +4,7 @@ use iced::theme::{
 };
 
 #[allow(unused)]
-mod raw {
+pub mod raw {
     use iced::{Color, color};
 
     // App surface
