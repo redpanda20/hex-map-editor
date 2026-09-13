@@ -4,6 +4,7 @@
 mod app;
 pub mod domain;
 pub mod infrastructure;
+pub mod theme;
 pub mod ui;
 
 use app::App;

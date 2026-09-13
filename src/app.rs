@@ -14,6 +14,7 @@ use crate::{
         Document, IoProcess, export_png, load_image_async, load_project_async, save_bytes_async,
         save_project_async,
     },
+    theme,
     ui::{
         About, AboutMessage, CanvasEvent, Inspector, InspectorMessage, KeybindMessage, Keybinds,
         Layers, LayersMessage, Panes, PanesMessage, ToastMessage, Toasts, Toolbar, ToolbarMessage,
@@ -93,7 +94,8 @@ impl App {
     }
 
     pub fn theme(&self) -> Option<Theme> {
-        None
+        let theme = Theme::custom("Hexmap Theme", theme::PALETTE);
+        Some(theme)
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
