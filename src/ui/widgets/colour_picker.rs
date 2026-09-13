@@ -1,5 +1,3 @@
-#! Colour picker widget
-
 use iced::{
     Color, Element, Length, Point, Renderer, Theme, mouse,
     widget::{

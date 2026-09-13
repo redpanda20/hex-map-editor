@@ -1,10 +1,3 @@
-use iced::{
-    Alignment, Color, Element, Length, Padding, Point, Size, Task, alignment,
-    widget::{Row, button, column, row, rule, slider, space, text, text_input},
-};
-use iced_fonts::bootstrap;
-use rand::random;
-
 use crate::{
     app::Message,
     domain::{
@@ -21,16 +14,21 @@ use crate::{
         },
     },
     infrastructure::IoProcess,
-    ui::colour_picker,
+    ui::{Property, colour_picker, text_field},
 };
+use iced::{
+    Alignment, Color, Element, Length, Padding, Point, Size, Task,
+    widget::{Row, button, column, container, row, rule, slider, space, text, text_input},
+};
+use iced_fonts::bootstrap;
+use rand::random;
 
 #[derive(Debug, Clone)]
 pub enum InspectorMessage {
     Clear,
+    Changed,
 
-    LayerRename(Option<String>),
-    LayerRenameCommit { id: LayerId },
-    LayerRenameStart(String),
+    LayerNameCommit { id: LayerId },
 
     ColourChange { colour: Color },
     ColourCommit { id: LayerId },
@@ -50,7 +48,7 @@ pub enum InspectorMessage {
 
 #[derive(Debug, Default, Clone)]
 pub struct Inspector {
-    active_layer_name: Option<String>,
+    layer_name: Property<String>,
     active_colour: Option<Color>,
     active_noise_params: Option<NoiseParams>,
     active_opacity: Option<f32>,
@@ -62,24 +60,16 @@ impl Inspector {
     pub fn update(&mut self, message: InspectorMessage) -> Task<Message> {
         match message {
             InspectorMessage::Clear => {
-                self.active_layer_name = None;
                 self.active_colour = None;
                 self.active_noise_params = None
             }
-            InspectorMessage::LayerRename(new_name) => self.active_layer_name = new_name,
-            InspectorMessage::LayerRenameStart(name) => self.active_layer_name = Some(name),
-            InspectorMessage::LayerRenameCommit { id } => {
-                if let Some(name) = &self.active_layer_name {
-                    return Task::done(
-                        Rename {
-                            id,
-                            name: name.to_string(),
-                        }
-                        .into(),
-                    )
-                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+            InspectorMessage::Changed => {}
+            InspectorMessage::LayerNameCommit { id } => {
+                if let Some(name) = self.layer_name.take() {
+                    return Task::done(Rename { id, name }.into());
                 }
             }
+
             InspectorMessage::ColourChange { colour } => self.active_colour = Some(colour),
             InspectorMessage::ColourCommit { id } => {
                 if let Some(colour) = &self.active_colour {
@@ -169,7 +159,14 @@ impl Inspector {
         } = layer;
 
         column![
-            name_input(*id, name, &self.active_layer_name).map(Message::Inspector),
+            container(text_field(&self.layer_name, name, move |new_name| {
+                Rename {
+                    id: *id,
+                    name: new_name.to_string(),
+                }
+                .into()
+            }))
+            .center_x(Length::Fill),
             visible_toggle(*id, visible),
             match kind {
                 LayerInner::Tiles(tiles) => self.details_tiles(*id, tiles),
@@ -184,41 +181,6 @@ impl Inspector {
         ]
         .into()
     }
-}
-
-fn name_input<'a>(
-    id: LayerId,
-    starting_name: &str,
-    name: &Option<String>,
-) -> Element<'a, InspectorMessage> {
-    if let Some(name) = name {
-        row![
-            bootstrap::input_cursor().style(text::secondary),
-            text_input("Layer name...", name)
-                .on_input(|s| InspectorMessage::LayerRename(Some(s)))
-                .on_submit(InspectorMessage::LayerRenameCommit { id })
-                .width(Length::Fill)
-                .align_x(alignment::Horizontal::Center)
-        ]
-        .spacing(4.0)
-        .align_y(alignment::Vertical::Center)
-    } else {
-        row![
-            space::horizontal(),
-            button(
-                row![
-                    bootstrap::input_cursor().style(text::secondary),
-                    text(starting_name.to_owned()).height(20.0)
-                ]
-                .spacing(4.0)
-                .align_y(alignment::Vertical::Center),
-            )
-            .on_press(InspectorMessage::LayerRenameStart(starting_name.to_owned()))
-            .style(button::text),
-            space::horizontal()
-        ]
-    }
-    .into()
 }
 
 fn visible_toggle<'a>(id: LayerId, visible: &bool) -> Row<'a, Message> {
