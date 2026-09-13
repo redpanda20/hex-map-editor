@@ -35,7 +35,7 @@ A few things worth a closer look if you're browsing the source:
 
 - **Self-inverting edit commands.** Every edit (`domain/edit.rs`) is a small command object that returns its own inverse when applied. Undo/redo (`domain/history.rs`) falls out of this for free, with no separate snapshot or diffing system needed.
 - **Versioned save format.** Projects are saved as a zip archive of small JSON manifests plus binary resources (`infrastructure/schema/`). The format carries an explicit version number and degrades gracefully when loading a file with unknown layer or resource kinds, instead of hard failing.
-- **A hand-rolled GPU rendering pipeline.** The map canvas (`ui/canvas/gpu.rs`) drives `wgpu` directly with custom vertex/fragment shaders (`mesh.wgsl`, `image.wgsl`) and a texture cache, rather than relying on a higher-level 2D drawing API.
+- **A hand-rolled GPU rendering pipeline.** The map canvas (`ui/canvas.rs`) drives `wgpu` directly with custom vertex/fragment shaders (`mesh.wgsl`, `image.wgsl`) and a texture cache, rather than relying on a higher-level 2D drawing API.
 - **Correct hex-grid math.** Axial <-> cartesian conversion, cube-coordinate rounding for pixel-to-hex picking, and a capped flood fill for the paint bucket tool (`domain/hex.rs`), so a very large fill can't hang the editor.
 - **One codebase, two targets.** The same code compiles to a native desktop app and to WebAssembly for the browser, deployed automatically to GitHub Pages on every push (`.github/workflows/pages.yml`).
 
