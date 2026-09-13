@@ -1,6 +1,6 @@
 use iced::{
     Alignment, Color, Element, Length, Padding, Rectangle, Task, alignment,
-    widget::{Row, button, column, container, row, rule, slider, space, text, text_input},
+    widget::{Row, button, column, row, rule, slider, space, text, text_input},
 };
 use iced_fonts::bootstrap;
 use rand::random;
@@ -196,15 +196,11 @@ impl Inspector {
         active_layer: Option<LayerId>,
     ) -> Element<'a, Message> {
         let Some(layer) = active_layer.and_then(|id| scene.get_layer(id)) else {
-            return container(
-                column![rule::horizontal(1), text("No layer selected"),]
-                    .height(Length::Fill)
-                    .width(Length::Fill)
-                    .spacing(8.0)
-                    .padding(8.0),
-            )
-            .style(container::bordered_box)
-            .into();
+            return column![rule::horizontal(1), text("No layer selected"),]
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .spacing(8.0)
+                .into();
         };
 
         let Layer {
@@ -214,7 +210,7 @@ impl Inspector {
             kind,
         } = layer;
 
-        container(column![
+        column![
             name_input(*id, name, &self.active_layer_name).map(Message::Inspector),
             visible_toggle(*id, visible),
             match kind {
@@ -227,8 +223,7 @@ impl Inspector {
                 ))
                 .into(),
             },
-        ])
-        .style(container::bordered_box)
+        ]
         .into()
     }
 }

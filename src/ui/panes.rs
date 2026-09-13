@@ -1,4 +1,7 @@
-use iced::{Element, widget::pane_grid};
+use iced::{
+    Element,
+    widget::{container, pane_grid},
+};
 
 use crate::{app::Message, domain::Scene};
 
@@ -48,7 +51,7 @@ impl Panes {
                 PaneKind::Toolbar => toolbar(scene),
                 PaneKind::LayerStack => layers(scene),
                 PaneKind::Canvas => canvas(scene),
-                PaneKind::Inspector => inspector(scene),
+                PaneKind::Inspector => wrap_with_pane(inspector(scene)),
             };
 
             pane_grid::Content::new(inner)
@@ -91,4 +94,11 @@ impl Default for Panes {
 
         Self::new_with(config)
     }
+}
+
+pub fn wrap_with_pane<'a>(inner: Element<'a, Message>) -> Element<'a, Message> {
+    container(inner)
+        .padding(8.0)
+        .style(container::bordered_box)
+        .into()
 }
