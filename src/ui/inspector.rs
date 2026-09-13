@@ -14,7 +14,7 @@ use crate::{
         },
     },
     infrastructure::IoProcess,
-    ui::{Property, colour_picker, text_field},
+    ui::{colour_picker, text_field},
 };
 use iced::{
     Alignment, Color, Element, Length, Padding, Point, Size, Task,
@@ -26,9 +26,6 @@ use rand::random;
 #[derive(Debug, Clone)]
 pub enum InspectorMessage {
     Clear,
-    Changed,
-
-    LayerNameCommit { id: LayerId },
 
     ColourChange { colour: Color },
     ColourCommit { id: LayerId },
@@ -48,7 +45,6 @@ pub enum InspectorMessage {
 
 #[derive(Debug, Default, Clone)]
 pub struct Inspector {
-    layer_name: Property<String>,
     active_colour: Option<Color>,
     active_noise_params: Option<NoiseParams>,
     active_opacity: Option<f32>,
@@ -62,12 +58,6 @@ impl Inspector {
             InspectorMessage::Clear => {
                 self.active_colour = None;
                 self.active_noise_params = None
-            }
-            InspectorMessage::Changed => {}
-            InspectorMessage::LayerNameCommit { id } => {
-                if let Some(name) = self.layer_name.take() {
-                    return Task::done(Rename { id, name }.into());
-                }
             }
 
             InspectorMessage::ColourChange { colour } => self.active_colour = Some(colour),
@@ -159,7 +149,7 @@ impl Inspector {
         } = layer;
 
         column![
-            container(text_field(&self.layer_name, name, move |new_name| {
+            container(text_field(name, move |new_name| {
                 Rename {
                     id: *id,
                     name: new_name.to_string(),

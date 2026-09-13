@@ -21,4 +21,4 @@ pub use toasts::{ToastMessage, Toasts};
 
 // Widgets
 mod widgets;
-use widgets::{Property, colour_picker, text_field};
+use widgets::{colour_picker, text_field};
