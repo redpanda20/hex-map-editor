@@ -1,5 +1,5 @@
 use iced::{
-    Alignment, Color, Element, Length, Padding, Rectangle, Task, alignment,
+    Alignment, Color, Element, Length, Padding, Point, Size, Task, alignment,
     widget::{Row, button, column, row, rule, slider, space, text, text_input},
 };
 use iced_fonts::bootstrap;
@@ -10,8 +10,8 @@ use crate::{
     domain::{
         Layer, LayerInner, Scene,
         edit::{
-            Rename, SetColour, SetImageBounds, SetImageOpacity, SetNoiseParams, SetNoiseSeed,
-            SetVisible,
+            Rename, SetColour, SetImageOpacity, SetImagePosition, SetImageSize, SetNoiseParams,
+            SetNoiseSeed, SetVisible,
         },
         id::LayerId,
         layer::{
@@ -29,48 +29,23 @@ pub enum InspectorMessage {
     Clear,
 
     LayerRename(Option<String>),
-    LayerRenameCommit {
-        id: LayerId,
-    },
+    LayerRenameCommit { id: LayerId },
     LayerRenameStart(String),
 
-    ColourChange {
-        colour: Color,
-    },
-    ColourCommit {
-        id: LayerId,
-    },
+    ColourChange { colour: Color },
+    ColourCommit { id: LayerId },
 
-    NoiseParamsChange {
-        params: NoiseParams,
-    },
-    NoiseParamCommit {
-        id: LayerId,
-    },
+    NoiseParamsChange { params: NoiseParams },
+    NoiseParamCommit { id: LayerId },
 
-    ImageOpacityChange {
-        opacity: f32,
-    },
-    ImageOpacityCommit {
-        id: LayerId,
-    },
+    ImageOpacityChange { opacity: f32 },
+    ImageOpacityCommit { id: LayerId },
 
-    ImageXChange {
-        x_maybe: String,
-    },
-    ImageYChange {
-        y_maybe: String,
-    },
-    ImageWChange {
-        w_maybe: String,
-    },
-    ImageHChange {
-        h_maybe: String,
-    },
-    ImageBoundsCommit {
-        id: LayerId,
-        starting_bounds: Rectangle,
-    },
+    ImageSizeChange(Option<Size>),
+    ImageSizeCommit { id: LayerId },
+
+    ImagePositionChange(Option<Point>),
+    ImagePositionCommit { id: LayerId },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -79,10 +54,8 @@ pub struct Inspector {
     active_colour: Option<Color>,
     active_noise_params: Option<NoiseParams>,
     active_opacity: Option<f32>,
-    active_x: Option<f32>,
-    active_y: Option<f32>,
-    active_w: Option<f32>,
-    active_h: Option<f32>,
+    active_size: Option<Size>,
+    active_position: Option<Point>,
 }
 
 impl Inspector {
@@ -150,40 +123,25 @@ impl Inspector {
                 }
             }
 
-            InspectorMessage::ImageBoundsCommit {
-                id,
-                starting_bounds,
-            } => {
-                let x = self.active_x.unwrap_or(starting_bounds.x);
-                let y = self.active_y.unwrap_or(starting_bounds.y);
-                let width = self.active_w.unwrap_or(starting_bounds.width);
-                let height = self.active_h.unwrap_or(starting_bounds.height);
-
-                return Task::done(
-                    SetImageBounds {
-                        layer: id,
-                        bounds: Rectangle {
-                            x,
-                            y,
-                            width,
-                            height,
-                        },
-                    }
-                    .into(),
-                )
-                .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+            InspectorMessage::ImagePositionChange(position) => self.active_position = position,
+            InspectorMessage::ImagePositionCommit { id } => {
+                if let Some(position) = self.active_position {
+                    return Task::done(
+                        SetImagePosition {
+                            layer: id,
+                            position,
+                        }
+                        .into(),
+                    )
+                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+                }
             }
-            InspectorMessage::ImageXChange { x_maybe } => {
-                self.active_x = x_maybe.parse::<f32>().ok()
-            }
-            InspectorMessage::ImageYChange { y_maybe } => {
-                self.active_y = y_maybe.parse::<f32>().ok()
-            }
-            InspectorMessage::ImageWChange { w_maybe } => {
-                self.active_w = w_maybe.parse::<f32>().ok()
-            }
-            InspectorMessage::ImageHChange { h_maybe } => {
-                self.active_h = h_maybe.parse::<f32>().ok()
+            InspectorMessage::ImageSizeChange(size) => self.active_size = size,
+            InspectorMessage::ImageSizeCommit { id } => {
+                if let Some(size) = self.active_size {
+                    return Task::done(SetImageSize { layer: id, size }.into())
+                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
+                }
             }
         }
 
@@ -415,10 +373,8 @@ impl Inspector {
     }
 
     fn details_image(&self, id: LayerId, layer: &ImageLayer) -> Element<'_, Message> {
-        let x = self.active_x.unwrap_or(layer.bounds.x);
-        let y = self.active_y.unwrap_or(layer.bounds.y);
-        let width = self.active_w.unwrap_or(layer.bounds.width);
-        let height = self.active_h.unwrap_or(layer.bounds.height);
+        let Point { x, y } = self.active_position.unwrap_or(layer.position);
+        let Size { width, height } = self.active_size.unwrap_or(layer.size);
         let opacity = self.active_opacity.unwrap_or(layer.get_opacity());
 
         let image_control = row![
@@ -452,28 +408,22 @@ impl Inspector {
         .align_y(Alignment::Center);
 
         let x_control = text_input("0.0", &x.to_string())
-            .on_input(|x_maybe| Message::Inspector(InspectorMessage::ImageXChange { x_maybe }))
-            .on_submit(Message::Inspector(InspectorMessage::ImageBoundsCommit {
+            .on_input(move |x_maybe| {
+                let pos = x_maybe.parse::<f32>().ok().map(|x| Point { x, y });
+                Message::Inspector(InspectorMessage::ImagePositionChange(pos))
+            })
+            .on_submit(Message::Inspector(InspectorMessage::ImagePositionCommit {
                 id,
-                starting_bounds: Rectangle {
-                    x,
-                    y,
-                    width,
-                    height,
-                },
             }))
             .width(Length::Fill);
 
         let y_control = text_input("0.0", &y.to_string())
-            .on_input(|y_maybe| Message::Inspector(InspectorMessage::ImageYChange { y_maybe }))
-            .on_submit(Message::Inspector(InspectorMessage::ImageBoundsCommit {
+            .on_input(move |y_maybe| {
+                let pos = y_maybe.parse::<f32>().ok().map(|y| Point { x, y });
+                Message::Inspector(InspectorMessage::ImagePositionChange(pos))
+            })
+            .on_submit(Message::Inspector(InspectorMessage::ImagePositionCommit {
                 id,
-                starting_bounds: Rectangle {
-                    x,
-                    y,
-                    width,
-                    height,
-                },
             }))
             .width(Length::Fill);
 
@@ -488,29 +438,25 @@ impl Inspector {
         .padding(Padding::default().bottom(8));
 
         let width_control = text_input("0.0", &width.to_string())
-            .on_input(|w_maybe| Message::Inspector(InspectorMessage::ImageWChange { w_maybe }))
-            .on_submit(Message::Inspector(InspectorMessage::ImageBoundsCommit {
-                id,
-                starting_bounds: Rectangle {
-                    x,
-                    y,
-                    width,
-                    height,
-                },
-            }))
+            .on_input(move |w_maybe| {
+                let size = w_maybe
+                    .parse::<f32>()
+                    .ok()
+                    .map(|width| Size { width, height });
+                Message::Inspector(InspectorMessage::ImageSizeChange(size))
+            })
+            .on_submit(Message::Inspector(InspectorMessage::ImageSizeCommit { id }))
             .width(Length::Fill);
 
         let height_control = text_input("0.0", &height.to_string())
-            .on_input(|h_maybe| Message::Inspector(InspectorMessage::ImageHChange { h_maybe }))
-            .on_submit(Message::Inspector(InspectorMessage::ImageBoundsCommit {
-                id,
-                starting_bounds: Rectangle {
-                    x,
-                    y,
-                    width,
-                    height,
-                },
-            }))
+            .on_input(move |h_maybe| {
+                let size = h_maybe
+                    .parse::<f32>()
+                    .ok()
+                    .map(|height| Size { width, height });
+                Message::Inspector(InspectorMessage::ImageSizeChange(size))
+            })
+            .on_submit(Message::Inspector(InspectorMessage::ImageSizeCommit { id }))
             .width(Length::Fill);
 
         let size_control = row![

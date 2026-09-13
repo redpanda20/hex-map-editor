@@ -1,4 +1,4 @@
-use iced::{Color, Rectangle, Size, widget::image::Handle};
+use iced::{Color, Point, Size, widget::image::Handle};
 
 use crate::domain::{
     HexCoord, LayerInner, LayerKind, Scene, flood_fill,
@@ -146,9 +146,15 @@ pub struct SetImage {
 }
 
 #[derive(Debug, Clone)]
-pub struct SetImageBounds {
+pub struct SetImageSize {
     pub layer: LayerId,
-    pub bounds: Rectangle,
+    pub size: Size,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetImagePosition {
+    pub layer: LayerId,
+    pub position: Point,
 }
 
 #[derive(Debug, Clone)]
@@ -434,10 +440,9 @@ impl EditCommand for SetImageAndSize {
         };
 
         let prev_image = layer.image;
-        let prev_size = layer.bounds.size();
+        let prev_size = layer.size;
 
-        layer.bounds.width = self.size.width;
-        layer.bounds.height = self.size.height;
+        layer.size = self.size;
         layer.image = self.image;
 
         Box::new(SetImageAndSize {
@@ -474,11 +479,10 @@ impl EditCommand for SetImage {
         };
 
         let prev_image = layer.image;
-        let prev_size = layer.bounds.size();
+        let prev_size = layer.size;
 
         layer.image = Some(self.image);
-        layer.bounds.width = width;
-        layer.bounds.height = height;
+        layer.size = Size { width, height };
 
         Box::new(SetImageAndSize {
             layer: self.layer,
@@ -488,7 +492,7 @@ impl EditCommand for SetImage {
     }
 }
 
-impl EditCommand for SetImageBounds {
+impl EditCommand for SetImageSize {
     fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
         let Some(Layer {
             kind: LayerInner::Image(layer),
@@ -497,16 +501,41 @@ impl EditCommand for SetImageBounds {
         else {
             return Box::new(NoOp);
         };
-        if self.bounds == layer.bounds {
+
+        if self.size == layer.size {
             return Box::new(NoOp);
         }
 
-        let prev = layer.bounds;
-        layer.bounds = self.bounds;
+        let prev = layer.size;
+        layer.size = self.size;
 
-        Box::new(SetImageBounds {
+        Box::new(SetImageSize {
             layer: self.layer,
-            bounds: prev,
+            size: prev,
+        })
+    }
+}
+
+impl EditCommand for SetImagePosition {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Image(layer),
+            ..
+        }) = scene.get_layer_mut(self.layer)
+        else {
+            return Box::new(NoOp);
+        };
+
+        if self.position == layer.position {
+            return Box::new(NoOp);
+        }
+
+        let prev = layer.position;
+        layer.position = self.position;
+
+        Box::new(SetImagePosition {
+            layer: self.layer,
+            position: prev,
         })
     }
 }
@@ -538,7 +567,7 @@ impl EditCommand for SetImageOpacity {
 mod tests {
     use std::collections::HashSet;
 
-    use iced::{Color, Point, Rectangle, Size};
+    use iced::{Color, Point, Size};
 
     use super::*;
     use crate::domain::assets::ImageAsset;
@@ -997,8 +1026,8 @@ mod tests {
             panic!("expected image layer");
         };
         assert_eq!(image_layer.image, Some(image_id));
-        assert_eq!(image_layer.bounds.width, 8.0);
-        assert_eq!(image_layer.bounds.height, 6.0);
+        assert_eq!(image_layer.size.width, 8.0);
+        assert_eq!(image_layer.size.height, 6.0);
     }
 
     #[test]
@@ -1013,23 +1042,55 @@ mod tests {
     }
 
     #[test]
-    fn set_image_bounds_round_trips() {
+    fn set_image_size_round_trips() {
         let (mut scene, id) = scene_with_image_layer();
-        let bounds = Rectangle::new(Point::new(1.0, 2.0), Size::new(30.0, 40.0));
+        // let bounds = Rectangle::new(Point::new(1.0, 2.0), Size::new(30.0, 40.0));
+        let size = Size::new(30.0, 40.0);
+
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(SetImageSize { layer: id, size }));
+    }
+
+    #[test]
+    fn set_image_size_noops_on_identical_bounds() {
+        let (mut scene, id) = scene_with_image_layer();
+        // let bounds = Rectangle::new(Point::new(1.0, 2.0), Size::new(30.0, 40.0));
+        let size = Size::new(30.0, 40.0);
+
+        let _ = Box::new(SetImageSize { layer: id, size }).apply(&mut scene);
+        let inverse = Box::new(SetImageSize { layer: id, size }).apply(&mut scene);
+
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn set_image_position_round_trips() {
+        let (mut scene, id) = scene_with_image_layer();
+        let position = Point::new(1.0, 2.0);
 
         assert_apply_then_undo_is_identity(
             &mut scene,
-            Box::new(SetImageBounds { layer: id, bounds }),
+            Box::new(SetImagePosition {
+                layer: id,
+                position,
+            }),
         );
     }
 
     #[test]
-    fn set_image_bounds_noops_on_identical_bounds() {
+    fn set_image_position_noops_on_identical_bounds() {
         let (mut scene, id) = scene_with_image_layer();
-        let bounds = Rectangle::new(Point::new(1.0, 2.0), Size::new(30.0, 40.0));
+        let position = Point::new(1.0, 2.0);
 
-        let _ = Box::new(SetImageBounds { layer: id, bounds }).apply(&mut scene);
-        let inverse = Box::new(SetImageBounds { layer: id, bounds }).apply(&mut scene);
+        let _ = Box::new(SetImagePosition {
+            layer: id,
+            position,
+        })
+        .apply(&mut scene);
+        let inverse = Box::new(SetImagePosition {
+            layer: id,
+            position,
+        })
+        .apply(&mut scene);
 
         assert!(inverse.is_noop());
     }

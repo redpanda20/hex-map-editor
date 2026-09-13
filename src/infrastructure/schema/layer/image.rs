@@ -1,4 +1,4 @@
-use iced::Rectangle;
+use iced::{Point, Rectangle, Size};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{id::ImageId, layer::image::ImageLayer};
@@ -9,6 +9,17 @@ pub struct RectangleV1 {
     pub y: f32,
     pub width: f32,
     pub height: f32,
+}
+
+impl RectangleV1 {
+    fn position(&self) -> Point {
+        let Self { x, y, .. } = *self;
+        Point { x, y }
+    }
+    fn size(&self) -> Size {
+        let Self { width, height, .. } = *self;
+        Size { width, height }
+    }
 }
 
 impl From<Rectangle> for RectangleV1 {
@@ -48,7 +59,7 @@ impl From<&ImageLayer> for ImageLayerV1 {
     fn from(layer: &ImageLayer) -> Self {
         ImageLayerV1 {
             resource: layer.image.map(ImageId::raw),
-            bounds: layer.bounds.into(),
+            bounds: layer.get_bounds().into(),
             opacity: layer.get_opacity(),
         }
     }
@@ -64,7 +75,8 @@ impl ImageLayerV1 {
             Some(id) => ImageLayer::new_with(id),
             None => ImageLayer::new(),
         };
-        layer.bounds = self.bounds.into();
+        layer.position = self.bounds.position();
+        layer.size = self.bounds.size();
         layer.set_opacity(self.opacity);
         layer
     }
