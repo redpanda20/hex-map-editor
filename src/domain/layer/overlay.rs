@@ -58,7 +58,7 @@ impl LayerInnerImpl for HexGridOverlay {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::render::MockRenderer;
+    use crate::domain::ports::MockRenderer;
 
     #[test]
     fn dark_variant_is_a_translucent_black() {

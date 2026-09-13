@@ -27,7 +27,7 @@ impl LayerInnerImpl for UnknownLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::render::MockRenderer;
+    use crate::domain::ports::MockRenderer;
 
     #[test]
     fn is_never_given_bounds() {

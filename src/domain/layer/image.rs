@@ -56,7 +56,7 @@ mod tests {
     use iced::Point;
 
     use super::*;
-    use crate::domain::render::MockRenderer;
+    use crate::domain::ports::MockRenderer;
 
     #[test]
     fn new_layer_has_no_image_and_full_opacity() {

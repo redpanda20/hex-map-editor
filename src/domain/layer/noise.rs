@@ -221,7 +221,7 @@ impl Debug for PerlinNoiseLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::render::MockRenderer;
+    use crate::domain::ports::MockRenderer;
 
     #[test]
     fn get_and_set_seed_round_trip() {

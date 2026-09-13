@@ -121,7 +121,7 @@ mod tests {
     use iced::Color;
 
     use super::*;
-    use crate::domain::render::MockRenderer;
+    use crate::domain::ports::MockRenderer;
 
     fn coord(col: i32, row: i32) -> HexCoord {
         HexCoord { col, row }

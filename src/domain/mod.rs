@@ -5,9 +5,10 @@ mod hex;
 pub mod history;
 pub mod id;
 pub mod layer;
-mod render;
 mod scene;
 mod tool;
+
+mod ports;
 
 pub use hex::{HexBounds, HexCoord, flood_fill};
 
@@ -18,7 +19,7 @@ pub use tool::Tool;
 pub use edit::EditCommand;
 pub use history::History;
 pub use layer::{Layer, LayerInner, LayerKind};
-pub use render::RenderTarget;
+pub use ports::RenderTarget;
 
 /// End-to-end workflow tests that exercise `History` + `Scene` +
 /// `EditCommand` together, the way `App::update` does in practice, rather
