@@ -15,7 +15,7 @@ use crate::{
         id::LayerId,
     },
     theme,
-    ui::widgets::text_field,
+    ui::widgets::{context_menu, text_field},
 };
 
 #[derive(Debug, Clone)]
@@ -146,14 +146,37 @@ fn layer_preview<'a>(
         (false, false) => container::transparent,
     });
 
-    mouse_area(content)
+    let row = mouse_area(content)
         .on_press(Message::Action(SetLayer(Some(*id))))
         .on_enter(Message::Layers(LayersMessage::LayerEnter { layer: *id }))
         .on_exit(Message::Layers(LayersMessage::LayerExit { layer: *id }))
         .on_release(Message::Layers(LayersMessage::DragLayerDropped {
             dropped: *id,
-        }))
-        .into()
+        }));
+
+    context_menu(row, move || layer_context_menu(*id))
+}
+
+fn layer_context_menu<'a>(id: LayerId) -> Element<'a, Message> {
+    container(
+        column![
+            text("Layer menu"),
+            rule::horizontal(1),
+            // Duplicate layer
+            //
+            // Lock layer
+            //
+            button(text("Delete layer"))
+                .width(Length::Fill)
+                .style(button::warning)
+                .on_press(RemoveLayer { id }.into()),
+        ]
+        .spacing(4),
+    )
+    .style(container::bordered_box)
+    .padding(4)
+    .width(Length::Fixed(160.0))
+    .into()
 }
 
 fn drag_handle<'a>(id: &LayerId) -> Element<'a, Message> {
@@ -178,12 +201,6 @@ fn visible_toggle<'a>(id: &LayerId, visible: &bool) -> Button<'a, Message> {
         .into(),
     )
 }
-
-// fn delete_button<'a>(id: &LayerId) -> Button<'a, Message> {
-//     button(bootstrap::trash_fill())
-//         .on_press(RemoveLayer { id: *id }.into())
-//         .style(button::warning)
-// }
 
 fn thumbnail<'a>(kind: &LayerInner) -> Text<'a> {
     match kind {

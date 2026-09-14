@@ -14,7 +14,7 @@ use crate::{
         },
     },
     infrastructure::IoProcess,
-    ui::{colour_picker, text_field},
+    ui::widgets::{colour_picker, text_field},
 };
 use iced::{
     Alignment, Color, Element, Length, Padding, Point, Size, Task,

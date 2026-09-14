@@ -66,6 +66,7 @@ impl<'a> TextField<'a> {
 
 fn idle_content<'a>(value: &'a str) -> Element<'a, Internal> {
     let text_content = column![
+        // TODO: Unbake this value
         // 19.0 happens to be the height that matches text_input
         text(value).height(19.0),
         container(space())
