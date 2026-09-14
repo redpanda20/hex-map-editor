@@ -1,3 +1,5 @@
+//!
+
 use iced::{
     Color, Element, Length, Point, Renderer, Theme, mouse,
     widget::{
@@ -9,6 +11,11 @@ use iced::{
 
 use crate::{app::Message, domain::colour::Hsva};
 
+/// Creates a context-aware bundle of widget's for editing a `Color`.
+///
+/// - [`SaturationValuePicker`]. A box for picking saturation & value.
+/// - [`HuePicker`]. A slider strip for picking hue.
+/// - [`AlphaPicker`]. A slider strip for picking alpha.
 pub fn colour_picker<'a>(
     colour: Color,
     on_change: impl Fn(Color) -> Message + 'a + Copy,

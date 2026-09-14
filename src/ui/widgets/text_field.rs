@@ -1,10 +1,3 @@
-//! A "field" is a UI widget that persists a starting value until
-//! a user chooses to edit it, where it will persist changes
-//!
-//! A "field" is a UI widget that elides it's active state,
-//! only ommiting messages `on_submit`. This is to reduce UI
-//! state that is passed between messages.
-
 use iced::advanced::text::Renderer as TextRenderer;
 use iced::advanced::widget::{Operation, Tree, tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};

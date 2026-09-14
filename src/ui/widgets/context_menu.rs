@@ -1,5 +1,3 @@
-//! A wrapper that shows a floating menu when its content is right-clicked.
-
 use iced::advanced::widget::{Operation, Tree, tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, overlay, renderer};
 use iced::{
@@ -9,6 +7,8 @@ use iced::{
 
 use crate::app::Message;
 
+/// Creates a [`ContextMenu`] widget.
+///
 /// Displays `menu` at the cursor position when `content` is right clicked.
 pub fn context_menu<'a>(
     content: impl Into<Element<'a, Message>>,
