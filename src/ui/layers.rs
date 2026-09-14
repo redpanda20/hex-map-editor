@@ -1,5 +1,6 @@
 use iced::{
     Element, Length, Padding, Task, alignment, color,
+    mouse::Interaction,
     widget::{
         Button, Text, button, column, container, mouse_area, pick_list, row, rule, scrollable,
         space, text,
@@ -53,6 +54,7 @@ impl Layers {
             LayersMessage::DragLayerCancelled => self.dragged_layer = None,
             LayersMessage::DragLayerDropped { dropped } => {
                 if let Some(picked) = self.dragged_layer.take() {
+                    self.hovered_layer = None;
                     return Task::done(
                         MoveLayerTo {
                             id: picked,
@@ -184,6 +186,7 @@ fn drag_handle<'a>(id: &LayerId) -> Element<'a, Message> {
         .on_press(Message::Layers(LayersMessage::DragLayerPick {
             picked: *id,
         }))
+        .interaction(Interaction::Grab)
         .into()
 }
 
