@@ -7,6 +7,7 @@ use crate::{
             SetNoiseSeed, SetVisible,
         },
         id::LayerId,
+        inspect::{BoolProperty, Property, TextProperty},
         layer::{
             image::ImageLayer,
             noise::{NoiseParams, PerlinNoiseLayer},
@@ -18,7 +19,9 @@ use crate::{
 };
 use iced::{
     Alignment, Color, Element, Length, Padding, Point, Size, Task,
-    widget::{Row, button, column, container, row, rule, slider, space, text, text_input},
+    widget::{
+        Row, button, checkbox, column, container, row, rule, slider, space, text, text_input,
+    },
 };
 use iced_fonts::bootstrap;
 use rand::random;
@@ -170,6 +173,38 @@ impl Inspector {
             },
         ]
         .into()
+    }
+
+    #[allow(unused)]
+    fn view_property<'a>(property: Property<'a>, id: LayerId) -> Element<'a, Message> {
+        const FIELD_INDENT: Length = Length::Fixed(80.0);
+        match property {
+            Property::Text(TextProperty {
+                name,
+                value,
+                on_submit,
+            }) => {
+                let field = text_field(value, move |name| {
+                    Message::Scene(on_submit(name.to_string(), id))
+                });
+                row![text(name).style(text::secondary).width(FIELD_INDENT), field]
+                    .spacing(8)
+                    .align_y(Alignment::Center)
+                    .into()
+            }
+            Property::Bool(BoolProperty {
+                name,
+                value,
+                on_submit,
+            }) => {
+                let field = checkbox(value)
+                    .on_toggle(move |enabled| Message::Scene(on_submit(enabled, id)));
+                row![text(name).style(text::secondary).width(FIELD_INDENT), field]
+                    .spacing(8)
+                    .align_y(Alignment::Center)
+                    .into()
+            }
+        }
     }
 }
 

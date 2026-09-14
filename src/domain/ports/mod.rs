@@ -1,4 +1,4 @@
-mod inspect;
+pub mod inspect;
 mod render;
 
 pub use render::RenderTarget;
