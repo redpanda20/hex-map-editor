@@ -99,15 +99,15 @@ impl<'a> Widget<Message, Theme, Renderer> for ContextMenu<'a> {
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) = event {
-            if cursor.is_over(layout.bounds()) {
-                let state = tree.state.downcast_mut::<State>();
-                state.position = cursor.position().unwrap_or_default();
-                state.open = !state.open;
+        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) = event
+            && cursor.is_over(layout.bounds())
+        {
+            let state = tree.state.downcast_mut::<State>();
+            state.position = cursor.position().unwrap_or_default();
+            state.open = !state.open;
 
-                shell.capture_event();
-                shell.request_redraw();
-            }
+            shell.capture_event();
+            shell.request_redraw();
         }
 
         self.content.as_widget_mut().update(
