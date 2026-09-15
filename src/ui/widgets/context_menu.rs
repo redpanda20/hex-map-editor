@@ -76,6 +76,25 @@ impl<'a> Widget<Message, Theme, Renderer> for ContextMenu<'a> {
             .layout(&mut tree.children[0], renderer, limits)
     }
 
+    fn children(&self) -> Vec<Tree> {
+        if let Some(menu) = &self.menu_content {
+            vec![Tree::new(&self.content), Tree::new(menu)]
+        } else {
+            vec![Tree::new(&self.content)]
+        }
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        let open = tree.state.downcast_ref::<State>().open;
+
+        if open {
+            let menu = (self.menu)();
+            tree.diff_children(&[&self.content, &menu]);
+        } else {
+            tree.diff_children(std::slice::from_ref(&self.content));
+        }
+    }
+
     fn operate(
         &mut self,
         tree: &mut Tree,
@@ -107,6 +126,7 @@ impl<'a> Widget<Message, Theme, Renderer> for ContextMenu<'a> {
             state.open = !state.open;
 
             shell.capture_event();
+            shell.invalidate_layout();
             shell.request_redraw();
         }
 
