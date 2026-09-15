@@ -8,7 +8,10 @@ use crate::{
             SetVisible,
         },
         id::LayerId,
-        inspect::{BoolProperty, BoundedFloatProperty, Property, TextProperty},
+        inspect::{
+            BoolProperty, BoundedFloatProperty, BoundedIntegerProperty, FloatProperty, Property,
+            TextProperty,
+        },
         layer::{
             image::ImageLayer,
             noise::{NoiseParams, PerlinNoiseLayer},
@@ -16,62 +19,25 @@ use crate::{
         },
     },
     infrastructure::IoProcess,
-    ui::widgets::{bounded_float_field, bounded_integer_field, colour_field, inline_text_field},
+    ui::widgets::{
+        bounded_float_field, bounded_integer_field, colour_field, float_field, inline_text_field,
+    },
 };
 use iced::{
-    Alignment, Element, Length, Padding, Point, Size, Task,
-    widget::{Row, button, checkbox, column, container, row, rule, space, text, text_input},
+    Alignment, Element, Length, Point, Size, Task,
+    widget::{Row, button, checkbox, column, container, row, rule, space, text},
 };
 use iced_fonts::bootstrap;
 use rand::random;
 
 #[derive(Debug, Clone)]
-pub enum InspectorMessage {
-    Clear,
-
-    ImageSizeChange(Option<Size>),
-    ImageSizeCommit { id: LayerId },
-
-    ImagePositionChange(Option<Point>),
-    ImagePositionCommit { id: LayerId },
-}
+pub enum InspectorMessage {}
 
 #[derive(Debug, Default, Clone)]
-pub struct Inspector {
-    active_size: Option<Size>,
-    active_position: Option<Point>,
-}
+pub struct Inspector {}
 
 impl Inspector {
-    pub fn update(&mut self, message: InspectorMessage) -> Task<Message> {
-        match message {
-            InspectorMessage::Clear => {
-                self.active_position = None;
-                self.active_size = None;
-            }
-
-            InspectorMessage::ImagePositionChange(position) => self.active_position = position,
-            InspectorMessage::ImagePositionCommit { id } => {
-                if let Some(position) = self.active_position {
-                    return Task::done(
-                        SetImagePosition {
-                            layer: id,
-                            position,
-                        }
-                        .into(),
-                    )
-                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
-                }
-            }
-            InspectorMessage::ImageSizeChange(size) => self.active_size = size,
-            InspectorMessage::ImageSizeCommit { id } => {
-                if let Some(size) = self.active_size {
-                    return Task::done(SetImageSize { layer: id, size }.into())
-                        .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
-                }
-            }
-        }
-
+    pub fn update(&mut self, _message: InspectorMessage) -> Task<Message> {
         Task::none()
     }
 
@@ -121,7 +87,6 @@ impl Inspector {
 
     #[allow(unused)]
     fn view_property<'a>(property: Property<'a>, id: LayerId) -> Element<'a, Message> {
-        const FIELD_INDENT: Length = Length::Fixed(80.0);
         match property {
             Property::Text(TextProperty {
                 name,
@@ -131,10 +96,14 @@ impl Inspector {
                 let field = inline_text_field(value, move |name| {
                     Message::Scene(on_submit(name.to_string(), id))
                 });
-                row![text(name).style(text::secondary).width(FIELD_INDENT), field]
-                    .spacing(8)
-                    .align_y(Alignment::Center)
-                    .into()
+                row![
+                    text(name).style(text::secondary),
+                    space::horizontal(),
+                    field
+                ]
+                .spacing(8)
+                .align_y(Alignment::Center)
+                .into()
             }
             Property::Bool(BoolProperty {
                 name,
@@ -142,11 +111,16 @@ impl Inspector {
                 on_submit,
             }) => {
                 let field = checkbox(value)
-                    .on_toggle(move |enabled| Message::Scene(on_submit(enabled, id)));
-                row![text(name).style(text::secondary).width(FIELD_INDENT), field]
-                    .spacing(8)
-                    .align_y(Alignment::Center)
-                    .into()
+                    .on_toggle(move |enabled| Message::Scene(on_submit(enabled, id)))
+                    .width(80);
+                row![
+                    text(name).style(text::secondary),
+                    space::horizontal(),
+                    field
+                ]
+                .spacing(8)
+                .align_y(Alignment::Center)
+                .into()
             }
             Property::BoundedFloat(BoundedFloatProperty {
                 name,
@@ -156,6 +130,23 @@ impl Inspector {
             }) => bounded_float_field(name, value, range, move |value| {
                 Message::Scene(on_submit(value, id))
             }),
+            Property::Float(FloatProperty {
+                name,
+                value,
+                on_submit,
+            }) => float_field(name, value, move |value| {
+                Message::Scene(on_submit(value, id))
+            })
+            .into(),
+            Property::BoundedInteger(BoundedIntegerProperty {
+                name,
+                value,
+                range,
+                on_submit,
+            }) => bounded_integer_field(name, value, range, move |value| {
+                Message::Scene(on_submit(value, id))
+            })
+            .into(),
         }
     }
 }
@@ -260,25 +251,29 @@ impl Inspector {
     }
 
     fn details_image(&self, id: LayerId, layer: &ImageLayer) -> Element<'_, Message> {
-        let Point { x, y } = self.active_position.unwrap_or(layer.position);
-        let Size { width, height } = self.active_size.unwrap_or(layer.size);
+        let ImageLayer {
+            image,
+            size,
+            position,
+            ..
+        } = layer;
+        let Size { width, height } = *size;
+        let Point { x, y } = *position;
 
         let image_control = row![
             text(
-                layer
-                    .image
+                image
                     .map(|id| format!("{id:?}"))
                     .unwrap_or("No image loaded".into())
             )
             .style(text::secondary),
+            space::horizontal(),
             button("Load").on_press(Message::LoadAsset {
                 caller: id,
                 process: IoProcess::Start
             })
         ]
-        .spacing(8)
-        .align_y(Alignment::Center)
-        .padding(Padding::default().bottom(8));
+        .align_y(Alignment::Center);
 
         let opacity_control = bounded_float_field(
             "Opacity",
@@ -286,84 +281,44 @@ impl Inspector {
             0.0..=1.0,
             move |value| {
                 SetImageOpacity {
-                    layer: id,
+                    id,
                     opacity: value as f32,
                 }
                 .into()
             },
         );
 
-        let x_control = text_input("0.0", &x.to_string())
-            .on_input(move |x_maybe| {
-                let pos = x_maybe.parse::<f32>().ok().map(|x| Point { x, y });
-                Message::Inspector(InspectorMessage::ImagePositionChange(pos))
-            })
-            .on_submit(Message::Inspector(InspectorMessage::ImagePositionCommit {
-                id,
-            }))
-            .width(Length::Fill);
+        let x_control = float_field("X", x as f64, move |x_value| {
+            let position = Point::new(x_value as f32, y);
+            SetImagePosition { id, position }.into()
+        })
+        .vertical();
 
-        let y_control = text_input("0.0", &y.to_string())
-            .on_input(move |y_maybe| {
-                let pos = y_maybe.parse::<f32>().ok().map(|y| Point { x, y });
-                Message::Inspector(InspectorMessage::ImagePositionChange(pos))
-            })
-            .on_submit(Message::Inspector(InspectorMessage::ImagePositionCommit {
-                id,
-            }))
-            .width(Length::Fill);
+        let y_control = float_field("Y", y as f64, move |y_value| {
+            let position = Point::new(x, y_value as f32);
+            SetImagePosition { id, position }.into()
+        })
+        .vertical();
 
-        let position_control = row![
-            text("X:").style(text::secondary),
-            x_control,
-            text("Y:").style(text::secondary),
-            y_control
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center)
-        .padding(Padding::default().bottom(8));
+        let width_control = float_field("Width", width as f64, move |width_value| {
+            let size = Size::new(width_value as f32, height);
+            SetImageSize { id, size }.into()
+        })
+        .vertical();
 
-        let width_control = text_input("0.0", &width.to_string())
-            .on_input(move |w_maybe| {
-                let size = w_maybe
-                    .parse::<f32>()
-                    .ok()
-                    .map(|width| Size { width, height });
-                Message::Inspector(InspectorMessage::ImageSizeChange(size))
-            })
-            .on_submit(Message::Inspector(InspectorMessage::ImageSizeCommit { id }))
-            .width(Length::Fill);
-
-        let height_control = text_input("0.0", &height.to_string())
-            .on_input(move |h_maybe| {
-                let size = h_maybe
-                    .parse::<f32>()
-                    .ok()
-                    .map(|height| Size { width, height });
-                Message::Inspector(InspectorMessage::ImageSizeChange(size))
-            })
-            .on_submit(Message::Inspector(InspectorMessage::ImageSizeCommit { id }))
-            .width(Length::Fill);
-
-        let size_control = row![
-            text("Width:").style(text::secondary),
-            width_control,
-            text("Height:").style(text::secondary),
-            height_control
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center)
-        .padding(Padding::default().bottom(8));
+        let height_control = float_field("Height", height as f64, move |height_value| {
+            let size = Size::new(width, height_value as f32);
+            SetImageSize { id, size }.into()
+        })
+        .vertical();
 
         column![
             image_control,
             opacity_control,
-            text("Position:"),
-            position_control,
-            text("Size:"),
-            size_control,
+            row![x_control, y_control].spacing(12),
+            row![width_control, height_control].spacing(12)
         ]
-        .spacing(4)
+        .spacing(8)
         .padding(8)
         .into()
     }

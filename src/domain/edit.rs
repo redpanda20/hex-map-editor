@@ -159,25 +159,25 @@ pub struct SetImageAndSize {
 
 #[derive(Debug, Clone)]
 pub struct SetImage {
-    pub layer: LayerId,
+    pub id: LayerId,
     pub image: ImageId,
 }
 
 #[derive(Debug, Clone)]
 pub struct SetImageSize {
-    pub layer: LayerId,
+    pub id: LayerId,
     pub size: Size,
 }
 
 #[derive(Debug, Clone)]
 pub struct SetImagePosition {
-    pub layer: LayerId,
+    pub id: LayerId,
     pub position: Point,
 }
 
 #[derive(Debug, Clone)]
 pub struct SetImageOpacity {
-    pub layer: LayerId,
+    pub id: LayerId,
     pub opacity: f32,
 }
 
@@ -564,7 +564,7 @@ impl EditCommand for SetImage {
         let Some(Layer {
             kind: LayerInner::Image(layer),
             ..
-        }) = scene.get_layer_mut(self.layer)
+        }) = scene.get_layer_mut(self.id)
         else {
             return Box::new(NoOp);
         };
@@ -576,7 +576,7 @@ impl EditCommand for SetImage {
         layer.size = Size { width, height };
 
         Box::new(SetImageAndSize {
-            layer: self.layer,
+            layer: self.id,
             image: prev_image,
             size: prev_size,
         })
@@ -588,7 +588,7 @@ impl EditCommand for SetImageSize {
         let Some(Layer {
             kind: LayerInner::Image(layer),
             ..
-        }) = scene.get_layer_mut(self.layer)
+        }) = scene.get_layer_mut(self.id)
         else {
             return Box::new(NoOp);
         };
@@ -601,7 +601,7 @@ impl EditCommand for SetImageSize {
         layer.size = self.size;
 
         Box::new(SetImageSize {
-            layer: self.layer,
+            id: self.id,
             size: prev,
         })
     }
@@ -612,7 +612,7 @@ impl EditCommand for SetImagePosition {
         let Some(Layer {
             kind: LayerInner::Image(layer),
             ..
-        }) = scene.get_layer_mut(self.layer)
+        }) = scene.get_layer_mut(self.id)
         else {
             return Box::new(NoOp);
         };
@@ -625,7 +625,7 @@ impl EditCommand for SetImagePosition {
         layer.position = self.position;
 
         Box::new(SetImagePosition {
-            layer: self.layer,
+            id: self.id,
             position: prev,
         })
     }
@@ -636,11 +636,11 @@ impl EditCommand for SetImageOpacity {
         let Some(Layer {
             kind: LayerInner::Image(layer),
             ..
-        }) = scene.get_layer_mut(self.layer)
+        }) = scene.get_layer_mut(self.id)
         else {
             return Box::new(NoOp);
         };
-        if self.opacity == layer.get_opacity() {
+        if self.opacity < 0.0 || self.opacity > 1.0 || self.opacity == layer.get_opacity() {
             return Box::new(NoOp);
         }
 
@@ -648,7 +648,7 @@ impl EditCommand for SetImageOpacity {
         layer.set_opacity(self.opacity);
 
         Box::new(SetImageOpacity {
-            layer: self.layer,
+            id: self.id,
             opacity: prev,
         })
     }
@@ -1170,7 +1170,7 @@ mod tests {
         let image_id = register_test_image(&mut scene, 8, 6);
 
         Box::new(SetImage {
-            layer: id,
+            id,
             image: image_id,
         })
         .apply(&mut scene);
@@ -1191,7 +1191,7 @@ mod tests {
     fn set_image_of_unregistered_asset_is_a_noop() {
         let (mut scene, id) = scene_with_image_layer();
         let inverse = Box::new(SetImage {
-            layer: id,
+            id,
             image: ImageId::from_raw(u64::MAX),
         })
         .apply(&mut scene);
@@ -1204,7 +1204,7 @@ mod tests {
         // let bounds = Rectangle::new(Point::new(1.0, 2.0), Size::new(30.0, 40.0));
         let size = Size::new(30.0, 40.0);
 
-        assert_apply_then_undo_is_identity(&mut scene, Box::new(SetImageSize { layer: id, size }));
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(SetImageSize { id, size }));
     }
 
     #[test]
@@ -1213,8 +1213,8 @@ mod tests {
         // let bounds = Rectangle::new(Point::new(1.0, 2.0), Size::new(30.0, 40.0));
         let size = Size::new(30.0, 40.0);
 
-        let _ = Box::new(SetImageSize { layer: id, size }).apply(&mut scene);
-        let inverse = Box::new(SetImageSize { layer: id, size }).apply(&mut scene);
+        let _ = Box::new(SetImageSize { id, size }).apply(&mut scene);
+        let inverse = Box::new(SetImageSize { id, size }).apply(&mut scene);
 
         assert!(inverse.is_noop());
     }
@@ -1224,13 +1224,7 @@ mod tests {
         let (mut scene, id) = scene_with_image_layer();
         let position = Point::new(1.0, 2.0);
 
-        assert_apply_then_undo_is_identity(
-            &mut scene,
-            Box::new(SetImagePosition {
-                layer: id,
-                position,
-            }),
-        );
+        assert_apply_then_undo_is_identity(&mut scene, Box::new(SetImagePosition { id, position }));
     }
 
     #[test]
@@ -1238,56 +1232,38 @@ mod tests {
         let (mut scene, id) = scene_with_image_layer();
         let position = Point::new(1.0, 2.0);
 
-        let _ = Box::new(SetImagePosition {
-            layer: id,
-            position,
-        })
-        .apply(&mut scene);
-        let inverse = Box::new(SetImagePosition {
-            layer: id,
-            position,
-        })
-        .apply(&mut scene);
+        let _ = Box::new(SetImagePosition { id, position }).apply(&mut scene);
+        let inverse = Box::new(SetImagePosition { id, position }).apply(&mut scene);
 
         assert!(inverse.is_noop());
     }
 
     #[test]
-    fn set_image_opacity_round_trips_and_clamps() {
+    fn set_image_opacity_round_trips() {
         let (mut scene, id) = scene_with_image_layer();
+        let inverse = Box::new(SetImageOpacity { id, opacity: 0.7 })
+            .apply(&mut scene)
+            .apply(&mut scene);
 
-        assert_apply_then_undo_is_identity(
-            &mut scene,
-            Box::new(SetImageOpacity {
-                layer: id,
-                opacity: 0.4,
-            }),
-        );
-
-        // Over-range opacity should be clamped to 1.0 when applied.
-        Box::new(SetImageOpacity {
-            layer: id,
-            opacity: 5.0,
-        })
-        .apply(&mut scene);
-        let Some(Layer {
-            kind: LayerInner::Image(image_layer),
-            ..
-        }) = scene.get_layer(id)
-        else {
-            panic!("expected image layer");
-        };
-        assert_eq!(image_layer.get_opacity(), 1.0);
+        assert!(!inverse.is_noop())
+    }
+    #[test]
+    fn set_image_opacity_fails_below_zero() {
+        let (mut scene, id) = scene_with_image_layer();
+        let inverse = Box::new(SetImageOpacity { id, opacity: -1.0 }).apply(&mut scene);
+        assert!(inverse.is_noop())
+    }
+    #[test]
+    fn set_image_opacity_fails_above_one() {
+        let (mut scene, id) = scene_with_image_layer();
+        let inverse = Box::new(SetImageOpacity { id, opacity: 2.0 }).apply(&mut scene);
+        assert!(inverse.is_noop())
     }
 
     #[test]
     fn set_image_opacity_on_non_image_layer_is_a_noop() {
         let (mut scene, id) = scene_with_tiles_layer();
-        let inverse = Box::new(SetImageOpacity {
-            layer: id,
-            opacity: 0.5,
-        })
-        .apply(&mut scene);
+        let inverse = Box::new(SetImageOpacity { id, opacity: 0.5 }).apply(&mut scene);
         assert!(inverse.is_noop());
     }
 }

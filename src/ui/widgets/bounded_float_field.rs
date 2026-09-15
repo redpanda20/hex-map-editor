@@ -2,115 +2,105 @@ use std::ops::RangeInclusive;
 
 use iced::advanced::widget::{Operation, Tree, tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};
-use iced::widget::{row, space, text, text_input};
-use iced::{Alignment, Element, Event, Length, Rectangle, Renderer, Size, Theme};
+use iced::widget::{column, row, slider, space, text};
+use iced::{Element, Event, Length, Rectangle, Renderer, Size, Theme};
 
-use crate::ui::widgets::INPUT_WIDTH;
-
-/// Creates a [`BoundedIntegerField`] widget.
-pub fn bounded_integer_field<'a, Message>(
+/// Creates a [`BoundedFloatField`] widget.
+pub fn bounded_float_field<'a, Message>(
     name: impl Into<String>,
-    starting_value: u64,
-    range: RangeInclusive<u64>,
-    on_submit: impl Fn(u64) -> Message + 'a,
+    starting_value: f64,
+    range: RangeInclusive<f64>,
+    on_submit: impl Fn(f64) -> Message + 'a,
 ) -> Element<'a, Message>
 where
     Message: 'a,
 {
-    BoundedIntegerField::new(name.into(), starting_value, range, on_submit).into()
+    BoundedFloatField::new(name.into(), starting_value, range, on_submit).into()
 }
 
-/// Local state, Lives in the [`Tree`].
-#[derive(Debug, Clone)]
-struct Mode {
-    raw: String,
+/// Lives in the [`Tree`].
+#[derive(Debug, Default, Clone)]
+struct State {
+    value: f64,
 }
 
 /// Messages internal to a [`BoundedFloatField`].
 #[derive(Debug, Clone)]
 enum Internal {
-    Change(String),
+    Change(f64),
     Submit,
 }
 
-struct BoundedIntegerField<'a, Message> {
+struct BoundedFloatField<'a, Message> {
     name: String,
-    value: u64,
-    range: RangeInclusive<u64>,
-    on_submit: Box<dyn Fn(u64) -> Message + 'a>,
+    starting_value: f64,
+    range: RangeInclusive<f64>,
+    on_submit: Box<dyn Fn(f64) -> Message + 'a>,
     content: Element<'a, Internal>,
 }
 
-impl<'a, Message> BoundedIntegerField<'a, Message> {
+impl<'a, Message> BoundedFloatField<'a, Message> {
     fn new(
         name: String,
-        value: u64,
-        range: RangeInclusive<u64>,
-        on_submit: impl Fn(u64) -> Message + 'a,
+        starting_value: f64,
+        range: RangeInclusive<f64>,
+        on_submit: impl Fn(f64) -> Message + 'a,
     ) -> Self {
-        let content = editing_content(name.clone(), &value.to_string(), range.clone());
+        let content = content(name.clone(), starting_value, range.clone());
         Self {
             name,
-            value,
+            starting_value,
             range,
             on_submit: Box::new(on_submit),
             content,
         }
     }
+
+    fn rebuild_content(&mut self, value: f64) {
+        self.content = content(self.name.clone(), value, self.range.clone())
+    }
 }
 
-fn parse_input(text: &str) -> Option<u64> {
-    text.trim().parse::<u64>().ok()
-}
+fn content<'a>(name: String, value: f64, range: RangeInclusive<f64>) -> Element<'a, Internal> {
+    let step = (*range.end() - *range.start()) / 100.0;
 
-fn editing_content<'a>(
-    name: String,
-    text_value: &str,
-    range: RangeInclusive<u64>,
-) -> Element<'a, Internal> {
-    let is_valid = parse_input(text_value)
-        .map(|num| range.contains(&num))
-        .unwrap_or(false);
+    let slider = slider(range, value, Internal::Change)
+        .on_release(Internal::Submit)
+        .step(step);
 
-    row![
-        text(name).style(text::secondary),
-        space::horizontal(),
-        text_input("", text_value)
-            .on_input(Internal::Change)
-            .on_submit(Internal::Submit)
-            .style(move |theme: &Theme, status| {
-                let mut style = text_input::default(theme, status);
-
-                if !is_valid {
-                    style.border.color = theme.palette().danger;
-                    style.border.width = 1.0;
-                }
-
-                style
-            })
-            .width(INPUT_WIDTH)
+    column![
+        row![
+            text(name).style(text::secondary),
+            space::horizontal(),
+            text!("{value:.2}")
+        ],
+        slider
     ]
-    .width(Length::Fill)
-    .align_y(Alignment::Center)
+    .spacing(8)
     .into()
 }
 
-impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, Message> {
+impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedFloatField<'a, Message> {
     fn size(&self) -> Size<Length> {
         Size::new(Length::Fill, Length::Shrink)
     }
 
     fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<Mode>()
+        tree::Tag::of::<State>()
     }
 
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
     fn state(&self) -> tree::State {
-        tree::State::new(Mode {
-            raw: self.value.to_string(),
+        tree::State::new(State {
+            value: self.starting_value,
         })
     }
-
-    fn diff(&self, _tree: &mut Tree) {}
 
     fn layout(
         &mut self,
@@ -118,11 +108,6 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let mode = tree.state.downcast_ref::<Mode>().clone();
-
-        self.content = editing_content(self.name.clone(), &mode.raw, self.range.clone());
-        tree.diff_children(std::slice::from_ref(&self.content));
-
         let node = self
             .content
             .as_widget_mut()
@@ -173,8 +158,10 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
             viewport,
         );
 
+        // Forward shell from child widgets
         shell.request_input_method(local_shell.input_method());
         shell.request_redraw_at(local_shell.redraw_request());
+
         if local_shell.is_layout_invalid() {
             shell.invalidate_layout();
         }
@@ -187,26 +174,19 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
 
         for message in internal_messages {
             match message {
-                Internal::Change(new_text) => {
-                    let Mode { raw, .. } = tree.state.downcast_mut::<Mode>();
-                    *raw = new_text;
+                Internal::Change(value) => {
+                    let state = tree.state.downcast_mut::<State>();
+
+                    state.value = value;
+                    self.rebuild_content(value);
 
                     shell.invalidate_layout();
                     shell.request_redraw();
                 }
                 Internal::Submit => {
-                    let Mode { raw, .. } = tree.state.downcast_ref::<Mode>();
+                    let state = tree.state.downcast_mut::<State>();
 
-                    let submitted = parse_input(raw);
-
-                    if let Some(value) = submitted
-                        && self.range.contains(&value)
-                    {
-                        shell.publish((self.on_submit)(value));
-
-                        shell.invalidate_layout();
-                        shell.request_redraw();
-                    }
+                    shell.publish((self.on_submit)(state.value));
                 }
             }
         }
@@ -253,11 +233,11 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
     // No `overlay` override.
 }
 
-impl<'a, Message> From<BoundedIntegerField<'a, Message>> for Element<'a, Message>
+impl<'a, Message> From<BoundedFloatField<'a, Message>> for Element<'a, Message>
 where
     Message: 'a,
 {
-    fn from(field: BoundedIntegerField<'a, Message>) -> Self {
+    fn from(field: BoundedFloatField<'a, Message>) -> Self {
         Self::new(field)
     }
 }

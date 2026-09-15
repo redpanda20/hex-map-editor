@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 use iced::advanced::widget::{Operation, Tree, tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};
 use iced::widget::{column, row, space, text, text_input};
@@ -5,16 +7,17 @@ use iced::{Alignment, Element, Event, Length, Rectangle, Renderer, Size, Theme};
 
 use crate::ui::widgets::INPUT_WIDTH;
 
-/// Creates a [`UnboundedFloatField`] widget.
-pub fn float_field<'a, Message>(
+/// Creates a [`BoundedIntegerField`] widget.
+pub fn bounded_integer_field<'a, Message>(
     name: impl Into<String>,
-    starting_value: f64,
-    on_submit: impl Fn(f64) -> Message + 'a,
-) -> FloatField<'a, Message>
+    starting_value: u64,
+    range: RangeInclusive<u64>,
+    on_submit: impl Fn(u64) -> Message + 'a,
+) -> BoundedIntegerField<'a, Message>
 where
     Message: 'a,
 {
-    FloatField::new(name.into(), starting_value, on_submit)
+    BoundedIntegerField::new(name.into(), starting_value, range, on_submit)
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -26,33 +29,39 @@ enum FieldLayout {
 
 /// Local state, Lives in the [`Tree`].
 #[derive(Debug, Clone)]
-struct State {
+struct Mode {
     raw: String,
-    value: f64,
 }
 
-/// Messages internal to a [`UnboundedFloatField`].
+/// Messages internal to a [`BoundedFloatField`].
 #[derive(Debug, Clone)]
 enum Internal {
     Change(String),
     Submit,
 }
 
-pub struct FloatField<'a, Message> {
+pub struct BoundedIntegerField<'a, Message> {
     name: String,
-    value: f64,
-    on_submit: Box<dyn Fn(f64) -> Message + 'a>,
+    value: u64,
+    range: RangeInclusive<u64>,
+    on_submit: Box<dyn Fn(u64) -> Message + 'a>,
     layout: FieldLayout,
     content: Element<'a, Internal>,
 }
 
-impl<'a, Message> FloatField<'a, Message> {
-    pub fn new(name: String, value: f64, on_submit: impl Fn(f64) -> Message + 'a) -> Self {
+impl<'a, Message> BoundedIntegerField<'a, Message> {
+    pub fn new(
+        name: String,
+        value: u64,
+        range: RangeInclusive<u64>,
+        on_submit: impl Fn(u64) -> Message + 'a,
+    ) -> Self {
         let layout = FieldLayout::default();
-        let content = editing_content(name.clone(), &value.to_string(), layout);
+        let content = editing_content(name.clone(), &value.to_string(), range.clone(), layout);
         Self {
             name,
             value,
+            range,
             on_submit: Box::new(on_submit),
             layout,
             content,
@@ -61,27 +70,28 @@ impl<'a, Message> FloatField<'a, Message> {
 
     pub fn horizontal(mut self) -> Self {
         self.layout = FieldLayout::Horizontal;
-        self.content = editing_content(self.name.clone(), &self.value.to_string(), self.layout);
         self
     }
 
     pub fn vertical(mut self) -> Self {
         self.layout = FieldLayout::Vertial;
-        self.content = editing_content(self.name.clone(), &self.value.to_string(), self.layout);
         self
     }
 }
 
-fn parse_input(text: &str) -> Option<f64> {
-    text.trim().parse::<f64>().ok()
+fn parse_input(text: &str) -> Option<u64> {
+    text.trim().parse::<u64>().ok()
 }
 
 fn editing_content<'a>(
     name: String,
     text_value: &str,
+    range: RangeInclusive<u64>,
     layout: FieldLayout,
 ) -> Element<'a, Internal> {
-    let is_valid = parse_input(text_value).is_some();
+    let is_valid = parse_input(text_value)
+        .map(|num| range.contains(&num))
+        .unwrap_or(false);
 
     let title = text(name).style(text::secondary);
 
@@ -108,34 +118,22 @@ fn editing_content<'a>(
     }
 }
 
-impl<'a, Message> Widget<Message, Theme, Renderer> for FloatField<'a, Message> {
+impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, Message> {
     fn size(&self) -> Size<Length> {
         Size::new(Length::Fill, Length::Shrink)
     }
 
     fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<State>()
-    }
-
-    fn children(&self) -> Vec<Tree> {
-        vec![Tree::new(&self.content)]
+        tree::Tag::of::<Mode>()
     }
 
     fn state(&self) -> tree::State {
-        tree::State::new(State {
+        tree::State::new(Mode {
             raw: self.value.to_string(),
-            value: self.value,
         })
     }
 
-    fn diff(&self, tree: &mut Tree) {
-        let state = tree.state.downcast_mut::<State>();
-
-        if state.value != self.value {
-            state.value = self.value;
-            state.raw = self.value.to_string();
-        }
-    }
+    fn diff(&self, _tree: &mut Tree) {}
 
     fn layout(
         &mut self,
@@ -143,6 +141,16 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for FloatField<'a, Message> {
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
+        let mode = tree.state.downcast_ref::<Mode>().clone();
+
+        self.content = editing_content(
+            self.name.clone(),
+            &mode.raw,
+            self.range.clone(),
+            self.layout,
+        );
+        tree.diff_children(std::slice::from_ref(&self.content));
+
         let node = self
             .content
             .as_widget_mut()
@@ -208,18 +216,20 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for FloatField<'a, Message> {
         for message in internal_messages {
             match message {
                 Internal::Change(new_text) => {
-                    let State { raw, .. } = tree.state.downcast_mut::<State>();
+                    let Mode { raw, .. } = tree.state.downcast_mut::<Mode>();
                     *raw = new_text;
 
                     shell.invalidate_layout();
                     shell.request_redraw();
                 }
                 Internal::Submit => {
-                    let State { raw, .. } = tree.state.downcast_ref::<State>();
+                    let Mode { raw, .. } = tree.state.downcast_ref::<Mode>();
 
                     let submitted = parse_input(raw);
 
-                    if let Some(value) = submitted {
+                    if let Some(value) = submitted
+                        && self.range.contains(&value)
+                    {
                         shell.publish((self.on_submit)(value));
 
                         shell.invalidate_layout();
@@ -271,11 +281,11 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for FloatField<'a, Message> {
     // No `overlay` override.
 }
 
-impl<'a, Message> From<FloatField<'a, Message>> for Element<'a, Message>
+impl<'a, Message> From<BoundedIntegerField<'a, Message>> for Element<'a, Message>
 where
     Message: 'a,
 {
-    fn from(field: FloatField<'a, Message>) -> Self {
+    fn from(field: BoundedIntegerField<'a, Message>) -> Self {
         Self::new(field)
     }
 }
