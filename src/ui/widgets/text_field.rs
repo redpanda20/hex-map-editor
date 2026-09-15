@@ -93,10 +93,9 @@ fn text_input_state(tree: &mut Tree) -> &mut text_input::State<Paragraph> {
 
 impl<'a> Widget<Message, Theme, Renderer> for TextField<'a> {
     fn size(&self) -> Size<Length> {
-        // Deliberately *not* `self.content.as_widget().size()`.
-        // Instead reports a fixed hint, that is valid
-        // for both states, as done by `text_input`.
-        Size::new(Length::Fill, Length::Shrink)
+        // Reports a constant size. Otherwise causes invalid
+        // sizing: `self.content.as_widget().size_hint()`
+        Size::new(Length::Shrink, Length::Shrink)
     }
 
     fn tag(&self) -> tree::Tag {
