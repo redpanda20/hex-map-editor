@@ -5,15 +5,16 @@ use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};
 use iced::widget::{row, text, text_input};
 use iced::{Alignment, Element, Event, Length, Rectangle, Renderer, Size, Theme};
 
-use crate::app::Message;
-
 /// Creates a [`BoundedIntegerField`] widget.
-pub fn bounded_integer_field<'a>(
+pub fn bounded_integer_field<'a, Message>(
     name: impl Into<String>,
     starting_value: u64,
     range: RangeInclusive<u64>,
     on_submit: impl Fn(u64) -> Message + 'a,
-) -> Element<'a, Message> {
+) -> Element<'a, Message>
+where
+    Message: 'a,
+{
     BoundedIntegerField::new(name.into(), starting_value, range, on_submit).into()
 }
 
@@ -30,7 +31,7 @@ enum Internal {
     Submit,
 }
 
-struct BoundedIntegerField<'a> {
+struct BoundedIntegerField<'a, Message> {
     name: String,
     value: u64,
     range: RangeInclusive<u64>,
@@ -38,7 +39,7 @@ struct BoundedIntegerField<'a> {
     content: Element<'a, Internal>,
 }
 
-impl<'a> BoundedIntegerField<'a> {
+impl<'a, Message> BoundedIntegerField<'a, Message> {
     fn new(
         name: String,
         value: u64,
@@ -93,7 +94,7 @@ fn editing_content<'a>(
     .into()
 }
 
-impl<'a> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a> {
+impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, Message> {
     fn size(&self) -> Size<Length> {
         Size::new(Length::Fill, Length::Shrink)
     }
@@ -251,8 +252,11 @@ impl<'a> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a> {
     // No `overlay` override.
 }
 
-impl<'a> From<BoundedIntegerField<'a>> for Element<'a, Message> {
-    fn from(field: BoundedIntegerField<'a>) -> Self {
+impl<'a, Message> From<BoundedIntegerField<'a, Message>> for Element<'a, Message>
+where
+    Message: 'a,
+{
+    fn from(field: BoundedIntegerField<'a, Message>) -> Self {
         Self::new(field)
     }
 }

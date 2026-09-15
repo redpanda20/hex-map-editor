@@ -4,17 +4,18 @@ use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};
 use iced::widget::{button, column, container, space, text, text_input};
 use iced::{Element, Event, Length, Rectangle, Renderer, Size, Theme};
 
-use crate::app::Message;
-
 /// Creates a [`TextField`] widget.
 ///
 /// Displays `starting_value` as an inline label. When interacted
 /// it becomes a real [`text_input`], and any edits are persisted
 /// until the user commits them (by pressing enter), or are dropped.
-pub fn inline_text_field<'a>(
+pub fn inline_text_field<'a, Message>(
     starting_value: &'a str,
     on_submit: impl Fn(&str) -> Message + 'a,
-) -> Element<'a, Message> {
+) -> Element<'a, Message>
+where
+    Message: 'a,
+{
     TextField::new(starting_value, on_submit).into()
 }
 
@@ -41,13 +42,13 @@ enum Internal {
     Submit,
 }
 
-struct TextField<'a> {
+struct TextField<'a, Message> {
     value: &'a str,
     on_submit: Box<dyn Fn(&str) -> Message + 'a>,
     content: Element<'a, Internal>,
 }
 
-impl<'a> TextField<'a> {
+impl<'a, Message> TextField<'a, Message> {
     fn new(value: &'a str, on_submit: impl Fn(&str) -> Message + 'a) -> Self {
         Self {
             value,
@@ -91,7 +92,7 @@ fn text_input_state(tree: &mut Tree) -> &mut text_input::State<Paragraph> {
     tree.state.downcast_mut()
 }
 
-impl<'a> Widget<Message, Theme, Renderer> for TextField<'a> {
+impl<'a, Message> Widget<Message, Theme, Renderer> for TextField<'a, Message> {
     fn size(&self) -> Size<Length> {
         // Reports a constant size. Otherwise causes invalid
         // sizing: `self.content.as_widget().size_hint()`
@@ -299,8 +300,11 @@ impl<'a> Widget<Message, Theme, Renderer> for TextField<'a> {
     // the overlay's `Internal` messages back into `Message`.
 }
 
-impl<'a> From<TextField<'a>> for Element<'a, Message> {
-    fn from(field: TextField<'a>) -> Self {
+impl<'a, Message> From<TextField<'a, Message>> for Element<'a, Message>
+where
+    Message: 'a,
+{
+    fn from(field: TextField<'a, Message>) -> Self {
         Self::new(field)
     }
 }

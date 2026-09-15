@@ -5,15 +5,16 @@ use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};
 use iced::widget::{column, row, slider, space, text};
 use iced::{Element, Event, Length, Rectangle, Renderer, Size, Theme};
 
-use crate::app::Message;
-
 /// Creates a [`BoundedFloatField`] widget.
-pub fn bounded_float_field<'a>(
+pub fn bounded_float_field<'a, Message>(
     name: impl Into<String>,
     starting_value: f64,
     range: RangeInclusive<f64>,
     on_submit: impl Fn(f64) -> Message + 'a,
-) -> Element<'a, Message> {
+) -> Element<'a, Message>
+where
+    Message: 'a,
+{
     BoundedFloatField::new(name.into(), starting_value, range, on_submit).into()
 }
 
@@ -30,7 +31,7 @@ enum Internal {
     Submit,
 }
 
-struct BoundedFloatField<'a> {
+struct BoundedFloatField<'a, Message> {
     name: String,
     starting_value: f64,
     range: RangeInclusive<f64>,
@@ -38,7 +39,7 @@ struct BoundedFloatField<'a> {
     content: Element<'a, Internal>,
 }
 
-impl<'a> BoundedFloatField<'a> {
+impl<'a, Message> BoundedFloatField<'a, Message> {
     fn new(
         name: String,
         starting_value: f64,
@@ -79,7 +80,7 @@ fn content<'a>(name: String, value: f64, range: RangeInclusive<f64>) -> Element<
     .into()
 }
 
-impl<'a> Widget<Message, Theme, Renderer> for BoundedFloatField<'a> {
+impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedFloatField<'a, Message> {
     fn size(&self) -> Size<Length> {
         Size::new(Length::Fill, Length::Shrink)
     }
@@ -232,8 +233,11 @@ impl<'a> Widget<Message, Theme, Renderer> for BoundedFloatField<'a> {
     // No `overlay` override.
 }
 
-impl<'a> From<BoundedFloatField<'a>> for Element<'a, Message> {
-    fn from(field: BoundedFloatField<'a>) -> Self {
+impl<'a, Message> From<BoundedFloatField<'a, Message>> for Element<'a, Message>
+where
+    Message: 'a,
+{
+    fn from(field: BoundedFloatField<'a, Message>) -> Self {
         Self::new(field)
     }
 }
