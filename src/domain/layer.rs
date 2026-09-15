@@ -9,16 +9,12 @@ use std::fmt::Display;
 use iced::Rectangle;
 
 use crate::domain::{
-    Inspectable, RenderTarget,
-    edit::{Rename, SetVisible},
+    RenderTarget,
     id::LayerId,
-    inspect::{BoolProperty, TextProperty},
     layer::{
         image::ImageLayer, noise::PerlinNoiseLayer, tiles::SparseTiles, unknown::UnknownLayer,
     },
 };
-
-use super::inspect::Property;
 
 #[derive(Debug, Clone)]
 pub struct Layer {
@@ -37,28 +33,6 @@ impl Layer {
             visible: true,
             kind,
         }
-    }
-}
-
-impl Inspectable for Layer {
-    fn properties<'a>(&'a self) -> Vec<Property<'a>> {
-        vec![
-            Property::Text(TextProperty {
-                name: "Name",
-                value: &self.name,
-                on_submit: Box::new(|name, id| {
-                    Box::new(Rename {
-                        id,
-                        name: name.to_string(),
-                    })
-                }),
-            }),
-            Property::Bool(BoolProperty {
-                name: "Visible",
-                value: self.visible,
-                on_submit: Box::new(|visible, id| Box::new(SetVisible { id, visible })),
-            }),
-        ]
     }
 }
 
