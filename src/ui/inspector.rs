@@ -15,7 +15,7 @@ use crate::{
         },
     },
     infrastructure::IoProcess,
-    ui::widgets::{colour_picker, text_field},
+    ui::widgets::{colour_picker, inline_text_field},
 };
 use iced::{
     Alignment, Color, Element, Length, Padding, Point, Size, Task,
@@ -152,7 +152,7 @@ impl Inspector {
         } = layer;
 
         column![
-            container(text_field(name, move |new_name| {
+            container(inline_text_field(name, move |new_name| {
                 Rename {
                     id: *id,
                     name: new_name.to_string(),
@@ -184,7 +184,7 @@ impl Inspector {
                 value,
                 on_submit,
             }) => {
-                let field = text_field(value, move |name| {
+                let field = inline_text_field(value, move |name| {
                     Message::Scene(on_submit(name.to_string(), id))
                 });
                 row![text(name).style(text::secondary).width(FIELD_INDENT), field]

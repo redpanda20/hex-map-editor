@@ -11,7 +11,7 @@ use crate::app::Message;
 /// Displays `starting_value` as an inline label. When interacted
 /// it becomes a real [`text_input`], and any edits are persisted
 /// until the user commits them (by pressing enter), or are dropped.
-pub fn text_field<'a>(
+pub fn inline_text_field<'a>(
     starting_value: &'a str,
     on_submit: impl Fn(&str) -> Message + 'a,
 ) -> Element<'a, Message> {

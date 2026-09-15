@@ -4,4 +4,4 @@ mod text_field;
 
 pub use colour_picker::colour_picker;
 pub use context_menu::context_menu;
-pub use text_field::text_field;
+pub use text_field::inline_text_field;

@@ -16,7 +16,7 @@ use crate::{
         id::LayerId,
     },
     theme,
-    ui::widgets::{context_menu, text_field},
+    ui::widgets::{context_menu, inline_text_field},
 };
 
 #[derive(Debug, Clone)]
@@ -130,7 +130,7 @@ fn layer_preview<'a>(
                 None
             },
             thumbnail(kind),
-            text_field(name, move |value| Rename {
+            inline_text_field(name, move |value| Rename {
                 id: *id,
                 name: value.to_string()
             }
