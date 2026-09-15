@@ -115,8 +115,8 @@ pub struct InvertTiles {
 }
 
 #[derive(Debug, Clone)]
-pub struct SetColour {
-    pub layer: LayerId,
+pub struct SetTilesColour {
+    pub id: LayerId,
     pub colour: Color,
 }
 
@@ -377,12 +377,12 @@ impl EditCommand for BucketFill {
     }
 }
 
-impl EditCommand for SetColour {
+impl EditCommand for SetTilesColour {
     fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
         let Some(Layer {
             kind: LayerInner::Tiles(tiles),
             ..
-        }) = scene.get_layer_mut(self.layer)
+        }) = scene.get_layer_mut(self.id)
         else {
             return Box::new(NoOp);
         };
@@ -393,8 +393,8 @@ impl EditCommand for SetColour {
         let prev = tiles.colour;
         tiles.colour = self.colour;
 
-        Box::new(SetColour {
-            layer: self.layer,
+        Box::new(SetTilesColour {
+            id: self.id,
             colour: prev,
         })
     }
@@ -985,8 +985,8 @@ mod tests {
         let (mut scene, id) = scene_with_tiles_layer();
         assert_apply_then_undo_is_identity(
             &mut scene,
-            Box::new(SetColour {
-                layer: id,
+            Box::new(SetTilesColour {
+                id,
                 colour: Color::from_rgb(0.1, 0.2, 0.3),
             }),
         );
@@ -1001,8 +1001,8 @@ mod tests {
             };
             tiles.colour
         };
-        let inverse = Box::new(SetColour {
-            layer: id,
+        let inverse = Box::new(SetTilesColour {
+            id,
             colour: current_colour,
         })
         .apply(&mut scene);
@@ -1012,8 +1012,8 @@ mod tests {
     #[test]
     fn set_colour_on_non_tiles_layer_is_a_noop() {
         let (mut scene, id) = scene_with_noise_layer();
-        let inverse = Box::new(SetColour {
-            layer: id,
+        let inverse = Box::new(SetTilesColour {
+            id,
             colour: Color::BLACK,
         })
         .apply(&mut scene);

@@ -3,38 +3,32 @@ use iced::{
     widget::{
         Action,
         canvas::{self, Frame, Path, Stroke},
-        column, responsive, row,
+        column, responsive,
     },
 };
 
-use crate::{app::Message, domain::colour::Hsva};
+use crate::domain::colour::Hsva;
 
-/// Creates a context-aware bundle of widget's for editing a `Color`.
+/// Creates a bundle of widget's for editing a `Color`.
 ///
 /// - [`SaturationValuePicker`]. A box for picking saturation & value.
 /// - [`HuePicker`]. A slider strip for picking hue.
 /// - [`AlphaPicker`]. A slider strip for picking alpha.
-pub fn colour_picker<'a>(
+///
+pub fn colour_picker<'a, Message, OnChange, OnCommit>(
     colour: Color,
-    on_change: impl Fn(Color) -> Message + 'a + Copy,
-    on_commit: impl Fn(Color) -> Message + 'a + Copy,
-) -> Element<'a, Message> {
+    on_change: OnChange,
+    on_commit: OnCommit,
+) -> Element<'a, Message>
+where
+    Message: 'a,
+    OnChange: Fn(Color) -> Message + Copy + 'a,
+    OnCommit: Fn(Color) -> Message + Copy + 'a,
+{
     responsive(move |size| {
         const PICKER_THICKNESS: f32 = 20.0;
         const GAP: f32 = 8.0;
-        const ROW_OVERHEAD: f32 = PICKER_THICKNESS * 2.0 + GAP * 2.0;
-
-        let width = size.width;
-        let height = size.height;
-
-        // The square is allowed to shrink up to 100 px to accomidate sliders
-        let is_col_layout = width < ROW_OVERHEAD * 2.0 + GAP * 2.0 + 100.0;
-
-        // Calculate short edge length
-        let side = match is_col_layout {
-            true => width.clamp(100.0, 300.0),
-            false => (width - ROW_OVERHEAD).min(height).clamp(100.0, 300.0),
-        };
+        let side = size.width.clamp(100.0, 300.0);
 
         let Hsva {
             hue,
@@ -56,7 +50,7 @@ pub fn colour_picker<'a>(
             value,
             on_change: Box::new(on_change),
             on_commit: Box::new(on_commit),
-            is_row: is_col_layout,
+            is_row: true,
         };
 
         let alpha_picker = AlphaPicker {
@@ -65,38 +59,22 @@ pub fn colour_picker<'a>(
             hue,
             on_change: Box::new(on_change),
             on_commit: Box::new(on_commit),
-            is_row: is_col_layout,
+            is_row: true,
         };
 
-        if is_col_layout {
-            column![
-                iced::widget::canvas(PickerProgram(sv_picker))
-                    .width(Length::Fixed(side))
-                    .height(Length::Fixed(side)),
-                iced::widget::canvas(PickerProgram(hue_picker))
-                    .width(Length::Fixed(side))
-                    .height(Length::Fixed(PICKER_THICKNESS)),
-                iced::widget::canvas(PickerProgram(alpha_picker))
-                    .width(Length::Fixed(side))
-                    .height(Length::Fixed(PICKER_THICKNESS)),
-            ]
-            .spacing(GAP)
-            .into()
-        } else {
-            row![
-                iced::widget::canvas(PickerProgram(sv_picker))
-                    .width(Length::Fixed(side))
-                    .height(Length::Fixed(side)),
-                iced::widget::canvas(PickerProgram(hue_picker))
-                    .width(Length::Fixed(PICKER_THICKNESS))
-                    .height(Length::Fixed(side)),
-                iced::widget::canvas(PickerProgram(alpha_picker))
-                    .width(Length::Fixed(PICKER_THICKNESS))
-                    .height(Length::Fixed(side)),
-            ]
-            .spacing(GAP)
-            .into()
-        }
+        column![
+            iced::widget::canvas(PickerProgram(sv_picker))
+                .width(Length::Fixed(side))
+                .height(Length::Fixed(side)),
+            iced::widget::canvas(PickerProgram(hue_picker))
+                .width(Length::Fixed(side))
+                .height(Length::Fixed(PICKER_THICKNESS)),
+            iced::widget::canvas(PickerProgram(alpha_picker))
+                .width(Length::Fixed(side))
+                .height(Length::Fixed(PICKER_THICKNESS)),
+        ]
+        .spacing(GAP)
+        .into()
     })
     .into()
 }
@@ -107,7 +85,7 @@ pub struct PickerState {
     selected_point: Point,
 }
 
-trait Picker {
+trait Picker<Message> {
     fn on_change(&self) -> &dyn Fn(Color) -> Message;
     fn on_commit(&self) -> &dyn Fn(Color) -> Message;
 
@@ -116,14 +94,14 @@ trait Picker {
 }
 
 /// Saturation value square
-pub struct SaturationValuePicker<'a> {
+pub struct SaturationValuePicker<'a, Message> {
     alpha: f32,
     hue: f32,
     on_change: Box<dyn Fn(Color) -> Message + 'a>,
     on_commit: Box<dyn Fn(Color) -> Message + 'a>,
 }
 
-impl<'a> Picker for SaturationValuePicker<'a> {
+impl<'a, Message> Picker<Message> for SaturationValuePicker<'a, Message> {
     fn on_change(&self) -> &dyn Fn(Color) -> Message {
         &self.on_change
     }
@@ -204,7 +182,7 @@ impl<'a> Picker for SaturationValuePicker<'a> {
 }
 
 /// Hue colour line
-pub struct HuePicker<'a> {
+pub struct HuePicker<'a, Message> {
     saturation: f32,
     value: f32,
     alpha: f32,
@@ -213,7 +191,7 @@ pub struct HuePicker<'a> {
     is_row: bool,
 }
 
-impl<'a> Picker for HuePicker<'a> {
+impl<'a, Message> Picker<Message> for HuePicker<'a, Message> {
     fn on_change(&self) -> &dyn Fn(Color) -> Message {
         &self.on_change
     }
@@ -288,7 +266,7 @@ impl<'a> Picker for HuePicker<'a> {
 }
 
 /// Alpha value selector
-pub struct AlphaPicker<'a> {
+pub struct AlphaPicker<'a, Message> {
     saturation: f32,
     value: f32,
     hue: f32,
@@ -297,7 +275,7 @@ pub struct AlphaPicker<'a> {
     is_row: bool,
 }
 
-impl<'a> Picker for AlphaPicker<'a> {
+impl<'a, Message> Picker<Message> for AlphaPicker<'a, Message> {
     fn on_change(&self) -> &dyn Fn(Color) -> Message {
         &self.on_change
     }
@@ -413,7 +391,10 @@ impl<'a> Picker for AlphaPicker<'a> {
 // Wrapped over picker to prove to the compiler there will be no type conflict
 struct PickerProgram<T>(T);
 
-impl<T: Picker> canvas::Program<Message> for PickerProgram<T> {
+impl<T, Message> canvas::Program<Message> for PickerProgram<T>
+where
+    T: Picker<Message>,
+{
     type State = PickerState;
 
     fn draw(

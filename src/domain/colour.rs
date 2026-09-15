@@ -70,6 +70,35 @@ impl From<Hsva> for Color {
     }
 }
 
+/// Parses a `#RRGGBB` / `RRGGBB` hex string into RGB byte components.
+/// - case-insensitive
+/// - optional leading `#`
+/// - no alpha channel
+///
+/// Returns `None` for anything that isn't exactly 6 hex digits
+pub fn parse_hex_rgb(text: &str) -> Option<[u8; 3]> {
+    let text = text.trim();
+    let text = text.strip_prefix('#').unwrap_or(text);
+
+    if text.len() != 6 || !text.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+
+    let r = u8::from_str_radix(&text[0..2], 16).ok()?;
+    let g = u8::from_str_radix(&text[2..4], 16).ok()?;
+    let b = u8::from_str_radix(&text[4..6], 16).ok()?;
+
+    Some([r, g, b])
+}
+
+/// Formats an iced [`Color`] as an uppercase, 6-digit hex string.
+///
+/// Example: `Color::from_rgb8(239, 159, 39)` -> `"EF9F27"`
+pub fn to_hex_rgb(colour: Color) -> String {
+    let [r, g, b, _] = colour.into_rgba8();
+    format!("{r:02X}{g:02X}{b:02X}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,6 +176,40 @@ mod tests {
             let round_tripped: Color = hsva.into();
             assert_colour_approx(round_tripped, colour);
         }
+    }
+
+    #[test]
+    fn parse_hex_rgb_accepts_with_and_without_a_leading_hash() {
+        assert_eq!(parse_hex_rgb("EF9F27"), Some([0xEF, 0x9F, 0x27]));
+        assert_eq!(parse_hex_rgb("#EF9F27"), Some([0xEF, 0x9F, 0x27]));
+    }
+
+    #[test]
+    fn parse_hex_rgb_is_case_insensitive() {
+        assert_eq!(parse_hex_rgb("ef9f27"), Some([0xEF, 0x9F, 0x27]));
+    }
+
+    #[test]
+    fn parse_hex_rgb_rejects_the_wrong_length() {
+        assert_eq!(parse_hex_rgb("EF9F2"), None);
+        assert_eq!(parse_hex_rgb("EF9F277"), None);
+        assert_eq!(parse_hex_rgb(""), None);
+    }
+
+    #[test]
+    fn parse_hex_rgb_rejects_non_hex_characters() {
+        assert_eq!(parse_hex_rgb("GGGGGG"), None);
+    }
+
+    #[test]
+    fn to_hex_rgb_formats_uppercase_with_no_hash_or_alpha() {
+        assert_eq!(to_hex_rgb(Color::from_rgba8(239, 159, 39, 0.5)), "EF9F27");
+    }
+
+    #[test]
+    fn hex_round_trips_through_parse_and_format() {
+        let [r, g, b] = parse_hex_rgb(&to_hex_rgb(Color::from_rgb8(18, 200, 91))).unwrap();
+        assert_eq!((r, g, b), (18, 200, 91));
     }
 
     #[test]

@@ -3,8 +3,9 @@ use crate::{
     domain::{
         Layer, LayerInner, Scene,
         edit::{
-            Rename, SetColour, SetImageOpacity, SetImagePosition, SetImageSize, SetNoiseFrequency,
-            SetNoiseOctaves, SetNoisePersistence, SetNoiseSeed, SetNoiseThreshold, SetVisible,
+            Rename, SetImageOpacity, SetImagePosition, SetImageSize, SetNoiseFrequency,
+            SetNoiseOctaves, SetNoisePersistence, SetNoiseSeed, SetNoiseThreshold, SetTilesColour,
+            SetVisible,
         },
         id::LayerId,
         inspect::{BoolProperty, BoundedFloatProperty, Property, TextProperty},
@@ -15,10 +16,10 @@ use crate::{
         },
     },
     infrastructure::IoProcess,
-    ui::widgets::{bounded_float_field, bounded_integer_field, colour_picker, inline_text_field},
+    ui::widgets::{bounded_float_field, bounded_integer_field, colour_field, inline_text_field},
 };
 use iced::{
-    Alignment, Color, Element, Length, Padding, Point, Size, Task,
+    Alignment, Element, Length, Padding, Point, Size, Task,
     widget::{Row, button, checkbox, column, container, row, rule, space, text, text_input},
 };
 use iced_fonts::bootstrap;
@@ -27,9 +28,6 @@ use rand::random;
 #[derive(Debug, Clone)]
 pub enum InspectorMessage {
     Clear,
-
-    ColourChange { colour: Color },
-    ColourCommit { id: LayerId },
 
     ImageSizeChange(Option<Size>),
     ImageSizeCommit { id: LayerId },
@@ -40,7 +38,6 @@ pub enum InspectorMessage {
 
 #[derive(Debug, Default, Clone)]
 pub struct Inspector {
-    active_colour: Option<Color>,
     active_size: Option<Size>,
     active_position: Option<Point>,
 }
@@ -49,21 +46,8 @@ impl Inspector {
     pub fn update(&mut self, message: InspectorMessage) -> Task<Message> {
         match message {
             InspectorMessage::Clear => {
-                self.active_colour = None;
-            }
-
-            InspectorMessage::ColourChange { colour } => self.active_colour = Some(colour),
-            InspectorMessage::ColourCommit { id } => {
-                if let Some(colour) = &self.active_colour {
-                    return Task::done(
-                        SetColour {
-                            layer: id,
-                            colour: *colour,
-                        }
-                        .into(),
-                    )
-                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
-                }
+                self.active_position = None;
+                self.active_size = None;
             }
 
             InspectorMessage::ImagePositionChange(position) => self.active_position = position,
@@ -199,13 +183,9 @@ fn visible_toggle<'a>(id: LayerId, visible: &bool) -> Row<'a, Message> {
 
 impl Inspector {
     fn details_tiles(&self, id: LayerId, tiles: &SparseTiles) -> Element<'_, Message> {
-        let colour = self.active_colour.unwrap_or(tiles.colour);
-
-        column![colour_picker(
-            colour,
-            |colour| Message::Inspector(InspectorMessage::ColourChange { colour }),
-            move |_| Message::Inspector(InspectorMessage::ColourCommit { id }),
-        )]
+        column![colour_field("Colour", tiles.colour, move |colour| {
+            SetTilesColour { id, colour }.into()
+        })]
         .padding(8)
         .into()
     }
