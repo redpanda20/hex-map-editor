@@ -15,13 +15,11 @@ use crate::{
         },
     },
     infrastructure::IoProcess,
-    ui::widgets::{bounded_float_field, colour_picker, inline_text_field},
+    ui::widgets::{bounded_float_field, bounded_integer_field, colour_picker, inline_text_field},
 };
 use iced::{
     Alignment, Color, Element, Length, Padding, Point, Size, Task,
-    widget::{
-        Row, button, checkbox, column, container, row, rule, slider, space, text, text_input,
-    },
+    widget::{Row, button, checkbox, column, container, row, rule, space, text, text_input},
 };
 use iced_fonts::bootstrap;
 use rand::random;
@@ -33,9 +31,6 @@ pub enum InspectorMessage {
     ColourChange { colour: Color },
     ColourCommit { id: LayerId },
 
-    NoiseOctaveChange { count: usize },
-    NoiseOctaveCommit { id: LayerId },
-
     ImageSizeChange(Option<Size>),
     ImageSizeCommit { id: LayerId },
 
@@ -46,7 +41,6 @@ pub enum InspectorMessage {
 #[derive(Debug, Default, Clone)]
 pub struct Inspector {
     active_colour: Option<Color>,
-    active_noise_octaves: Option<usize>,
     active_size: Option<Size>,
     active_position: Option<Point>,
 }
@@ -56,7 +50,6 @@ impl Inspector {
         match message {
             InspectorMessage::Clear => {
                 self.active_colour = None;
-                self.active_noise_octaves = None
             }
 
             InspectorMessage::ColourChange { colour } => self.active_colour = Some(colour),
@@ -66,21 +59,6 @@ impl Inspector {
                         SetColour {
                             layer: id,
                             colour: *colour,
-                        }
-                        .into(),
-                    )
-                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
-                }
-            }
-            InspectorMessage::NoiseOctaveChange { count } => {
-                self.active_noise_octaves = Some(count)
-            }
-            InspectorMessage::NoiseOctaveCommit { id } => {
-                if let Some(count) = &self.active_noise_octaves {
-                    return Task::done(
-                        SetNoiseOctaves {
-                            id,
-                            octaves: *count,
                         }
                         .into(),
                     )
@@ -240,19 +218,22 @@ impl Inspector {
             persistence,
         } = noise.get_params();
 
-        let seed = row![
-            button(bootstrap::arrow_clockwise())
-                .on_press_with(move || {
-                    Message::Scene(Box::new(SetNoiseSeed {
-                        layer: id,
-                        seed: random(),
-                    }))
-                })
-                .style(button::text),
-            text(noise.get_seed()).style(text::secondary)
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center);
+        let seed = column![
+            row![
+                text("Seed").style(text::secondary),
+                space::horizontal(),
+                button(bootstrap::arrow_clockwise())
+                    .on_press_with(move || {
+                        Message::Scene(Box::new(SetNoiseSeed {
+                            layer: id,
+                            seed: random(),
+                        }))
+                    })
+                    .style(button::text)
+            ]
+            .align_y(Alignment::Center),
+            text(noise.get_seed()).align_x(Alignment::End)
+        ];
 
         let scale_control =
             bounded_float_field("Scale", frequency as f64, 1.0..=20.0, move |value| {
@@ -270,19 +251,13 @@ impl Inspector {
                 }))
             });
 
-        let octave_control = row![
-            text!("{octaves}").style(text::secondary),
-            slider(1..=8, octaves as i32, move |octaves| Message::Inspector(
-                InspectorMessage::NoiseOctaveChange {
-                    count: octaves as usize
-                }
-            ))
-            .on_release(Message::Inspector(InspectorMessage::NoiseOctaveCommit {
-                id
-            }))
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center);
+        let octave_control =
+            bounded_integer_field("Octaves", octaves as u64, 1..=8, move |value| {
+                Message::Scene(Box::new(SetNoiseOctaves {
+                    id,
+                    octaves: value as usize,
+                }))
+            });
 
         let persistence_control =
             bounded_float_field("Persistence", persistence as f64, 0.0..=1.0, move |value| {
@@ -293,15 +268,13 @@ impl Inspector {
             });
 
         column![
-            text("Seed:"),
             seed,
             scale_control,
             threshold_control,
-            text("Octaves:"),
             octave_control,
             persistence_control
         ]
-        .spacing(8)
+        .spacing(12)
         .padding(8)
         .into()
     }
