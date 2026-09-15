@@ -45,7 +45,7 @@ impl PerlinNoiseLayer {
             seed,
             gradient_table: Box::new(gradient_table),
             threshold: 0.0,
-            frequency: 5.0,
+            frequency: 10.0,
             octaves: 1,
             persistence: 0.5,
         }

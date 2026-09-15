@@ -3,7 +3,7 @@ use iced::{Color, Point, Size, widget::image::Handle};
 use crate::domain::{
     HexCoord, LayerInner, LayerKind, Scene, flood_fill,
     id::{ImageId, LayerId},
-    layer::{Layer, noise::NoiseParams},
+    layer::Layer,
 };
 
 /// A standalone edit that can be made to a scene
@@ -127,9 +127,27 @@ pub struct SetNoiseSeed {
 }
 
 #[derive(Debug, Clone)]
-pub struct SetNoiseParams {
-    pub layer: LayerId,
-    pub params: NoiseParams,
+pub struct SetNoiseFrequency {
+    pub id: LayerId,
+    pub frequency: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetNoiseThreshold {
+    pub id: LayerId,
+    pub threshold: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetNoisePersistence {
+    pub id: LayerId,
+    pub persistence: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct SetNoiseOctaves {
+    pub id: LayerId,
+    pub octaves: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -404,26 +422,99 @@ impl EditCommand for SetNoiseSeed {
         })
     }
 }
-
-impl EditCommand for SetNoiseParams {
+impl EditCommand for SetNoiseFrequency {
     fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
         let Some(Layer {
             kind: LayerInner::Perlin(noise),
             ..
-        }) = scene.get_layer_mut(self.layer)
+        }) = scene.get_layer_mut(self.id)
         else {
             return Box::new(NoOp);
         };
-        if self.params == noise.get_params() {
+
+        if self.frequency == noise.frequency {
             return Box::new(NoOp);
         }
 
-        let params = noise.get_params();
-        noise.set_params(&self.params);
+        let prev = noise.frequency;
+        noise.frequency = self.frequency;
 
-        Box::new(SetNoiseParams {
-            layer: self.layer,
-            params,
+        Box::new(SetNoiseFrequency {
+            id: self.id,
+            frequency: prev,
+        })
+    }
+}
+
+impl EditCommand for SetNoiseThreshold {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Perlin(noise),
+            ..
+        }) = scene.get_layer_mut(self.id)
+        else {
+            return Box::new(NoOp);
+        };
+
+        if self.threshold < 0.0 || self.threshold > 1.0 || self.threshold == noise.threshold {
+            return Box::new(NoOp);
+        }
+
+        let prev = noise.threshold;
+        noise.threshold = self.threshold;
+
+        Box::new(SetNoiseThreshold {
+            id: self.id,
+            threshold: prev,
+        })
+    }
+}
+
+impl EditCommand for SetNoisePersistence {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Perlin(noise),
+            ..
+        }) = scene.get_layer_mut(self.id)
+        else {
+            return Box::new(NoOp);
+        };
+
+        if self.persistence < 0.0 || self.persistence > 1.0 || self.persistence == noise.persistence
+        {
+            return Box::new(NoOp);
+        }
+
+        let prev = noise.persistence;
+        noise.persistence = self.persistence;
+
+        Box::new(SetNoisePersistence {
+            id: self.id,
+            persistence: prev,
+        })
+    }
+}
+
+impl EditCommand for SetNoiseOctaves {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Perlin(noise),
+            ..
+        }) = scene.get_layer_mut(self.id)
+        else {
+            return Box::new(NoOp);
+        };
+
+        if self.octaves < 1 || self.octaves == noise.octaves {
+            return Box::new(NoOp);
+        }
+
+        let prev = noise.octaves;
+        noise.octaves = self.octaves;
+
+        Box::new(SetNoiseOctaves {
+            id: self.id,
+            octaves: prev,
         })
     }
 }
@@ -973,21 +1064,87 @@ mod tests {
     }
 
     #[test]
-    fn set_noise_params_round_trips() {
+    fn set_noise_threshold_round_trips() {
         let (mut scene, id) = scene_with_noise_layer();
-        let new_params = NoiseParams {
-            threshold: 0.5,
-            frequency: 10.0,
-            octaves: 3,
-            persistence: 0.25,
-        };
-        assert_apply_then_undo_is_identity(
-            &mut scene,
-            Box::new(SetNoiseParams {
-                layer: id,
-                params: new_params,
-            }),
-        );
+        let inverse = Box::new(SetNoiseThreshold { id, threshold: 1.0 })
+            .apply(&mut scene)
+            .apply(&mut scene);
+        assert!(!inverse.is_noop());
+    }
+    #[test]
+    fn set_noise_threshold_caps_above_one() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(SetNoiseThreshold { id, threshold: 2.0 }).apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+    #[test]
+    fn set_noise_threshold_fails_below_zero() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(SetNoiseThreshold {
+            id,
+            threshold: -2.0,
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop());
+    }
+
+    #[test]
+    fn set_noise_frequency_round_trips() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(SetNoiseFrequency {
+            id,
+            frequency: 15.0,
+        })
+        .apply(&mut scene)
+        .apply(&mut scene);
+        assert!(!inverse.is_noop())
+    }
+    #[test]
+    fn set_noise_octaves_round_trips() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(SetNoiseOctaves { id, octaves: 6 })
+            .apply(&mut scene)
+            .apply(&mut scene);
+        assert!(!inverse.is_noop())
+    }
+    #[test]
+    fn set_noise_octaves_fails_below_one() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(SetNoiseOctaves { id, octaves: 0 }).apply(&mut scene);
+        assert!(inverse.is_noop())
+    }
+
+    #[test]
+    fn set_noise_persistence_round_trips() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(SetNoisePersistence {
+            id,
+            persistence: 0.7,
+        })
+        .apply(&mut scene)
+        .apply(&mut scene);
+
+        assert!(!inverse.is_noop())
+    }
+    #[test]
+    fn set_noise_persistence_caps_above_one() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(SetNoisePersistence {
+            id,
+            persistence: 2.0,
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop())
+    }
+    #[test]
+    fn set_noise_persistence_fails_below_zero() {
+        let (mut scene, id) = scene_with_noise_layer();
+        let inverse = Box::new(SetNoisePersistence {
+            id,
+            persistence: -1.0,
+        })
+        .apply(&mut scene);
+        assert!(inverse.is_noop())
     }
 
     // -- SetImageAndSize / SetImage / SetImageBounds / SetImageOpacity --

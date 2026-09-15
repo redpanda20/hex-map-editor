@@ -3,11 +3,11 @@ use crate::{
     domain::{
         Layer, LayerInner, Scene,
         edit::{
-            Rename, SetColour, SetImageOpacity, SetImagePosition, SetImageSize, SetNoiseParams,
-            SetNoiseSeed, SetVisible,
+            Rename, SetColour, SetImageOpacity, SetImagePosition, SetImageSize, SetNoiseFrequency,
+            SetNoiseOctaves, SetNoisePersistence, SetNoiseSeed, SetNoiseThreshold, SetVisible,
         },
         id::LayerId,
-        inspect::{BoolProperty, Property, TextProperty},
+        inspect::{BoolProperty, BoundedFloatProperty, Property, TextProperty},
         layer::{
             image::ImageLayer,
             noise::{NoiseParams, PerlinNoiseLayer},
@@ -15,7 +15,7 @@ use crate::{
         },
     },
     infrastructure::IoProcess,
-    ui::widgets::{colour_picker, inline_text_field},
+    ui::widgets::{bounded_float_field, colour_picker, inline_text_field},
 };
 use iced::{
     Alignment, Color, Element, Length, Padding, Point, Size, Task,
@@ -33,11 +33,8 @@ pub enum InspectorMessage {
     ColourChange { colour: Color },
     ColourCommit { id: LayerId },
 
-    NoiseParamsChange { params: NoiseParams },
-    NoiseParamCommit { id: LayerId },
-
-    ImageOpacityChange { opacity: f32 },
-    ImageOpacityCommit { id: LayerId },
+    NoiseOctaveChange { count: usize },
+    NoiseOctaveCommit { id: LayerId },
 
     ImageSizeChange(Option<Size>),
     ImageSizeCommit { id: LayerId },
@@ -49,8 +46,7 @@ pub enum InspectorMessage {
 #[derive(Debug, Default, Clone)]
 pub struct Inspector {
     active_colour: Option<Color>,
-    active_noise_params: Option<NoiseParams>,
-    active_opacity: Option<f32>,
+    active_noise_octaves: Option<usize>,
     active_size: Option<Size>,
     active_position: Option<Point>,
 }
@@ -60,7 +56,7 @@ impl Inspector {
         match message {
             InspectorMessage::Clear => {
                 self.active_colour = None;
-                self.active_noise_params = None
+                self.active_noise_octaves = None
             }
 
             InspectorMessage::ColourChange { colour } => self.active_colour = Some(colour),
@@ -76,29 +72,15 @@ impl Inspector {
                     .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
                 }
             }
-            InspectorMessage::NoiseParamsChange { params } => {
-                self.active_noise_params = Some(params)
+            InspectorMessage::NoiseOctaveChange { count } => {
+                self.active_noise_octaves = Some(count)
             }
-            InspectorMessage::NoiseParamCommit { id } => {
-                if let Some(params) = &self.active_noise_params {
+            InspectorMessage::NoiseOctaveCommit { id } => {
+                if let Some(count) = &self.active_noise_octaves {
                     return Task::done(
-                        SetNoiseParams {
-                            layer: id,
-                            params: *params,
-                        }
-                        .into(),
-                    )
-                    .chain(Task::done(Message::Inspector(InspectorMessage::Clear)));
-                }
-            }
-
-            InspectorMessage::ImageOpacityChange { opacity } => self.active_opacity = Some(opacity),
-            InspectorMessage::ImageOpacityCommit { id } => {
-                if let Some(opacity) = &self.active_opacity {
-                    return Task::done(
-                        SetImageOpacity {
-                            layer: id,
-                            opacity: *opacity,
+                        SetNoiseOctaves {
+                            id,
+                            octaves: *count,
                         }
                         .into(),
                     )
@@ -204,6 +186,14 @@ impl Inspector {
                     .align_y(Alignment::Center)
                     .into()
             }
+            Property::BoundedFloat(BoundedFloatProperty {
+                name,
+                value,
+                range,
+                on_submit,
+            }) => bounded_float_field(name, value, range, move |value| {
+                Message::Scene(on_submit(value, id))
+            }),
         }
     }
 }
@@ -248,7 +238,7 @@ impl Inspector {
             frequency,
             octaves,
             persistence,
-        } = self.active_noise_params.unwrap_or(noise.get_params());
+        } = noise.get_params();
 
         let seed = row![
             button(bootstrap::arrow_clockwise())
@@ -264,97 +254,54 @@ impl Inspector {
         .spacing(8)
         .align_y(Alignment::Center);
 
-        let scale_control = row![
-            text!("{frequency:.2}").style(text::secondary),
-            slider(1.0..=20.0, frequency, move |frequency| Message::Inspector(
-                InspectorMessage::NoiseParamsChange {
-                    params: NoiseParams {
-                        threshold,
-                        frequency,
-                        octaves,
-                        persistence
-                    }
-                }
-            ))
-            .on_release(Message::Inspector(InspectorMessage::NoiseParamCommit {
-                id
-            }))
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center);
+        let scale_control =
+            bounded_float_field("Scale", frequency as f64, 1.0..=20.0, move |value| {
+                Message::Scene(Box::new(SetNoiseFrequency {
+                    id,
+                    frequency: value as f32,
+                }))
+            });
 
-        let threshold_control = row![
-            text!("{threshold:.2} / 1.00").style(text::secondary),
-            slider(0.0..=1.0, threshold, move |threshold| Message::Inspector(
-                InspectorMessage::NoiseParamsChange {
-                    params: NoiseParams {
-                        threshold,
-                        frequency,
-                        octaves,
-                        persistence
-                    }
-                }
-            ))
-            .step(0.01_f32)
-            .on_release(Message::Inspector(InspectorMessage::NoiseParamCommit {
-                id
-            }))
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center);
+        let threshold_control =
+            bounded_float_field("Threshold", threshold as f64, 0.0..=1.0, move |value| {
+                Message::Scene(Box::new(SetNoiseThreshold {
+                    id,
+                    threshold: value as f32,
+                }))
+            });
 
         let octave_control = row![
             text!("{octaves}").style(text::secondary),
             slider(1..=8, octaves as i32, move |octaves| Message::Inspector(
-                InspectorMessage::NoiseParamsChange {
-                    params: NoiseParams {
-                        threshold,
-                        frequency,
-                        octaves: octaves as usize,
-                        persistence
-                    }
+                InspectorMessage::NoiseOctaveChange {
+                    count: octaves as usize
                 }
             ))
-            .on_release(Message::Inspector(InspectorMessage::NoiseParamCommit {
+            .on_release(Message::Inspector(InspectorMessage::NoiseOctaveCommit {
                 id
             }))
         ]
         .spacing(8)
         .align_y(Alignment::Center);
 
-        let persistence_control = row![
-            text!("{persistence:.2} / 1.00").style(text::secondary),
-            slider(0.0..=1.0, persistence, move |persistence| {
-                Message::Inspector(InspectorMessage::NoiseParamsChange {
-                    params: NoiseParams {
-                        threshold,
-                        frequency,
-                        octaves,
-                        persistence,
-                    },
-                })
-            })
-            .step(0.01_f32)
-            .on_release(Message::Inspector(InspectorMessage::NoiseParamCommit {
-                id
-            }))
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center);
+        let persistence_control =
+            bounded_float_field("Persistence", persistence as f64, 0.0..=1.0, move |value| {
+                Message::Scene(Box::new(SetNoisePersistence {
+                    id,
+                    persistence: value as f32,
+                }))
+            });
 
         column![
             text("Seed:"),
             seed,
-            text("Scale:"),
             scale_control,
-            text("Threshold:"),
             threshold_control,
             text("Octaves:"),
             octave_control,
-            text("Persistence:"),
             persistence_control
         ]
-        .spacing(4)
+        .spacing(8)
         .padding(8)
         .into()
     }
@@ -362,7 +309,6 @@ impl Inspector {
     fn details_image(&self, id: LayerId, layer: &ImageLayer) -> Element<'_, Message> {
         let Point { x, y } = self.active_position.unwrap_or(layer.position);
         let Size { width, height } = self.active_size.unwrap_or(layer.size);
-        let opacity = self.active_opacity.unwrap_or(layer.get_opacity());
 
         let image_control = row![
             text(
@@ -381,18 +327,18 @@ impl Inspector {
         .align_y(Alignment::Center)
         .padding(Padding::default().bottom(8));
 
-        let opacity_control = row![
-            text!("{opacity:.2} / 1.00").style(text::secondary),
-            slider(0.0..=1.0, opacity, |opacity| Message::Inspector(
-                InspectorMessage::ImageOpacityChange { opacity }
-            ))
-            .step(0.01_f32)
-            .on_release(Message::Inspector(InspectorMessage::ImageOpacityCommit {
-                id
-            }))
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center);
+        let opacity_control = bounded_float_field(
+            "Opacity",
+            layer.get_opacity() as f64,
+            0.0..=1.0,
+            move |value| {
+                SetImageOpacity {
+                    layer: id,
+                    opacity: value as f32,
+                }
+                .into()
+            },
+        );
 
         let x_control = text_input("0.0", &x.to_string())
             .on_input(move |x_maybe| {
@@ -458,7 +404,6 @@ impl Inspector {
 
         column![
             image_control,
-            text("Opacity:"),
             opacity_control,
             text("Position:"),
             position_control,
