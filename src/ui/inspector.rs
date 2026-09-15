@@ -232,7 +232,7 @@ impl Inspector {
                     .style(button::text)
             ]
             .align_y(Alignment::Center),
-            text(noise.get_seed()).align_x(Alignment::End)
+            row![space::horizontal(), text(noise.get_seed())]
         ];
 
         let scale_control =
