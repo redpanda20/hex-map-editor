@@ -10,5 +10,9 @@ pub use float_field::bounded_float_field;
 pub use integer_field::bounded_integer_field;
 pub use text_field::inline_text_field;
 
+// Local components
 mod colour_picker;
 use colour_picker::colour_picker;
+
+/// Implements Into<iced::Length>
+const INPUT_WIDTH: u32 = 80;

@@ -2,8 +2,10 @@ use std::ops::RangeInclusive;
 
 use iced::advanced::widget::{Operation, Tree, tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};
-use iced::widget::{row, text, text_input};
+use iced::widget::{row, space, text, text_input};
 use iced::{Alignment, Element, Event, Length, Rectangle, Renderer, Size, Theme};
+
+use crate::ui::widgets::INPUT_WIDTH;
 
 /// Creates a [`BoundedIntegerField`] widget.
 pub fn bounded_integer_field<'a, Message>(
@@ -71,9 +73,8 @@ fn editing_content<'a>(
         .unwrap_or(false);
 
     row![
-        text(name)
-            .style(text::secondary)
-            .width(Length::Fixed(100.0)),
+        text(name).style(text::secondary),
+        space::horizontal(),
         text_input("", text_value)
             .on_input(Internal::Change)
             .on_submit(Internal::Submit)
@@ -87,7 +88,7 @@ fn editing_content<'a>(
 
                 style
             })
-            .width(Length::Fill)
+            .width(INPUT_WIDTH)
     ]
     .width(Length::Fill)
     .align_y(Alignment::Center)

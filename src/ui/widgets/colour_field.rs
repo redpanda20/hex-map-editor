@@ -1,19 +1,18 @@
 use iced::advanced::widget::{Operation, Tree, tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, overlay, renderer};
-use iced::widget::{button, column, container, row, space, text, text_input};
+use iced::widget::{Button, Row, button, column, container, row, space, text, text_input};
 use iced::{
     Alignment, Background, Border, Color, Element, Event, Length, Point, Rectangle, Renderer, Size,
     Theme, Vector, keyboard, touch,
 };
 
-use crate::ui::widgets::colour_picker;
+use crate::ui::widgets::{INPUT_WIDTH, colour_picker};
 use crate::{
     app::Message,
     domain::colour::{parse_hex_rgb, to_hex_rgb},
 };
 
 const SWATCH_SIZE: f32 = 24.0;
-const NAME_WIDTH: f32 = 100.0;
 const POPOVER_WIDTH: f32 = 240.0;
 const POPOVER_GAP: f32 = 6.0;
 
@@ -153,7 +152,7 @@ fn hex_field<'a>(
     raw: &str,
     on_change: impl Fn(String) -> Internal + 'a,
     on_submit: Internal,
-) -> Element<'a, Internal> {
+) -> Row<'a, Internal> {
     let is_valid = parse_hex_rgb(raw).is_some();
 
     row![
@@ -171,14 +170,13 @@ fn hex_field<'a>(
 
                 style
             })
-            .width(Length::Fill)
+            .width(INPUT_WIDTH)
     ]
     .spacing(4)
     .align_y(Alignment::Center)
-    .into()
 }
 
-fn swatch<'a>(colour: Color) -> Element<'a, Internal> {
+fn swatch<'a>(colour: Color) -> Button<'a, Internal> {
     button(
         space()
             .width(Length::Fixed(SWATCH_SIZE))
@@ -204,14 +202,12 @@ fn swatch<'a>(colour: Color) -> Element<'a, Internal> {
             ..button::Style::default()
         }
     })
-    .into()
 }
 
 fn inline_content<'a>(name: &str, colour: Color, raw: &str) -> Element<'a, Internal> {
     row![
-        text(name.to_string())
-            .style(text::secondary)
-            .width(Length::Fixed(NAME_WIDTH)),
+        text(name.to_string()).style(text::secondary),
+        space::horizontal(),
         swatch(colour),
         hex_field(raw, Internal::InlineChange, Internal::InlineSubmit)
     ]
