@@ -9,8 +9,8 @@ use crate::{
         },
         id::LayerId,
         inspect::{
-            BoolProperty, BoundedFloatProperty, BoundedIntegerProperty, FloatProperty, Property,
-            TextProperty,
+            BoolProperty, BoundedFloatProperty, BoundedIntegerProperty, FloatProperty,
+            IntegerProperty, Property, TextProperty,
         },
         layer::{
             image::ImageLayer,
@@ -21,6 +21,7 @@ use crate::{
     infrastructure::IoProcess,
     ui::widgets::{
         bounded_float_field, bounded_integer_field, colour_field, float_field, inline_text_field,
+        integer_field,
     },
 };
 use iced::{
@@ -122,14 +123,6 @@ impl Inspector {
                 .align_y(Alignment::Center)
                 .into()
             }
-            Property::BoundedFloat(BoundedFloatProperty {
-                name,
-                value,
-                range,
-                on_submit,
-            }) => bounded_float_field(name, value, range, move |value| {
-                Message::Scene(on_submit(value, id))
-            }),
             Property::Float(FloatProperty {
                 name,
                 value,
@@ -138,6 +131,22 @@ impl Inspector {
                 Message::Scene(on_submit(value, id))
             })
             .into(),
+            Property::Integer(IntegerProperty {
+                name,
+                value,
+                on_submit,
+            }) => integer_field(name, value, move |value| {
+                Message::Scene(on_submit(value, id))
+            })
+            .into(),
+            Property::BoundedFloat(BoundedFloatProperty {
+                name,
+                value,
+                range,
+                on_submit,
+            }) => bounded_float_field(name, value, range, move |value| {
+                Message::Scene(on_submit(value, id))
+            }),
             Property::BoundedInteger(BoundedIntegerProperty {
                 name,
                 value,
