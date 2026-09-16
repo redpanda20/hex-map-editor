@@ -6,11 +6,8 @@ use iced::{
     Theme, Vector, keyboard, touch,
 };
 
+use crate::domain::colour::{parse_hex_rgb, to_hex_rgb};
 use crate::ui::widgets::{INPUT_WIDTH, colour_picker};
-use crate::{
-    app::Message,
-    domain::colour::{parse_hex_rgb, to_hex_rgb},
-};
 
 const SWATCH_SIZE: f32 = 24.0;
 const POPOVER_WIDTH: f32 = 240.0;
@@ -21,11 +18,14 @@ const POPOVER_GAP: f32 = 6.0;
 /// Shows a colour swatch and a validated hex field inline.
 /// Pressing the swatch opens a popover with additional controls.
 /// Only provides on_commit messages, changes are stored locally.
-pub fn colour_field<'a>(
+pub fn colour_field<'a, Message>(
     name: impl Into<String>,
     colour: Color,
     on_commit: impl Fn(Color) -> Message + 'a + Copy,
-) -> Element<'a, Message> {
+) -> Element<'a, Message>
+where
+    Message: 'a,
+{
     ColourField::new(name.into(), colour, on_commit).into()
 }
 
@@ -98,7 +98,7 @@ enum Internal {
 
 /// Applies one [`Internal`] message to `State`,
 /// publishing `on_commit` only for a finalised edit.
-fn handle_internal<F>(
+fn handle_internal<F, Message>(
     message: Internal,
     mode: &mut State,
     on_commit: F,
@@ -229,7 +229,7 @@ fn popover_content<'a>(colour: Color, raw: &str) -> Element<'a, Internal> {
         .into()
 }
 
-struct ColourField<'a, F>
+struct ColourField<'a, Message, F>
 where
     F: Fn(Color) -> Message + Copy + 'a,
 {
@@ -241,7 +241,7 @@ where
     popover_content: Option<Element<'a, Internal>>,
 }
 
-impl<'a, F> ColourField<'a, F>
+impl<'a, Message, F> ColourField<'a, Message, F>
 where
     F: Fn(Color) -> Message + Copy + 'a,
 {
@@ -258,8 +258,9 @@ where
     }
 }
 
-impl<'a, F> Widget<Message, Theme, Renderer> for ColourField<'a, F>
+impl<'a, Message, F> Widget<Message, Theme, Renderer> for ColourField<'a, Message, F>
 where
+    Message: 'a,
     F: Fn(Color) -> Message + Copy + 'a,
 {
     fn size(&self) -> Size<Length> {
@@ -449,11 +450,12 @@ where
     }
 }
 
-impl<'a, F> From<ColourField<'a, F>> for Element<'a, Message>
+impl<'a, Message, F> From<ColourField<'a, Message, F>> for Element<'a, Message>
 where
+    Message: 'a,
     F: Fn(Color) -> Message + Copy + 'a,
 {
-    fn from(field: ColourField<'a, F>) -> Self {
+    fn from(field: ColourField<'a, Message, F>) -> Self {
         Self::new(field)
     }
 }
@@ -462,7 +464,7 @@ where
 ///
 /// 'short is the lifetime of a frame
 /// 'long is the lifetime of the content borrowed from
-struct ColourPopoverOverlay<'short, 'long, F>
+struct ColourPopoverOverlay<'short, 'long, Message, F>
 where
     'long: 'short,
     F: Fn(Color) -> Message + Copy,
@@ -475,8 +477,9 @@ where
     content: &'short mut Element<'long, Internal>,
 }
 
-impl<'short, 'long, F> ColourPopoverOverlay<'short, 'long, F>
+impl<'short, 'long, Message, F> ColourPopoverOverlay<'short, 'long, Message, F>
 where
+    Message: 'short,
     F: Fn(Color) -> Message + Copy + 'short,
 {
     fn overlay(self) -> overlay::Element<'short, Message, Theme, Renderer> {
@@ -484,8 +487,8 @@ where
     }
 }
 
-impl<'short, 'long, F> overlay::Overlay<Message, Theme, Renderer>
-    for ColourPopoverOverlay<'short, 'long, F>
+impl<'short, 'long, Message, F> overlay::Overlay<Message, Theme, Renderer>
+    for ColourPopoverOverlay<'short, 'long, Message, F>
 where
     F: Fn(Color) -> Message + Copy,
 {

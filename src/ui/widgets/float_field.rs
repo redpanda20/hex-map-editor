@@ -4,6 +4,7 @@ use iced::widget::{column, row, space, text, text_input};
 use iced::{Alignment, Element, Event, Length, Rectangle, Renderer, Size, Theme};
 
 use crate::ui::widgets::INPUT_WIDTH;
+use crate::ui::widgets::helper::subtree_is_focused;
 
 /// Creates a [`UnboundedFloatField`] widget.
 pub fn float_field<'a, Message>(
@@ -21,7 +22,7 @@ where
 enum FieldLayout {
     #[default]
     Horizontal,
-    Vertial,
+    Vertical,
 }
 
 /// Local state, Lives in the [`Tree`].
@@ -49,7 +50,7 @@ pub struct FloatField<'a, Message> {
 impl<'a, Message> FloatField<'a, Message> {
     pub fn new(name: String, value: f64, on_submit: impl Fn(f64) -> Message + 'a) -> Self {
         let layout = FieldLayout::default();
-        let content = editing_content(name.clone(), &value.to_string(), layout);
+        let content = content(name.clone(), &value.to_string(), layout);
         Self {
             name,
             value,
@@ -61,14 +62,18 @@ impl<'a, Message> FloatField<'a, Message> {
 
     pub fn horizontal(mut self) -> Self {
         self.layout = FieldLayout::Horizontal;
-        self.content = editing_content(self.name.clone(), &self.value.to_string(), self.layout);
+        self.content = content(self.name.clone(), &self.value.to_string(), self.layout);
         self
     }
 
     pub fn vertical(mut self) -> Self {
-        self.layout = FieldLayout::Vertial;
-        self.content = editing_content(self.name.clone(), &self.value.to_string(), self.layout);
+        self.layout = FieldLayout::Vertical;
+        self.content = content(self.name.clone(), &self.value.to_string(), self.layout);
         self
+    }
+
+    fn rebuild_content(&mut self, text_value: &str) {
+        self.content = content(self.name.clone(), text_value, self.layout);
     }
 }
 
@@ -76,11 +81,7 @@ fn parse_input(text: &str) -> Option<f64> {
     text.trim().parse::<f64>().ok()
 }
 
-fn editing_content<'a>(
-    name: String,
-    text_value: &str,
-    layout: FieldLayout,
-) -> Element<'a, Internal> {
+fn content<'a>(name: String, text_value: &str, layout: FieldLayout) -> Element<'a, Internal> {
     let is_valid = parse_input(text_value).is_some();
 
     let title = text(name).style(text::secondary);
@@ -104,7 +105,7 @@ fn editing_content<'a>(
             .align_y(Alignment::Center)
             .width(Length::Fill)
             .into(),
-        FieldLayout::Vertial => column![title, input].spacing(4).width(Length::Fill).into(),
+        FieldLayout::Vertical => column![title, input].spacing(4).width(Length::Fill).into(),
     }
 }
 
@@ -179,6 +180,13 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for FloatField<'a, Message> {
     ) {
         let content_layout = layout.children().next().unwrap();
 
+        let was_focused = subtree_is_focused(
+            &mut self.content,
+            &mut tree.children[0],
+            content_layout,
+            renderer,
+        );
+
         let mut internal_messages = Vec::new();
         let mut local_shell = Shell::new(&mut internal_messages);
 
@@ -191,6 +199,13 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for FloatField<'a, Message> {
             clipboard,
             &mut local_shell,
             viewport,
+        );
+
+        let is_focused = subtree_is_focused(
+            &mut self.content,
+            &mut tree.children[0],
+            content_layout,
+            renderer,
         );
 
         shell.request_input_method(local_shell.input_method());
@@ -209,7 +224,10 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for FloatField<'a, Message> {
             match message {
                 Internal::Change(new_text) => {
                     let State { raw, .. } = tree.state.downcast_mut::<State>();
+
                     *raw = new_text;
+
+                    self.rebuild_content(raw);
 
                     shell.invalidate_layout();
                     shell.request_redraw();
@@ -221,12 +239,19 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for FloatField<'a, Message> {
 
                     if let Some(value) = submitted {
                         shell.publish((self.on_submit)(value));
-
-                        shell.invalidate_layout();
-                        shell.request_redraw();
                     }
                 }
             }
+        }
+
+        if was_focused && !is_focused {
+            let State { raw, value } = tree.state.downcast_mut::<State>();
+            *raw = value.to_string();
+
+            self.rebuild_content(raw);
+
+            shell.invalidate_layout();
+            shell.request_redraw();
         }
     }
 

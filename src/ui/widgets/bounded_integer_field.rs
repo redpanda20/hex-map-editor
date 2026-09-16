@@ -6,6 +6,7 @@ use iced::widget::{column, row, space, text, text_input};
 use iced::{Alignment, Element, Event, Length, Rectangle, Renderer, Size, Theme};
 
 use crate::ui::widgets::INPUT_WIDTH;
+use crate::ui::widgets::helper::subtree_is_focused;
 
 /// Creates a [`BoundedIntegerField`] widget.
 pub fn bounded_integer_field<'a, Message>(
@@ -24,13 +25,14 @@ where
 enum FieldLayout {
     #[default]
     Horizontal,
-    Vertial,
+    Vertical,
 }
 
 /// Local state, Lives in the [`Tree`].
 #[derive(Debug, Clone)]
-struct Mode {
+struct State {
     raw: String,
+    value: u64,
 }
 
 /// Messages internal to a [`BoundedFloatField`].
@@ -57,7 +59,7 @@ impl<'a, Message> BoundedIntegerField<'a, Message> {
         on_submit: impl Fn(u64) -> Message + 'a,
     ) -> Self {
         let layout = FieldLayout::default();
-        let content = editing_content(name.clone(), &value.to_string(), range.clone(), layout);
+        let content = content(name.clone(), &value.to_string(), range.clone(), layout);
         Self {
             name,
             value,
@@ -70,12 +72,33 @@ impl<'a, Message> BoundedIntegerField<'a, Message> {
 
     pub fn horizontal(mut self) -> Self {
         self.layout = FieldLayout::Horizontal;
+        self.content = content(
+            self.name.clone(),
+            &self.value.to_string(),
+            self.range.clone(),
+            self.layout,
+        );
         self
     }
 
     pub fn vertical(mut self) -> Self {
-        self.layout = FieldLayout::Vertial;
+        self.layout = FieldLayout::Vertical;
+        self.content = content(
+            self.name.clone(),
+            &self.value.to_string(),
+            self.range.clone(),
+            self.layout,
+        );
         self
+    }
+
+    fn rebuild_content(&mut self, text_value: &str) {
+        self.content = content(
+            self.name.clone(),
+            text_value,
+            self.range.clone(),
+            self.layout,
+        )
     }
 }
 
@@ -83,7 +106,7 @@ fn parse_input(text: &str) -> Option<u64> {
     text.trim().parse::<u64>().ok()
 }
 
-fn editing_content<'a>(
+fn content<'a>(
     name: String,
     text_value: &str,
     range: RangeInclusive<u64>,
@@ -114,7 +137,7 @@ fn editing_content<'a>(
             .align_y(Alignment::Center)
             .width(Length::Fill)
             .into(),
-        FieldLayout::Vertial => column![title, input].spacing(4).width(Length::Fill).into(),
+        FieldLayout::Vertical => column![title, input].spacing(4).width(Length::Fill).into(),
     }
 }
 
@@ -124,16 +147,28 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
     }
 
     fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<Mode>()
+        tree::Tag::of::<State>()
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
     }
 
     fn state(&self) -> tree::State {
-        tree::State::new(Mode {
+        tree::State::new(State {
             raw: self.value.to_string(),
+            value: self.value,
         })
     }
 
-    fn diff(&self, _tree: &mut Tree) {}
+    fn diff(&self, tree: &mut Tree) {
+        let state = tree.state.downcast_mut::<State>();
+
+        if state.value != self.value {
+            state.value = self.value;
+            state.raw = self.value.to_string();
+        }
+    }
 
     fn layout(
         &mut self,
@@ -141,16 +176,6 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let mode = tree.state.downcast_ref::<Mode>().clone();
-
-        self.content = editing_content(
-            self.name.clone(),
-            &mode.raw,
-            self.range.clone(),
-            self.layout,
-        );
-        tree.diff_children(std::slice::from_ref(&self.content));
-
         let node = self
             .content
             .as_widget_mut()
@@ -187,6 +212,13 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
     ) {
         let content_layout = layout.children().next().unwrap();
 
+        let was_focused = subtree_is_focused(
+            &mut self.content,
+            &mut tree.children[0],
+            content_layout,
+            renderer,
+        );
+
         let mut internal_messages = Vec::new();
         let mut local_shell = Shell::new(&mut internal_messages);
 
@@ -199,6 +231,13 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
             clipboard,
             &mut local_shell,
             viewport,
+        );
+
+        let is_focused = subtree_is_focused(
+            &mut self.content,
+            &mut tree.children[0],
+            content_layout,
+            renderer,
         );
 
         shell.request_input_method(local_shell.input_method());
@@ -216,14 +255,17 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
         for message in internal_messages {
             match message {
                 Internal::Change(new_text) => {
-                    let Mode { raw, .. } = tree.state.downcast_mut::<Mode>();
+                    let State { raw, .. } = tree.state.downcast_mut::<State>();
+
                     *raw = new_text;
+
+                    self.rebuild_content(raw);
 
                     shell.invalidate_layout();
                     shell.request_redraw();
                 }
                 Internal::Submit => {
-                    let Mode { raw, .. } = tree.state.downcast_ref::<Mode>();
+                    let State { raw, .. } = tree.state.downcast_ref::<State>();
 
                     let submitted = parse_input(raw);
 
@@ -231,12 +273,19 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
                         && self.range.contains(&value)
                     {
                         shell.publish((self.on_submit)(value));
-
-                        shell.invalidate_layout();
-                        shell.request_redraw();
                     }
                 }
             }
+        }
+
+        if was_focused && !is_focused {
+            let State { raw, value } = tree.state.downcast_mut::<State>();
+            *raw = value.to_string();
+
+            self.rebuild_content(raw);
+
+            shell.invalidate_layout();
+            shell.request_redraw();
         }
     }
 

@@ -1,8 +1,8 @@
 mod bounded_float_field;
-pub mod bounded_integer_field;
+mod bounded_integer_field;
 mod colour_field;
 mod context_menu;
-pub mod float_field;
+mod float_field;
 mod text_field;
 
 pub use bounded_float_field::bounded_float_field;
@@ -14,6 +14,7 @@ pub use text_field::inline_text_field;
 
 // Local components
 mod colour_picker;
+mod helper;
 use colour_picker::colour_picker;
 
 /// Implements Into<iced::Length>
