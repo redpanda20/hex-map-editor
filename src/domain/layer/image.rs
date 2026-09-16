@@ -5,7 +5,8 @@ use crate::domain::{RenderTarget, id::ImageId, layer::LayerInnerImpl};
 #[derive(Debug, Default, Clone)]
 pub struct ImageLayer {
     pub image: Option<ImageId>,
-    pub size: Size,
+    size: Size,
+    pub lock_aspect_ratio: bool,
     pub position: Point,
     opacity: f32,
 }
@@ -15,6 +16,7 @@ impl ImageLayer {
         Self {
             image: None,
             size: Size::default(),
+            lock_aspect_ratio: true,
             position: Point::default(),
             opacity: 1.0,
         }
@@ -24,9 +26,32 @@ impl ImageLayer {
         Self {
             image: Some(image),
             size: Size::default(),
+            lock_aspect_ratio: true,
             position: Point::default(),
             opacity: 1.0,
         }
+    }
+
+    pub fn get_size(&self) -> Size {
+        self.size
+    }
+
+    pub fn set_size(&mut self, size: Size) {
+        if !self.lock_aspect_ratio
+            || self.size.width <= 0.0
+            || self.size.height <= 0.0
+            || size.width <= 0.0
+        {
+            self.size = size;
+            return;
+        }
+
+        let aspect_ratio = self.size.height / self.size.width;
+        self.size = Size::new(size.width, size.width * aspect_ratio);
+    }
+
+    pub fn set_size_ignore_aspect_ratio(&mut self, size: Size) {
+        self.size = size
     }
 
     pub fn get_opacity(&self) -> f32 {
@@ -70,6 +95,7 @@ mod tests {
         let layer = ImageLayer::new();
         assert_eq!(layer.image, None);
         assert_eq!(layer.get_opacity(), 1.0);
+        assert!(layer.lock_aspect_ratio);
     }
 
     #[test]
@@ -77,6 +103,53 @@ mod tests {
         let id = ImageId::from_raw(1);
         let layer = ImageLayer::new_with(id);
         assert_eq!(layer.image, Some(id));
+    }
+
+    #[test]
+    fn set_size_updates_both_dimensions_when_aspect_ratio_is_unlocked() {
+        let mut layer = ImageLayer::new();
+        layer.size = Size::new(100.0, 50.0);
+        layer.lock_aspect_ratio = false;
+
+        layer.set_size(Size::new(200.0, 300.0));
+
+        assert_eq!(layer.size, Size::new(200.0, 300.0));
+    }
+
+    #[test]
+    fn set_size_preserves_aspect_ratio_when_locked() {
+        let mut layer = ImageLayer::new();
+        layer.size = Size::new(100.0, 50.0);
+        layer.lock_aspect_ratio = true;
+
+        layer.set_size(Size::new(200.0, 300.0));
+
+        assert_eq!(layer.size.width, 200.0);
+        assert_eq!(layer.size.height, 100.0);
+    }
+
+    #[test]
+    fn disabling_aspect_ratio_lock_allows_independent_dimensions() {
+        let mut layer = ImageLayer::new();
+        layer.size = Size::new(100.0, 50.0);
+        layer.lock_aspect_ratio = true;
+        layer.set_size(Size::new(200.0, 300.0));
+
+        layer.lock_aspect_ratio = false;
+        layer.set_size(Size::new(400.0, 300.0));
+
+        assert_eq!(layer.size, Size::new(400.0, 300.0));
+    }
+
+    #[test]
+    fn set_size_does_not_divide_by_zero_for_zero_sized_layer() {
+        let mut layer = ImageLayer::new();
+        layer.size = Size::new(0.0, 0.0);
+        layer.lock_aspect_ratio = true;
+
+        layer.set_size(Size::new(200.0, 100.0));
+
+        assert_eq!(layer.size, Size::new(200.0, 100.0));
     }
 
     #[test]

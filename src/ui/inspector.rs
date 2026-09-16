@@ -3,9 +3,9 @@ use crate::{
     domain::{
         Layer, LayerInner, Scene,
         edit::{
-            Rename, SetImageOpacity, SetImagePosition, SetImageSize, SetNoiseFrequency,
-            SetNoiseOctaves, SetNoisePersistence, SetNoiseSeed, SetNoiseThreshold, SetTilesColour,
-            SetVisible,
+            Rename, SetImageLockAspectRatio, SetImageOpacity, SetImagePosition, SetImageSize,
+            SetNoiseFrequency, SetNoiseOctaves, SetNoisePersistence, SetNoiseSeed,
+            SetNoiseThreshold, SetTilesColour, SetVisible,
         },
         id::LayerId,
         inspect::{
@@ -251,14 +251,10 @@ impl Inspector {
     }
 
     fn details_image(&self, id: LayerId, layer: &ImageLayer) -> Element<'_, Message> {
-        let ImageLayer {
-            image,
-            size,
-            position,
-            ..
-        } = layer;
-        let Size { width, height } = *size;
-        let Point { x, y } = *position;
+        let image = layer.image;
+        let Size { width, height } = layer.get_size();
+        let Point { x, y } = layer.position;
+        let lock_aspect_ratio = layer.lock_aspect_ratio;
 
         let image_control = row![
             text(
@@ -312,11 +308,24 @@ impl Inspector {
         })
         .vertical();
 
+        let aspect_ratio_control = row![
+            text("Lock aspect ratio").style(text::secondary),
+            space::horizontal(),
+            checkbox(lock_aspect_ratio).on_toggle(move |value| {
+                SetImageLockAspectRatio {
+                    id,
+                    lock_aspect_ratio: value,
+                }
+                .into()
+            })
+        ];
+
         column![
             image_control,
             opacity_control,
             row![x_control, y_control].spacing(12),
-            row![width_control, height_control].spacing(12)
+            row![width_control, height_control].spacing(12),
+            aspect_ratio_control
         ]
         .spacing(8)
         .padding(8)

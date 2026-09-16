@@ -76,7 +76,7 @@ impl ImageLayerV1 {
             None => ImageLayer::new(),
         };
         layer.position = self.bounds.position();
-        layer.size = self.bounds.size();
+        layer.set_size_ignore_aspect_ratio(self.bounds.size());
         layer.set_opacity(self.opacity);
         layer
     }

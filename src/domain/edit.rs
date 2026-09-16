@@ -170,6 +170,12 @@ pub struct SetImageSize {
 }
 
 #[derive(Debug, Clone)]
+pub struct SetImageLockAspectRatio {
+    pub id: LayerId,
+    pub lock_aspect_ratio: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct SetImagePosition {
     pub id: LayerId,
     pub position: Point,
@@ -531,9 +537,9 @@ impl EditCommand for SetImageAndSize {
         };
 
         let prev_image = layer.image;
-        let prev_size = layer.size;
+        let prev_size = layer.get_size();
 
-        layer.size = self.size;
+        layer.set_size_ignore_aspect_ratio(self.size);
         layer.image = self.image;
 
         Box::new(SetImageAndSize {
@@ -570,10 +576,10 @@ impl EditCommand for SetImage {
         };
 
         let prev_image = layer.image;
-        let prev_size = layer.size;
+        let prev_size = layer.get_size();
 
         layer.image = Some(self.image);
-        layer.size = Size { width, height };
+        layer.set_size_ignore_aspect_ratio(Size { width, height });
 
         Box::new(SetImageAndSize {
             layer: self.id,
@@ -593,16 +599,40 @@ impl EditCommand for SetImageSize {
             return Box::new(NoOp);
         };
 
-        if self.size == layer.size {
+        if self.size == layer.get_size() {
             return Box::new(NoOp);
         }
 
-        let prev = layer.size;
-        layer.size = self.size;
+        let prev = layer.get_size();
+        layer.set_size(self.size);
 
         Box::new(SetImageSize {
             id: self.id,
             size: prev,
+        })
+    }
+}
+
+impl EditCommand for SetImageLockAspectRatio {
+    fn apply(self: Box<Self>, scene: &mut Scene) -> Box<dyn EditCommand> {
+        let Some(Layer {
+            kind: LayerInner::Image(layer),
+            ..
+        }) = scene.get_layer_mut(self.id)
+        else {
+            return Box::new(NoOp);
+        };
+
+        if self.lock_aspect_ratio == layer.lock_aspect_ratio {
+            return Box::new(NoOp);
+        }
+
+        let prev = layer.lock_aspect_ratio;
+        layer.lock_aspect_ratio = self.lock_aspect_ratio;
+
+        Box::new(SetImageLockAspectRatio {
+            id: self.id,
+            lock_aspect_ratio: prev,
         })
     }
 }
@@ -1183,8 +1213,8 @@ mod tests {
             panic!("expected image layer");
         };
         assert_eq!(image_layer.image, Some(image_id));
-        assert_eq!(image_layer.size.width, 8.0);
-        assert_eq!(image_layer.size.height, 6.0);
+        assert_eq!(image_layer.get_size().width, 8.0);
+        assert_eq!(image_layer.get_size().height, 6.0);
     }
 
     #[test]
