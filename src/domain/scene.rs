@@ -182,7 +182,7 @@ impl Scene {
 impl Default for Scene {
     fn default() -> Self {
         let kind = LayerInner::Tiles(SparseTiles::new(DEFAULT_COLORS[0]));
-        let layer = Layer::new("Layer 1", kind);
+        let layer = Layer::new("Tile layer", kind);
 
         Self {
             inner: vec![layer],
@@ -204,7 +204,7 @@ mod tests {
     fn default_scene_has_a_single_visible_layer() {
         let scene = Scene::default();
         assert_eq!(scene.inner.len(), 1);
-        assert_eq!(scene.inner[0].name, "Layer 1");
+        assert_eq!(scene.inner[0].name, "Tile layer");
         assert!(scene.inner[0].visible);
         assert_eq!(scene.revision(), 0);
     }

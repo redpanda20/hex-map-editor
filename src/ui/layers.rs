@@ -162,21 +162,21 @@ fn layer_preview<'a>(
 fn layer_context_menu<'a>(id: LayerId) -> Element<'a, Message> {
     container(
         column![
-            text("Layer menu"),
+            column![text("Layer menu")].padding(8),
             rule::horizontal(1),
-            // Duplicate layer
-            //
-            // Lock layer
-            //
-            button(text("Delete layer"))
-                .width(Length::Fill)
-                .style(button::warning)
-                .on_press(RemoveLayer { id }.into()),
+            column![
+                // Duplicate layer,
+                // Lock layer
+                button(text("Delete layer"))
+                    .width(Length::Fill)
+                    .style(button::danger)
+                    .on_press(RemoveLayer { id }.into())
+            ]
+            .padding(8)
         ]
-        .spacing(4),
+        .spacing(0),
     )
     .style(container::bordered_box)
-    .padding(4)
     .width(Length::Fixed(160.0))
     .into()
 }
@@ -223,7 +223,7 @@ fn add_layer_button<'a>(layers: &Layers) -> Element<'a, Message> {
     .width(Length::Fill)
     .on_press(
         PushLayer {
-            name: "New layer".to_string(),
+            name: format!("{} layer", layers.active_layer_type),
             kind: layers.active_layer_type,
         }
         .into(),

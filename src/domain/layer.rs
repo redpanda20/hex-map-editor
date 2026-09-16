@@ -46,7 +46,7 @@ pub enum LayerKind {
 impl Display for LayerKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LayerKind::Tiles => write!(f, "Tiles"),
+            LayerKind::Tiles => write!(f, "Tile"),
             LayerKind::Noise => write!(f, "Noise"),
             LayerKind::Image => write!(f, "Image"),
         }
@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn layer_kind_display_matches_labels_used_in_the_ui() {
-        assert_eq!(LayerKind::Tiles.to_string(), "Tiles");
+        assert_eq!(LayerKind::Tiles.to_string(), "Tile");
         assert_eq!(LayerKind::Noise.to_string(), "Noise");
         assert_eq!(LayerKind::Image.to_string(), "Image");
     }
