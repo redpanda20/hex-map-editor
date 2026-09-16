@@ -2,7 +2,7 @@ use iced::{
     Alignment, Color, Element, Length,
     widget::{button, column, container, row, scrollable, space, text, text_input},
 };
-use iced_fonts::bootstrap;
+use iced_fonts::lucide;
 
 use crate::app::Message;
 
@@ -129,7 +129,7 @@ fn crates_view<'a>(content: &'a Crate) -> Element<'a, Message> {
 fn modal<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
     let close_button = row![
         space::horizontal(),
-        button(bootstrap::x_lg())
+        button(lucide::x())
             .style(button::text)
             .on_press(Message::About(AboutMessage::Hide))
     ];

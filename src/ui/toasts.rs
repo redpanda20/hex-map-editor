@@ -2,7 +2,7 @@ use iced::{
     Element, Length, Subscription, Task,
     widget::{button, column, container, row, space, text, tooltip},
 };
-use iced_fonts::bootstrap;
+use iced_fonts::lucide;
 
 use crate::infrastructure::{
     Duration, Instant,
@@ -118,7 +118,7 @@ impl Toasts {
                     container(row![
                         text(toast.title.as_str()),
                         space::horizontal(),
-                        button(bootstrap::x_lg()).on_press(ToastMessage::RemoveToast(index))
+                        button(lucide::x()).on_press(ToastMessage::RemoveToast(index))
                     ])
                     .padding(4.0)
                     .style(container::rounded_box)

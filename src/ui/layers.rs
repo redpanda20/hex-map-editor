@@ -1,12 +1,12 @@
 use iced::{
-    Element, Length, Padding, Task, alignment, color,
+    Element, Length, Padding, Task, alignment,
     mouse::Interaction,
     widget::{
         Button, Text, button, column, container, mouse_area, pick_list, row, rule, scrollable,
         space, text,
     },
 };
-use iced_fonts::bootstrap;
+use iced_fonts::lucide;
 
 use crate::{
     app::{Action::SetLayer, Message},
@@ -15,7 +15,6 @@ use crate::{
         edit::{MoveLayerTo, PushLayer, RemoveLayer, Rename, SetVisible},
         id::LayerId,
     },
-    theme,
     ui::widgets::{context_menu, inline_text_field},
 };
 
@@ -182,7 +181,7 @@ fn layer_context_menu<'a>(id: LayerId) -> Element<'a, Message> {
 }
 
 fn drag_handle<'a>(id: &LayerId) -> Element<'a, Message> {
-    mouse_area(bootstrap::grip_vertical().style(text::secondary))
+    mouse_area(lucide::grip_vertical().style(text::secondary))
         .on_press(Message::Layers(LayersMessage::DragLayerPick {
             picked: *id,
         }))
@@ -192,8 +191,8 @@ fn drag_handle<'a>(id: &LayerId) -> Element<'a, Message> {
 
 fn visible_toggle<'a>(id: &LayerId, visible: &bool) -> Button<'a, Message> {
     let inner = match visible {
-        true => bootstrap::eye(),
-        false => bootstrap::eye_slash(),
+        true => lucide::eye(),
+        false => lucide::eye_off(),
     }
     .style(text::secondary);
     button(inner).style(button::text).padding(0).on_press(
@@ -207,16 +206,16 @@ fn visible_toggle<'a>(id: &LayerId, visible: &bool) -> Button<'a, Message> {
 
 fn thumbnail<'a>(kind: &LayerInner) -> Text<'a> {
     match kind {
-        LayerInner::Tiles(_) => bootstrap::grid_threexthree_gap_fill().color(color!(0xEF9F27)),
-        LayerInner::Perlin(_) => bootstrap::cloud().color(color!(0x7F77DD)),
-        LayerInner::Image(_) => bootstrap::image(),
-        LayerInner::Unknown(_) => bootstrap::question_diamond().color(theme::raw::DANGER),
+        LayerInner::Tiles(_) => lucide::grid_threexthree().style(text::primary),
+        LayerInner::Perlin(_) => lucide::waves().style(text::secondary),
+        LayerInner::Image(_) => lucide::image().style(text::secondary),
+        LayerInner::Unknown(_) => lucide::message_circle_question().style(text::danger),
     }
 }
 
 fn add_layer_button<'a>(layers: &Layers) -> Element<'a, Message> {
     let add_layer_button = button(
-        row![bootstrap::plus_lg(), text("Add layer")]
+        row![lucide::plus(), text("Add layer")]
             .spacing(4.0)
             .align_y(alignment::Vertical::Center),
     )

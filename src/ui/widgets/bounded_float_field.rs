@@ -66,6 +66,23 @@ fn content<'a>(name: String, value: f64, range: RangeInclusive<f64>) -> Element<
 
     let slider = slider(range, value, Internal::Change)
         .on_release(Internal::Submit)
+        .style(|theme, status| {
+            let mut style = slider::default(theme, status);
+            let palette = theme.extended_palette();
+
+            // Pretty much just an over-ride of the slider default theme
+            let colour = match status {
+                slider::Status::Active => palette.secondary.strong.color,
+                slider::Status::Hovered => palette.primary.strong.color,
+                slider::Status::Dragged => palette.primary.weak.color,
+            }
+            .into();
+
+            style.handle.background = colour;
+            style.rail.backgrounds.0 = colour;
+
+            style
+        })
         .step(step);
 
     column![
@@ -76,7 +93,7 @@ fn content<'a>(name: String, value: f64, range: RangeInclusive<f64>) -> Element<
         ],
         slider
     ]
-    .spacing(8)
+    .spacing(4)
     .into()
 }
 

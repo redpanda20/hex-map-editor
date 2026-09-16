@@ -27,7 +27,7 @@ use iced::{
     Alignment, Element, Length, Point, Size, Task,
     widget::{Row, button, checkbox, column, container, row, rule, space, text},
 };
-use iced_fonts::bootstrap;
+use iced_fonts::lucide;
 use rand::random;
 
 #[derive(Debug, Clone)]
@@ -154,11 +154,11 @@ impl Inspector {
 fn visible_toggle<'a>(id: LayerId, visible: &bool) -> Row<'a, Message> {
     let inner = match visible {
         true => row![
-            bootstrap::eye().style(text::secondary),
+            lucide::eye().style(text::secondary),
             text("Visible").style(text::secondary)
         ],
         false => row![
-            bootstrap::eye_slash().style(text::secondary),
+            lucide::eye_off().style(text::secondary),
             text("Hidden").style(text::secondary)
         ],
     }
@@ -189,22 +189,30 @@ impl Inspector {
             persistence,
         } = noise.get_params();
 
-        let seed = column![
+        let seed_control = column![
             row![
                 text("Seed").style(text::secondary),
                 space::horizontal(),
-                button(bootstrap::arrow_clockwise())
-                    .on_press_with(move || {
-                        Message::Scene(Box::new(SetNoiseSeed {
-                            layer: id,
-                            seed: random(),
-                        }))
+                button(lucide::refresh_cw())
+                    .on_press_with(move || SetNoiseSeed {
+                        layer: id,
+                        seed: random(),
+                    }
+                    .into())
+                    .style(|theme, status| {
+                        let mut style = button::subtle(theme, status);
+
+                        if matches!(status, button::Status::Hovered | button::Status::Pressed) {
+                            style.text_color = theme.palette().primary
+                        }
+
+                        style
                     })
-                    .style(button::text)
             ]
             .align_y(Alignment::Center),
             row![space::horizontal(), text(noise.get_seed())]
-        ];
+        ]
+        .spacing(4);
 
         let scale_control =
             bounded_float_field("Scale", frequency as f64, 1.0..=20.0, move |value| {
@@ -239,7 +247,7 @@ impl Inspector {
             });
 
         column![
-            seed,
+            seed_control,
             scale_control,
             threshold_control,
             octave_control,
@@ -327,7 +335,7 @@ impl Inspector {
             row![width_control, height_control].spacing(12),
             aspect_ratio_control
         ]
-        .spacing(8)
+        .spacing(12)
         .padding(8)
         .into()
     }

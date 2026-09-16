@@ -25,7 +25,7 @@ pub fn main() -> iced::Result {
         .title(App::title)
         .theme(App::theme)
         .subscription(App::subscription)
-        .font(iced_fonts::BOOTSTRAP_FONT_BYTES);
+        .font(iced_fonts::LUCIDE_FONT_BYTES);
 
     #[cfg(target_arch = "wasm32")]
     {
