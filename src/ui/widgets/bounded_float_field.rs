@@ -125,6 +125,9 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedFloatField<'a, Mes
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
+        let State { value } = tree.state.downcast_ref::<State>();
+        self.rebuild_content(*value);
+
         let node = self
             .content
             .as_widget_mut()
@@ -195,7 +198,6 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedFloatField<'a, Mes
                     let state = tree.state.downcast_mut::<State>();
 
                     state.value = value;
-                    self.rebuild_content(value);
 
                     shell.invalidate_layout();
                     shell.request_redraw();

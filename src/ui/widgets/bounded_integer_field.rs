@@ -32,7 +32,7 @@ enum FieldLayout {
 #[derive(Debug, Clone)]
 struct State {
     raw: String,
-    value: u64,
+    committed: u64,
 }
 
 /// Messages internal to a [`BoundedFloatField`].
@@ -157,17 +157,19 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
     fn state(&self) -> tree::State {
         tree::State::new(State {
             raw: self.value.to_string(),
-            value: self.value,
+            committed: self.value,
         })
     }
 
     fn diff(&self, tree: &mut Tree) {
         let state = tree.state.downcast_mut::<State>();
 
-        if state.value != self.value {
-            state.value = self.value;
+        if state.committed != self.value {
+            state.committed = self.value;
             state.raw = self.value.to_string();
         }
+
+        tree.diff_children(std::slice::from_ref(&self.content));
     }
 
     fn layout(
@@ -176,6 +178,10 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
+        let State { raw, .. } = tree.state.downcast_ref::<State>();
+
+        self.rebuild_content(raw);
+
         let node = self
             .content
             .as_widget_mut()
@@ -259,8 +265,7 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
 
                     *raw = new_text;
 
-                    self.rebuild_content(raw);
-
+                    // Invalidating layout rebuilds content
                     shell.invalidate_layout();
                     shell.request_redraw();
                 }
@@ -279,11 +284,10 @@ impl<'a, Message> Widget<Message, Theme, Renderer> for BoundedIntegerField<'a, M
         }
 
         if was_focused && !is_focused {
-            let State { raw, value } = tree.state.downcast_mut::<State>();
-            *raw = value.to_string();
+            let State { raw, committed } = tree.state.downcast_mut::<State>();
+            *raw = committed.to_string();
 
-            self.rebuild_content(raw);
-
+            // Invalidating layout rebuilds content
             shell.invalidate_layout();
             shell.request_redraw();
         }
