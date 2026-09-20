@@ -29,9 +29,11 @@ impl<'a> shader::Program<CanvasEvent> for HexCanvas<'a> {
         bounds: Rectangle,
     ) -> HexMapPrimitive {
         let current_revision = self.scene.revision();
+        let viewport = state.camera.visible_hex_bounds(bounds);
 
-        let base =
-            state.base_commands(current_revision, || self.build_base_commands(state, bounds));
+        let base = state.base_commands(current_revision, viewport, || {
+            self.build_base_commands(state, bounds)
+        });
         let overlay = self.build_overlay_commands(state, cursor.position_in(bounds), bounds);
 
         HexMapPrimitive {

@@ -56,12 +56,19 @@ impl Camera {
     }
 }
 
-/// A cached build of the map's draw commands, tagged with the
-/// `Scene::revision()` it was built from.
+/// A cached build of the map's draw commands.
+/// Tagged with both `Scene::revision()` and viewport it was built from
 #[derive(Debug)]
 struct CachedCommands {
     revision: u64,
+    viewport: Rectangle,
     commands: Arc<Vec<DrawCommand>>,
+}
+
+/// Whether two viewports are close enough that draw commands built
+/// against one are still valid for the other.
+fn viewports_match(a: Rectangle, b: Rectangle) -> bool {
+    a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height
 }
 
 #[derive(Debug)]
@@ -89,18 +96,17 @@ impl CanvasState {
     }
 
     /// Returns the base draw commands for `revision`.
-    ///
-    /// Provides the cached commands if the revision matches,
-    /// otherwise calls `build` to produce (and cache) a fresh set.
     pub fn base_commands(
         &self,
         revision: u64,
+        viewport: Rectangle,
         build: impl FnOnce() -> Vec<DrawCommand>,
     ) -> Arc<Vec<DrawCommand>> {
         let mut cache = self.cache.borrow_mut();
 
         if let Some(cached) = cache.as_ref()
             && cached.revision == revision
+            && viewports_match(cached.viewport, viewport)
         {
             return Arc::clone(&cached.commands);
         }
@@ -108,6 +114,7 @@ impl CanvasState {
         let commands = Arc::new(build());
         *cache = Some(CachedCommands {
             revision,
+            viewport,
             commands: Arc::clone(&commands),
         });
         commands
