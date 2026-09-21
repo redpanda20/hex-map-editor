@@ -8,10 +8,7 @@ use crate::{
             SetNoiseThreshold, SetTilesColour, SetVisible,
         },
         id::LayerId,
-        inspect::{
-            BoolProperty, BoundedFloatProperty, BoundedIntegerProperty, FloatProperty,
-            IntegerProperty, Property, TextProperty,
-        },
+        inspect::{ActionHint, Property},
         layer::{
             image::ImageLayer,
             noise::{NoiseParams, PerlinNoiseLayer},
@@ -26,7 +23,7 @@ use crate::{
 };
 use iced::{
     Alignment, Element, Length, Point, Size, Task,
-    widget::{Row, button, checkbox, column, container, row, rule, space, text},
+    widget::{Row, Text, button, checkbox, column, container, row, rule, space, text},
 };
 use iced_fonts::lucide;
 use rand::random;
@@ -89,74 +86,70 @@ impl Inspector {
     #[allow(unused)]
     fn view_property<'a>(property: Property<'a>, id: LayerId) -> Element<'a, Message> {
         match property {
-            Property::Text(TextProperty {
-                name,
+            Property::Action {
+                info,
                 value,
-                on_submit,
-            }) => {
-                let field = inline_text_field(value, move |name| {
-                    Message::Scene(on_submit(name.to_string(), id))
-                });
+                action_hint,
+                action,
+            } => column![
                 row![
-                    text(name).style(text::secondary),
+                    text(info.label),
                     space::horizontal(),
-                    field
+                    button(render_action_hint(action_hint))
+                        .on_press_with(move || Message::Scene((action)(id)))
                 ]
-                .spacing(8)
-                .align_y(Alignment::Center)
-                .into()
-            }
-            Property::Bool(BoolProperty {
-                name,
+                .align_y(Alignment::Center),
+                // No space is allocated for a None value
+                value.map(|value| row![space::horizontal(), text(value)])
+            ]
+            .into(),
+
+            Property::Text {
+                info,
                 value,
                 on_submit,
-            }) => {
-                let field = checkbox(value)
-                    .on_toggle(move |enabled| Message::Scene(on_submit(enabled, id)))
-                    .width(80);
-                row![
-                    text(name).style(text::secondary),
-                    space::horizontal(),
-                    field
-                ]
-                .spacing(8)
-                .align_y(Alignment::Center)
-                .into()
-            }
-            Property::Float(FloatProperty {
-                name,
+            } => todo!(),
+            Property::Float {
+                info,
                 value,
                 on_submit,
-            }) => float_field(name, value, move |value| {
-                Message::Scene(on_submit(value, id))
+            } => float_field(info.label, value, move |new| {
+                Message::Scene((on_submit)(new, id))
             })
             .into(),
-            Property::Integer(IntegerProperty {
-                name,
+            Property::Integer {
+                info,
                 value,
                 on_submit,
-            }) => integer_field(name, value, move |value| {
-                Message::Scene(on_submit(value, id))
+            } => integer_field(info.label, value, move |new| {
+                Message::Scene((on_submit)(new, id))
             })
             .into(),
-            Property::BoundedFloat(BoundedFloatProperty {
-                name,
+            Property::BoundedFloat {
+                info,
                 value,
                 range,
                 on_submit,
-            }) => bounded_float_field(name, value, range, move |value| {
-                Message::Scene(on_submit(value, id))
+            } => bounded_float_field(info.label, value, range, move |new| {
+                Message::Scene((on_submit)(new, id))
             }),
-            Property::BoundedInteger(BoundedIntegerProperty {
-                name,
+            Property::BoundedInteger {
+                info,
                 value,
                 range,
                 on_submit,
-            }) => bounded_integer_field(name, value, range, move |value| {
-                Message::Scene(on_submit(value, id))
+            } => bounded_integer_field(info.label, value, range, move |new| {
+                Message::Scene((on_submit)(new, id))
             })
             .into(),
         }
+    }
+}
+
+fn render_action_hint<'a>(hint: ActionHint) -> Text<'a> {
+    match hint {
+        ActionHint::Text(content) => text(content),
+        ActionHint::Refresh => lucide::refresh_cw(),
     }
 }
 
