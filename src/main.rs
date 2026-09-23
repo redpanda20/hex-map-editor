@@ -19,22 +19,14 @@ pub fn main() -> iced::Result {
         std::env::set_var("WAYLAND_DISPLAY", "");
     }
 
-    #[allow(unused_mut)]
-    let mut app = iced::application(App::boot, App::update, App::view)
+    let app = iced::application(App::boot, App::update, App::view)
         .antialiasing(true)
         .title(App::title)
         .theme(App::theme)
         .subscription(App::subscription)
-        .font(iced_fonts::LUCIDE_FONT_BYTES);
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        use iced::Font;
-
-        app = app
-            .font(include_bytes!("../fonts/FiraSans-Regular.ttf"))
-            .default_font(Font::with_name("Fira Sans"));
-    }
+        .font(iced_fonts::LUCIDE_FONT_BYTES)
+        .font(include_bytes!("../fonts/IBMPlexSans-Variable.ttf"))
+        .default_font(iced::Font::with_name("IBM Plex Sans"));
 
     app.run()
 }

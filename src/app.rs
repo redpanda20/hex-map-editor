@@ -95,7 +95,7 @@ impl App {
     }
 
     pub fn theme(&self) -> Option<Theme> {
-        let theme = Theme::custom("Hexmap Theme", theme::PALETTE);
+        let theme = Theme::custom_with_fn("Hexmap Theme", theme::PALETTE, theme::extended_fn);
         Some(theme)
     }
 
