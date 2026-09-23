@@ -1,12 +1,12 @@
 use iced::{Point, Rectangle, Size};
 
 use crate::domain::{
-    Inspectable, RenderTarget,
+    RenderTarget,
     assets::FileKind,
     edit::{SetImageLockAspectRatio, SetImageOpacity, SetImagePosition, SetImageSize},
     id::ImageId,
     inspect::{Property, PropertyInfo},
-    layer::LayerInnerImpl,
+    layer::{Inspectable, Renderable},
 };
 
 #[derive(Debug, Default, Clone)]
@@ -74,7 +74,7 @@ impl ImageLayer {
     }
 }
 
-impl LayerInnerImpl for ImageLayer {
+impl Renderable for ImageLayer {
     fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
         // Technically this shouldn't be known,
         // exports are currently broken otherwise
@@ -177,7 +177,7 @@ mod tests {
     use iced::Point;
 
     use super::*;
-    use crate::domain::ports::MockRenderer;
+    use crate::domain::ports::render::MockRenderer;
 
     #[test]
     fn new_layer_has_no_image_and_full_opacity() {

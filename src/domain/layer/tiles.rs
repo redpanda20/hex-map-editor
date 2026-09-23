@@ -3,12 +3,11 @@ use std::collections::HashSet;
 use iced::{Color, Rectangle};
 
 use crate::domain::{
-    HexBounds, HexCoord, Inspectable, RenderTarget,
+    HexBounds, HexCoord, RenderTarget,
     edit::SetTilesColour,
     inspect::{Property, PropertyInfo},
+    layer::{Inspectable, Renderable},
 };
-
-use super::LayerInnerImpl;
 
 #[derive(Debug, Clone)]
 pub struct SparseTiles {
@@ -101,7 +100,7 @@ impl SparseTiles {
     }
 }
 
-impl LayerInnerImpl for SparseTiles {
+impl Renderable for SparseTiles {
     fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
         self.get_bounding_box(hex_size)
     }
@@ -135,7 +134,7 @@ mod tests {
     use iced::Color;
 
     use super::*;
-    use crate::domain::ports::MockRenderer;
+    use crate::domain::ports::render::MockRenderer;
 
     fn coord(col: i32, row: i32) -> HexCoord {
         HexCoord { col, row }

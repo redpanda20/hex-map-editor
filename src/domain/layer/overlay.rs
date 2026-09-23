@@ -1,7 +1,9 @@
 use iced::Color;
 
-use super::LayerInnerImpl;
-use crate::domain::HexBounds;
+use crate::domain::{
+    HexBounds, RenderTarget,
+    layer::{Inspectable, Renderable},
+};
 
 /// An entirely empty layer that is used to draw the hex grid overlay.
 #[derive(Debug, Clone, Copy)]
@@ -39,12 +41,8 @@ impl HexGridOverlay {
     }
 }
 
-impl LayerInnerImpl for HexGridOverlay {
-    fn bounds(&self, _hex_size: f32) -> Option<iced::Rectangle> {
-        None
-    }
-
-    fn draw(&self, renderer: &mut dyn crate::domain::RenderTarget) {
+impl Renderable for HexGridOverlay {
+    fn draw(&self, renderer: &mut dyn RenderTarget) {
         let bounds = renderer.get_bounds();
         let hexes = HexBounds::from_rect(bounds).into_hexes();
 
@@ -55,10 +53,12 @@ impl LayerInnerImpl for HexGridOverlay {
     }
 }
 
+impl Inspectable for HexGridOverlay {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::ports::MockRenderer;
+    use crate::domain::ports::render::MockRenderer;
 
     #[test]
     fn dark_variant_is_a_translucent_black() {

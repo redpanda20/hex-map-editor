@@ -4,13 +4,14 @@ pub mod overlay;
 pub mod tiles;
 pub mod unknown;
 
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use iced::Rectangle;
 
 use crate::domain::{
     RenderTarget,
     id::LayerId,
+    inspect::Property,
     layer::{
         image::ImageLayer, noise::PerlinNoiseLayer, tiles::SparseTiles, unknown::UnknownLayer,
     },
@@ -62,7 +63,7 @@ pub enum LayerInner {
     Unknown(UnknownLayer),
 }
 
-impl LayerInnerImpl for LayerInner {
+impl Renderable for LayerInner {
     fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
         match self {
             LayerInner::Tiles(inner) => inner.bounds(hex_size),
@@ -82,10 +83,33 @@ impl LayerInnerImpl for LayerInner {
     }
 }
 
-pub trait LayerInnerImpl: std::fmt::Debug + LayerInnerImplClone {
-    fn bounds(&self, hex_size: f32) -> Option<Rectangle>;
+impl Inspectable for LayerInner {
+    fn properties<'a>(&'a self) -> Vec<Property<'a>> {
+        match self {
+            LayerInner::Tiles(inner) => inner.properties(),
+            LayerInner::Perlin(inner) => inner.properties(),
+            LayerInner::Image(inner) => inner.properties(),
+            LayerInner::Unknown(inner) => inner.properties(),
+        }
+    }
+}
 
+pub trait LayerInnerImpl: Renderable + Inspectable + Debug + LayerInnerImplClone {}
+
+impl<T> LayerInnerImpl for T where T: Renderable + Inspectable + Debug + Clone + 'static {}
+
+pub trait Renderable {
+    #[allow(unused_variables)]
+    fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
+        None
+    }
     fn draw(&self, renderer: &mut dyn RenderTarget);
+}
+
+pub trait Inspectable {
+    fn properties<'a>(&'a self) -> Vec<Property<'a>> {
+        vec![]
+    }
 }
 
 pub trait LayerInnerImplClone {
@@ -94,7 +118,7 @@ pub trait LayerInnerImplClone {
 
 impl<T> LayerInnerImplClone for T
 where
-    T: 'static + LayerInnerImpl + Clone,
+    T: Renderable + Inspectable + std::fmt::Debug + Clone + 'static,
 {
     fn clone_box(&self) -> Box<dyn LayerInnerImpl> {
         Box::new(self.clone())

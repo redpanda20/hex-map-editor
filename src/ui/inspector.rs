@@ -1,10 +1,11 @@
 use crate::{
     app::Message,
     domain::{
-        Inspectable, Layer, LayerInner, Scene,
+        Layer, Scene,
         edit::{Rename, SetVisible},
         id::LayerId,
         inspect::{ActionHint, Property},
+        layer::Inspectable,
     },
     infrastructure::IoProcess,
     ui::widgets::{
@@ -59,33 +60,12 @@ impl Inspector {
             }))
             .center_x(Length::Fill),
             visible_toggle(*id, visible),
-            match kind {
-                LayerInner::Image(inner) => column(
-                    inner
-                        .properties()
-                        .into_iter()
-                        .map(|property| Self::view_property(property, *id)),
-                )
-                .spacing(12),
-                LayerInner::Perlin(inner) => column(
-                    inner
-                        .properties()
-                        .into_iter()
-                        .map(|property| Self::view_property(property, *id)),
-                )
-                .spacing(12),
-                LayerInner::Tiles(inner) => column(
-                    inner
-                        .properties()
-                        .into_iter()
-                        .map(|property| Self::view_property(property, *id)),
-                )
-                .spacing(12),
-                LayerInner::Unknown(unknown) => column![text(format!(
-                    "Unsupported layer (kind: \"{}\"). It will be kept as-is when you save.",
-                    unknown.kind
-                ))],
-            },
+            column(
+                kind.properties()
+                    .into_iter()
+                    .map(|property| Self::view_property(property, *id)),
+            )
+            .spacing(12),
         ]
         .into()
     }
@@ -105,6 +85,15 @@ impl Inspector {
                 }
             }
 
+            Property::ReadOnly {
+                info,
+                display_value,
+            } => column![
+                info.map(|info| text(info.label).style(text::secondary)),
+                display_value.map(text)
+            ]
+            .spacing(4)
+            .into(),
             Property::Action {
                 info,
                 display_value: value,

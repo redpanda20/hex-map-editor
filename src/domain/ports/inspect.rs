@@ -4,16 +4,16 @@ use iced::Color;
 
 use crate::domain::{EditCommand, assets::FileKind, id::LayerId};
 
-pub trait Inspectable {
-    fn properties<'a>(&'a self) -> Vec<Property<'a>>;
-}
-
 pub enum Property<'a> {
     Group {
         info: Option<PropertyInfo>,
         children: Vec<Property<'a>>,
     },
 
+    ReadOnly {
+        info: Option<PropertyInfo>,
+        display_value: Option<String>,
+    },
     Action {
         info: PropertyInfo,
         display_value: Option<String>,

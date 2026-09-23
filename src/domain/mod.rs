@@ -19,7 +19,7 @@ pub use tool::Tool;
 pub use edit::EditCommand;
 pub use history::History;
 pub use layer::{Layer, LayerInner, LayerKind};
-pub use ports::{RenderTarget, inspect, inspect::Inspectable};
+pub use ports::{inspect, render::RenderTarget};
 
 /// End-to-end workflow tests that exercise `History` + `Scene` +
 /// `EditCommand` together, the way `App::update` does in practice, rather

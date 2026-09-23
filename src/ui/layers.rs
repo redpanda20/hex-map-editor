@@ -209,7 +209,7 @@ fn thumbnail<'a>(kind: &LayerInner) -> Text<'a> {
         LayerInner::Tiles(_) => lucide::grid_threexthree().style(text::primary),
         LayerInner::Perlin(_) => lucide::waves().style(text::secondary),
         LayerInner::Image(_) => lucide::image().style(text::secondary),
-        LayerInner::Unknown(_) => lucide::message_circle_question().style(text::danger),
+        LayerInner::Unknown(_) => lucide::file_question().style(text::danger),
     }
 }
 

@@ -1,8 +1,8 @@
-use iced::Rectangle;
-
-use crate::domain::RenderTarget;
-
-use super::LayerInnerImpl;
+use crate::domain::{
+    RenderTarget,
+    inspect::{Property, PropertyInfo},
+    layer::{Inspectable, Renderable},
+};
 
 /// A layer whose `kind` this build doesn't recognise.
 ///
@@ -16,18 +16,32 @@ pub struct UnknownLayer {
 }
 
 /// Not renderable - No operation for bounds and draw.
-impl LayerInnerImpl for UnknownLayer {
-    fn bounds(&self, _hex_size: f32) -> Option<Rectangle> {
-        None
-    }
-
+impl Renderable for UnknownLayer {
     fn draw(&self, _renderer: &mut dyn RenderTarget) {}
+}
+impl Inspectable for UnknownLayer {
+    fn properties<'a>(&'a self) -> Vec<crate::domain::inspect::Property<'a>> {
+        vec![
+            Property::ReadOnly {
+                info: None,
+                display_value: Some(
+                    "Unsupported layer type.\nIt will be kept as-is when you save.".to_string(),
+                ),
+            },
+            Property::ReadOnly {
+                info: Some(PropertyInfo {
+                    label: "Layer kind",
+                }),
+                display_value: Some(self.kind.clone()),
+            },
+        ]
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::ports::MockRenderer;
+    use crate::domain::ports::render::MockRenderer;
 
     #[test]
     fn is_never_given_bounds() {

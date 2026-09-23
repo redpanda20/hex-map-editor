@@ -10,7 +10,7 @@ use iced::{
     widget::{Action, shader},
 };
 
-use crate::domain::{RenderTarget, Tool, layer::LayerInnerImpl, layer::overlay::HexGridOverlay};
+use crate::domain::{RenderTarget, Tool, layer::Renderable, layer::overlay::HexGridOverlay};
 
 use super::CanvasEvent;
 use super::gpu::{DrawCommand, HexMapPrimitive};

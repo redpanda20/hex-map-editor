@@ -3,18 +3,17 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
-use iced::{Color, Rectangle, Vector};
+use iced::{Color, Vector};
 use rand::{RngExt, SeedableRng, random, rngs::SmallRng};
 
 use crate::domain::{
-    HexBounds, Inspectable, RenderTarget,
+    HexBounds, RenderTarget,
     edit::{
         SetNoiseFrequency, SetNoiseOctaves, SetNoisePersistence, SetNoiseSeed, SetNoiseThreshold,
     },
     inspect::{ActionHint, Property, PropertyInfo},
+    layer::{Inspectable, Renderable},
 };
-
-use super::LayerInnerImpl;
 
 const TABLE_SIZE: usize = 64;
 
@@ -187,11 +186,7 @@ impl PerlinNoiseLayer {
     }
 }
 
-impl LayerInnerImpl for PerlinNoiseLayer {
-    fn bounds(&self, _hex_size: f32) -> Option<Rectangle> {
-        None
-    }
-
+impl Renderable for PerlinNoiseLayer {
     fn draw(&self, renderer: &mut dyn RenderTarget) {
         let bounds = renderer.get_bounds();
         let hexes = HexBounds::from_rect(bounds).into_hexes();
@@ -291,7 +286,7 @@ impl Inspectable for PerlinNoiseLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::ports::MockRenderer;
+    use crate::domain::ports::render::MockRenderer;
 
     #[test]
     fn get_and_set_seed_round_trip() {
