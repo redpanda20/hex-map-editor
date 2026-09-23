@@ -1,19 +1,14 @@
 use crate::{
     app::Message,
     domain::{
-        Layer, LayerInner, Scene,
+        Inspectable, Layer, LayerInner, Scene,
         edit::{
             Rename, SetImageLockAspectRatio, SetImageOpacity, SetImagePosition, SetImageSize,
-            SetNoiseFrequency, SetNoiseOctaves, SetNoisePersistence, SetNoiseSeed,
-            SetNoiseThreshold, SetTilesColour, SetVisible,
+            SetVisible,
         },
         id::LayerId,
         inspect::{ActionHint, Property},
-        layer::{
-            image::ImageLayer,
-            noise::{NoiseParams, PerlinNoiseLayer},
-            tiles::SparseTiles,
-        },
+        layer::image::ImageLayer,
     },
     infrastructure::IoProcess,
     ui::widgets::{
@@ -23,10 +18,9 @@ use crate::{
 };
 use iced::{
     Alignment, Element, Length, Point, Size, Task,
-    widget::{Row, Text, button, checkbox, column, container, row, rule, space, text},
+    widget::{Column, Row, Text, button, checkbox, column, container, row, rule, space, text},
 };
 use iced_fonts::lucide;
-use rand::random;
 
 #[derive(Debug, Clone)]
 pub enum InspectorMessage {}
@@ -70,20 +64,30 @@ impl Inspector {
             .center_x(Length::Fill),
             visible_toggle(*id, visible),
             match kind {
-                LayerInner::Tiles(tiles) => self.details_tiles(*id, tiles),
-                LayerInner::Perlin(noise) => self.details_noise(*id, noise),
                 LayerInner::Image(image) => self.details_image(*id, image),
-                LayerInner::Unknown(unknown) => text(format!(
+                LayerInner::Perlin(inner) => column(
+                    inner
+                        .properties()
+                        .into_iter()
+                        .map(|property| Self::view_property(property, *id)),
+                )
+                .spacing(12),
+                LayerInner::Tiles(inner) => column(
+                    inner
+                        .properties()
+                        .into_iter()
+                        .map(|property| Self::view_property(property, *id)),
+                )
+                .spacing(12),
+                LayerInner::Unknown(unknown) => column![text(format!(
                     "Unsupported layer (kind: \"{}\"). It will be kept as-is when you save.",
                     unknown.kind
-                ))
-                .into(),
+                ))],
             },
         ]
         .into()
     }
 
-    #[allow(unused)]
     fn view_property<'a>(property: Property<'a>, id: LayerId) -> Element<'a, Message> {
         match property {
             Property::Action {
@@ -93,15 +97,25 @@ impl Inspector {
                 action,
             } => column![
                 row![
-                    text(info.label),
+                    text(info.label).style(text::secondary),
                     space::horizontal(),
                     button(render_action_hint(action_hint))
                         .on_press_with(move || Message::Scene((action)(id)))
+                        .style(|theme, status| {
+                            let mut style = button::subtle(theme, status);
+
+                            if matches!(status, button::Status::Hovered | button::Status::Pressed) {
+                                style.text_color = theme.palette().primary
+                            }
+
+                            style
+                        })
                 ]
                 .align_y(Alignment::Center),
                 // No space is allocated for a None value
                 value.map(|value| row![space::horizontal(), text(value)])
             ]
+            .spacing(4)
             .into(),
 
             Property::Text {
@@ -125,6 +139,14 @@ impl Inspector {
                 Message::Scene((on_submit)(new, id))
             })
             .into(),
+            Property::Colour {
+                info,
+                value,
+                on_submit,
+            } => colour_field(info.label, value, move |new| {
+                Message::Scene((on_submit)(new, id))
+            }),
+
             Property::BoundedFloat {
                 info,
                 value,
@@ -175,92 +197,7 @@ fn visible_toggle<'a>(id: LayerId, visible: &bool) -> Row<'a, Message> {
 }
 
 impl Inspector {
-    fn details_tiles(&self, id: LayerId, tiles: &SparseTiles) -> Element<'_, Message> {
-        column![colour_field("Colour", tiles.colour, move |colour| {
-            SetTilesColour { id, colour }.into()
-        })]
-        .padding(8)
-        .into()
-    }
-
-    fn details_noise(&self, id: LayerId, noise: &PerlinNoiseLayer) -> Element<'_, Message> {
-        let NoiseParams {
-            threshold,
-            frequency,
-            octaves,
-            persistence,
-        } = noise.get_params();
-
-        let seed_control = column![
-            row![
-                text("Seed").style(text::secondary),
-                space::horizontal(),
-                button(lucide::refresh_cw())
-                    .on_press_with(move || SetNoiseSeed {
-                        layer: id,
-                        seed: random(),
-                    }
-                    .into())
-                    .style(|theme, status| {
-                        let mut style = button::subtle(theme, status);
-
-                        if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-                            style.text_color = theme.palette().primary
-                        }
-
-                        style
-                    })
-            ]
-            .align_y(Alignment::Center),
-            row![space::horizontal(), text(noise.get_seed())]
-        ]
-        .spacing(4);
-
-        let scale_control =
-            bounded_float_field("Scale", frequency as f64, 1.0..=20.0, move |value| {
-                Message::Scene(Box::new(SetNoiseFrequency {
-                    id,
-                    frequency: value as f32,
-                }))
-            });
-
-        let threshold_control =
-            bounded_float_field("Threshold", threshold as f64, 0.0..=1.0, move |value| {
-                Message::Scene(Box::new(SetNoiseThreshold {
-                    id,
-                    threshold: value as f32,
-                }))
-            });
-
-        let octave_control =
-            bounded_integer_field("Octaves", octaves as u64, 1..=8, move |value| {
-                Message::Scene(Box::new(SetNoiseOctaves {
-                    id,
-                    octaves: value as usize,
-                }))
-            });
-
-        let persistence_control =
-            bounded_float_field("Persistence", persistence as f64, 0.0..=1.0, move |value| {
-                Message::Scene(Box::new(SetNoisePersistence {
-                    id,
-                    persistence: value as f32,
-                }))
-            });
-
-        column![
-            seed_control,
-            scale_control,
-            threshold_control,
-            octave_control,
-            persistence_control
-        ]
-        .spacing(12)
-        .padding(8)
-        .into()
-    }
-
-    fn details_image(&self, id: LayerId, layer: &ImageLayer) -> Element<'_, Message> {
+    fn details_image(&self, id: LayerId, layer: &ImageLayer) -> Column<'_, Message> {
         let image = layer.image;
         let Size { width, height } = layer.get_size();
         let Point { x, y } = layer.position;

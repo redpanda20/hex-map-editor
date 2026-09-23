@@ -17,16 +17,16 @@ const POPOVER_GAP: f32 = 6.0;
 ///
 /// Shows a colour swatch and a validated hex field inline.
 /// Pressing the swatch opens a popover with additional controls.
-/// Only provides on_commit messages, changes are stored locally.
+/// Only provides on_submit messages, changes are stored locally.
 pub fn colour_field<'a, Message>(
     name: impl Into<String>,
     colour: Color,
-    on_commit: impl Fn(Color) -> Message + 'a + Copy,
+    on_submit: impl Fn(Color) -> Message + 'a,
 ) -> Element<'a, Message>
 where
     Message: 'a,
 {
-    ColourField::new(name.into(), colour, on_commit).into()
+    ColourField::new(name.into(), colour, on_submit).into()
 }
 
 /// State local to inline element or popover
@@ -97,15 +97,13 @@ enum Internal {
 }
 
 /// Applies one [`Internal`] message to `State`,
-/// publishing `on_commit` only for a finalised edit.
-fn handle_internal<F, Message>(
+/// publishing `on_submit` only for a finalised edit.
+fn handle_internal<Message>(
     message: Internal,
     mode: &mut State,
-    on_commit: F,
+    on_submit: &dyn Fn(Color) -> Message,
     shell: &mut Shell<'_, Message>,
-) where
-    F: Fn(Color) -> Message,
-{
+) {
     match message {
         Internal::ToggleOpen => {
             mode.popover_open = !mode.popover_open;
@@ -120,7 +118,7 @@ fn handle_internal<F, Message>(
             if let Some([r, g, b]) = parse_hex_rgb(&mode.inline.raw) {
                 let colour = Color::from_rgba8(r, g, b, mode.live.a);
                 mode.set_live(colour);
-                shell.publish(on_commit(colour));
+                shell.publish(on_submit(colour));
                 shell.request_redraw();
             }
         }
@@ -132,7 +130,7 @@ fn handle_internal<F, Message>(
             if let Some([r, g, b]) = parse_hex_rgb(&mode.popover.raw) {
                 let colour = Color::from_rgba8(r, g, b, mode.live.a);
                 mode.set_live(colour);
-                shell.publish(on_commit(colour));
+                shell.publish(on_submit(colour));
                 shell.request_redraw();
             }
         }
@@ -142,7 +140,7 @@ fn handle_internal<F, Message>(
         }
         Internal::PickerCommit(colour) => {
             mode.set_live(colour);
-            shell.publish(on_commit(colour));
+            shell.publish(on_submit(colour));
             shell.request_redraw();
         }
     }
@@ -229,39 +227,32 @@ fn popover_content<'a>(colour: Color, raw: &str) -> Element<'a, Internal> {
         .into()
 }
 
-struct ColourField<'a, Message, F>
-where
-    F: Fn(Color) -> Message + Copy + 'a,
-{
+struct ColourField<'a, Message> {
     name: String,
     colour: Color,
-    on_commit: F,
+    on_submit: Box<dyn Fn(Color) -> Message + 'a>,
     content: Element<'a, Internal>,
     // Built during `layout`, consumed by `overlay`. Only `Some` while open.
     popover_content: Option<Element<'a, Internal>>,
 }
 
-impl<'a, Message, F> ColourField<'a, Message, F>
-where
-    F: Fn(Color) -> Message + Copy + 'a,
-{
-    fn new(name: String, colour: Color, on_commit: F) -> Self {
+impl<'a, Message> ColourField<'a, Message> {
+    fn new(name: String, colour: Color, on_submit: impl Fn(Color) -> Message + 'a) -> Self {
         let content = inline_content(&name, colour, &to_hex_rgb(colour));
 
         Self {
             name,
             colour,
-            on_commit,
+            on_submit: Box::new(on_submit),
             content,
             popover_content: None,
         }
     }
 }
 
-impl<'a, Message, F> Widget<Message, Theme, Renderer> for ColourField<'a, Message, F>
+impl<'a, Message> Widget<Message, Theme, Renderer> for ColourField<'a, Message>
 where
     Message: 'a,
-    F: Fn(Color) -> Message + Copy + 'a,
 {
     fn size(&self) -> Size<Length> {
         Size::new(Length::Fill, Length::Shrink)
@@ -377,7 +368,7 @@ where
 
         let mode = tree.state.downcast_mut::<State>();
         for message in internal_messages {
-            handle_internal(message, mode, self.on_commit, shell);
+            handle_internal(message, mode, self.on_submit.as_ref(), shell);
         }
     }
 
@@ -441,7 +432,7 @@ where
                 anchor: bounds.position() + translation,
                 anchor_height: bounds.height,
                 mode,
-                on_commit: self.on_commit,
+                on_submit: self.on_submit.as_ref(),
                 tree: &mut tree.children[1],
                 content,
             }
@@ -450,12 +441,11 @@ where
     }
 }
 
-impl<'a, Message, F> From<ColourField<'a, Message, F>> for Element<'a, Message>
+impl<'a, Message> From<ColourField<'a, Message>> for Element<'a, Message>
 where
     Message: 'a,
-    F: Fn(Color) -> Message + Copy + 'a,
 {
-    fn from(field: ColourField<'a, Message, F>) -> Self {
+    fn from(field: ColourField<'a, Message>) -> Self {
         Self::new(field)
     }
 }
@@ -464,33 +454,29 @@ where
 ///
 /// 'short is the lifetime of a frame
 /// 'long is the lifetime of the content borrowed from
-struct ColourPopoverOverlay<'short, 'long, Message, F>
+struct ColourPopoverOverlay<'short, 'long, Message>
 where
     'long: 'short,
-    F: Fn(Color) -> Message + Copy,
 {
     anchor: Point,
     anchor_height: f32,
     mode: &'short mut State,
-    on_commit: F,
+    on_submit: &'short dyn Fn(Color) -> Message,
     tree: &'short mut Tree,
     content: &'short mut Element<'long, Internal>,
 }
 
-impl<'short, 'long, Message, F> ColourPopoverOverlay<'short, 'long, Message, F>
+impl<'short, 'long, Message> ColourPopoverOverlay<'short, 'long, Message>
 where
     Message: 'short,
-    F: Fn(Color) -> Message + Copy + 'short,
 {
     fn overlay(self) -> overlay::Element<'short, Message, Theme, Renderer> {
         overlay::Element::new(Box::new(self))
     }
 }
 
-impl<'short, 'long, Message, F> overlay::Overlay<Message, Theme, Renderer>
-    for ColourPopoverOverlay<'short, 'long, Message, F>
-where
-    F: Fn(Color) -> Message + Copy,
+impl<'short, 'long, Message> overlay::Overlay<Message, Theme, Renderer>
+    for ColourPopoverOverlay<'short, 'long, Message>
 {
     fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
         let limits = layout::Limits::new(Size::ZERO, bounds);
@@ -612,7 +598,7 @@ where
             }
 
             for message in internal_messages {
-                handle_internal(message, self.mode, self.on_commit, shell);
+                handle_internal(message, self.mode, self.on_submit, shell);
             }
         }
     }

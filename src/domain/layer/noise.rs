@@ -4,9 +4,15 @@ use std::{
 };
 
 use iced::{Color, Rectangle, Vector};
-use rand::{RngExt, SeedableRng, rngs::SmallRng};
+use rand::{RngExt, SeedableRng, random, rngs::SmallRng};
 
-use crate::domain::{HexBounds, RenderTarget};
+use crate::domain::{
+    HexBounds, Inspectable, RenderTarget,
+    edit::{
+        SetNoiseFrequency, SetNoiseOctaves, SetNoisePersistence, SetNoiseSeed, SetNoiseThreshold,
+    },
+    inspect::{ActionHint, Property, PropertyInfo},
+};
 
 use super::LayerInnerImpl;
 
@@ -215,6 +221,70 @@ impl Debug for PerlinNoiseLayer {
             .field("octaves", &self.octaves)
             .field("persistence", &self.persistence)
             .finish()
+    }
+}
+
+impl Inspectable for PerlinNoiseLayer {
+    fn properties<'a>(&'a self) -> Vec<Property<'a>> {
+        vec![
+            Property::Action {
+                info: PropertyInfo { label: "Seed" },
+                value: Some(format!("{}", self.seed)),
+                action_hint: ActionHint::Refresh,
+                action: Box::new(|id| {
+                    Box::new(SetNoiseSeed {
+                        layer: id,
+                        seed: random(),
+                    })
+                }),
+            },
+            Property::BoundedFloat {
+                info: PropertyInfo { label: "Scale" },
+                value: self.frequency as f64,
+                range: 0.0..=20.0,
+                on_submit: Box::new(|value, id| {
+                    Box::new(SetNoiseFrequency {
+                        id,
+                        frequency: value as f32,
+                    })
+                }),
+            },
+            Property::BoundedFloat {
+                info: PropertyInfo { label: "Threshold" },
+                value: self.threshold as f64,
+                range: 0.0..=1.0,
+                on_submit: Box::new(|value, id| {
+                    Box::new(SetNoiseThreshold {
+                        id,
+                        threshold: value as f32,
+                    })
+                }),
+            },
+            Property::BoundedInteger {
+                info: PropertyInfo { label: "Octaves" },
+                value: self.octaves as u64,
+                range: 1..=8,
+                on_submit: Box::new(|value, id| {
+                    Box::new(SetNoiseOctaves {
+                        id,
+                        octaves: value as usize,
+                    })
+                }),
+            },
+            Property::BoundedFloat {
+                info: PropertyInfo {
+                    label: "Persistence",
+                },
+                value: self.persistence as f64,
+                range: 0.0..=1.0,
+                on_submit: Box::new(|value, id| {
+                    Box::new(SetNoisePersistence {
+                        id,
+                        persistence: value as f32,
+                    })
+                }),
+            },
+        ]
     }
 }
 

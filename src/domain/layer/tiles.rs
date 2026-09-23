@@ -2,7 +2,11 @@ use std::collections::HashSet;
 
 use iced::{Color, Rectangle};
 
-use crate::domain::{HexBounds, HexCoord, RenderTarget};
+use crate::domain::{
+    HexBounds, HexCoord, Inspectable, RenderTarget,
+    edit::SetTilesColour,
+    inspect::{Property, PropertyInfo},
+};
 
 use super::LayerInnerImpl;
 
@@ -113,6 +117,16 @@ impl LayerInnerImpl for SparseTiles {
                 renderer.fill_polygon(&point, self.colour);
             }
         }
+    }
+}
+
+impl Inspectable for SparseTiles {
+    fn properties<'a>(&'a self) -> Vec<Property<'a>> {
+        vec![Property::Colour {
+            info: PropertyInfo { label: "Colour" },
+            value: self.colour,
+            on_submit: Box::new(|colour, id| Box::new(SetTilesColour { id, colour })),
+        }]
     }
 }
 

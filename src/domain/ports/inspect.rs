@@ -1,5 +1,7 @@
 use std::ops::RangeInclusive;
 
+use iced::Color;
+
 use crate::domain::{EditCommand, id::LayerId};
 
 pub trait Inspectable {
@@ -9,7 +11,7 @@ pub trait Inspectable {
 pub enum Property<'a> {
     Action {
         info: PropertyInfo,
-        value: Option<&'a str>,
+        value: Option<String>,
         action_hint: ActionHint,
         action: Box<dyn Fn(LayerId) -> Box<dyn EditCommand> + 'a>,
     },
@@ -29,6 +31,11 @@ pub enum Property<'a> {
         value: u64,
         on_submit: OnSubmit<'a, u64>,
     },
+    Colour {
+        info: PropertyInfo,
+        value: Color,
+        on_submit: OnSubmit<'a, Color>,
+    },
 
     BoundedFloat {
         info: PropertyInfo,
@@ -47,9 +54,9 @@ pub enum Property<'a> {
 type OnSubmit<'a, T> = Box<dyn Fn(T, LayerId) -> Box<dyn EditCommand> + 'a>;
 
 pub struct PropertyInfo {
-    pub id: &'static str,
+    // pub id: &'static str,
     pub label: &'static str,
-    pub description: Option<&'static str>,
+    // pub description: Option<&'static str>,
 }
 
 pub enum ActionHint {
