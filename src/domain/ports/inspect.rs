@@ -2,24 +2,34 @@ use std::ops::RangeInclusive;
 
 use iced::Color;
 
-use crate::domain::{EditCommand, id::LayerId};
+use crate::domain::{EditCommand, assets::FileKind, id::LayerId};
 
 pub trait Inspectable {
     fn properties<'a>(&'a self) -> Vec<Property<'a>>;
 }
 
 pub enum Property<'a> {
+    Group {
+        info: Option<PropertyInfo>,
+        children: Vec<Property<'a>>,
+    },
+
     Action {
         info: PropertyInfo,
-        value: Option<String>,
+        display_value: Option<String>,
         action_hint: ActionHint,
         action: Box<dyn Fn(LayerId) -> Box<dyn EditCommand> + 'a>,
     },
-
-    Text {
+    File {
         info: PropertyInfo,
-        value: &'a str,
-        on_submit: OnSubmit<'a, String>,
+        display_value: Option<String>,
+        kind: FileKind,
+    },
+
+    Boolean {
+        info: PropertyInfo,
+        value: bool,
+        on_submit: OnSubmit<'a, bool>,
     },
     Float {
         info: PropertyInfo,

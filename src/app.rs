@@ -6,12 +6,12 @@ use iced::{
 use crate::{
     domain::{
         History, Scene, Tool,
-        assets::ImageAsset,
+        assets::{FileAsset, FileKind},
         edit::{EditCommand, SetImageAndSize},
         id::LayerId,
     },
     infrastructure::{
-        Document, IoProcess, export_png, load_image_async, load_project_async, save_bytes_async,
+        Document, IoProcess, export_png, load_asset_async, load_project_async, save_bytes_async,
         save_project_async,
     },
     theme,
@@ -68,7 +68,8 @@ pub enum Message {
 
     LoadAsset {
         caller: LayerId,
-        process: IoProcess<ImageAsset>,
+        kind: FileKind,
+        process: IoProcess<FileAsset>,
     },
     Load(IoProcess<Document>),
     Save(IoProcess<()>),
@@ -143,20 +144,27 @@ impl App {
                 IoProcess::Finished(Err(err)) => eprintln!("Project load failed: {err}"),
             },
 
-            Message::LoadAsset { caller, process } => match process {
-                IoProcess::Start => return load_image_async(caller),
+            Message::LoadAsset {
+                caller,
+                kind,
+                process,
+            } => match process {
+                IoProcess::Start => return load_asset_async(caller, kind),
                 IoProcess::Cancelled => eprintln!("Asset load cancelled"),
                 IoProcess::Finished(Ok(asset)) => {
-                    let size = Size {
-                        width: asset.width as f32,
-                        height: asset.height as f32,
-                    };
-                    let id = self.scene.assets.register_image(asset);
-
-                    let edit = SetImageAndSize {
-                        layer: caller,
-                        image: Some(id),
-                        size,
+                    let edit = match asset {
+                        FileAsset::Image(image_asset) => {
+                            let size = Size {
+                                width: image_asset.width as f32,
+                                height: image_asset.height as f32,
+                            };
+                            let id = self.scene.assets.register_image(image_asset);
+                            SetImageAndSize {
+                                layer: caller,
+                                image: Some(id),
+                                size,
+                            }
+                        }
                     };
                     return Task::done(Message::Scene(Box::new(edit)));
                 }

@@ -3,6 +3,7 @@ use iced::futures::FutureExt;
 use rfd::AsyncFileDialog;
 
 use crate::domain::Scene;
+use crate::domain::assets::{FileAsset, FileKind};
 use crate::domain::id::LayerId;
 use crate::infrastructure::image_codec::decode_image_asset;
 use crate::{app::Message, domain::assets::ImageAsset};
@@ -84,24 +85,29 @@ pub fn load_project_async() -> Task<Message> {
     })
 }
 
-/// Opens a load dialog and parses the chosen file into an image asset.
-pub fn load_image_async(caller: LayerId) -> Task<Message> {
+/// Opens a load dialog and parses the chosen file into an asset.
+pub fn load_asset_async(caller: LayerId, kind: FileKind) -> Task<Message> {
+    let (filter_name, extensions) = match kind {
+        FileKind::Image => ("Image", &["png", "webp"]),
+    };
     Task::future(
         AsyncFileDialog::new()
-            .add_filter("Image", &["png", "webp"])
-            .set_title("Load image")
+            .add_filter(filter_name, extensions)
+            .set_title("Load asset")
             .pick_file()
             .map(move |handle| (caller, handle)),
     )
-    .then(|(caller, handle)| match handle {
+    .then(move |(caller, handle)| match handle {
         Some(file_handle) => {
             Task::perform(read_image(file_handle), move |content| Message::LoadAsset {
                 caller,
-                process: IoProcess::Finished(content),
+                kind,
+                process: IoProcess::Finished(content.map(FileAsset::Image)),
             })
         }
         None => Task::done(Message::LoadAsset {
             caller,
+            kind,
             process: IoProcess::Cancelled,
         }),
     })

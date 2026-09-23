@@ -4,6 +4,16 @@ use iced::advanced::image::Handle;
 
 use crate::domain::id::ImageId;
 
+#[derive(Debug, Clone, Copy)]
+pub enum FileKind {
+    Image,
+}
+
+#[derive(Debug, Clone)]
+pub enum FileAsset {
+    Image(ImageAsset),
+}
+
 /// A loaded image, ready to be registered into an [`AssetStore`].
 ///
 /// Both the decoded pixels (for rendering) and the original encoded bytes

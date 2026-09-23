@@ -1,6 +1,13 @@
 use iced::{Point, Rectangle, Size};
 
-use crate::domain::{RenderTarget, id::ImageId, layer::LayerInnerImpl};
+use crate::domain::{
+    Inspectable, RenderTarget,
+    assets::FileKind,
+    edit::{SetImageLockAspectRatio, SetImageOpacity, SetImagePosition, SetImageSize},
+    id::ImageId,
+    inspect::{Property, PropertyInfo},
+    layer::LayerInnerImpl,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct ImageLayer {
@@ -80,6 +87,88 @@ impl LayerInnerImpl for ImageLayer {
         if let Some(image) = self.image {
             renderer.draw_image(self.get_bounds(), image, self.opacity);
         }
+    }
+}
+
+impl Inspectable for ImageLayer {
+    fn properties<'a>(&'a self) -> Vec<Property<'a>> {
+        vec![
+            // File
+            Property::File {
+                info: PropertyInfo { label: "File" },
+                display_value: None,
+                kind: FileKind::Image,
+            },
+            // Opacity
+            Property::BoundedFloat {
+                info: PropertyInfo { label: "Opacity" },
+                value: self.opacity as f64,
+                range: 0.0..=1.0,
+                on_submit: Box::new(|value, id| {
+                    Box::new(SetImageOpacity {
+                        id,
+                        opacity: value as f32,
+                    })
+                }),
+            },
+            // X, Y
+            Property::Group {
+                info: Some(PropertyInfo { label: "Position" }),
+                children: vec![
+                    Property::Float {
+                        info: PropertyInfo { label: "X" },
+                        value: self.position.x as f64,
+                        on_submit: Box::new(|value, id| {
+                            let position = Point::new(value as f32, self.position.y);
+                            Box::new(SetImagePosition { id, position })
+                        }),
+                    },
+                    Property::Float {
+                        info: PropertyInfo { label: "Y" },
+                        value: self.position.y as f64,
+                        on_submit: Box::new(|value, id| {
+                            let position = Point::new(self.position.x, value as f32);
+                            Box::new(SetImagePosition { id, position })
+                        }),
+                    },
+                ],
+            },
+            // Width, Height
+            Property::Group {
+                info: None,
+                children: vec![
+                    Property::Float {
+                        info: PropertyInfo { label: "Width" },
+                        value: self.size.width as f64,
+                        on_submit: Box::new(|value, id| {
+                            let size = Size::new(value as f32, self.size.height);
+                            Box::new(SetImageSize { id, size })
+                        }),
+                    },
+                    Property::Float {
+                        info: PropertyInfo { label: "Height" },
+                        value: self.size.height as f64,
+                        on_submit: Box::new(|value, id| {
+                            let size = Size::new(self.size.width, value as f32);
+                            Box::new(SetImageSize { id, size })
+                        }),
+                    },
+                ],
+            },
+            // Lock aspect ratio
+            Property::Boolean {
+                info: PropertyInfo {
+                    label: "Lock aspect ratio",
+                },
+                value: self.lock_aspect_ratio,
+                on_submit: Box::new(|value, id| {
+                    Box::new(SetImageLockAspectRatio {
+                        id,
+                        lock_aspect_ratio: value,
+                    })
+                }),
+            },
+        ]
     }
 }
 

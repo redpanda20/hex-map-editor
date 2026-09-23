@@ -2,13 +2,9 @@ use crate::{
     app::Message,
     domain::{
         Inspectable, Layer, LayerInner, Scene,
-        edit::{
-            Rename, SetImageLockAspectRatio, SetImageOpacity, SetImagePosition, SetImageSize,
-            SetVisible,
-        },
+        edit::{Rename, SetVisible},
         id::LayerId,
         inspect::{ActionHint, Property},
-        layer::image::ImageLayer,
     },
     infrastructure::IoProcess,
     ui::widgets::{
@@ -17,8 +13,8 @@ use crate::{
     },
 };
 use iced::{
-    Alignment, Element, Length, Point, Size, Task,
-    widget::{Column, Row, Text, button, checkbox, column, container, row, rule, space, text},
+    Alignment, Element, Length, Task,
+    widget::{Row, Text, button, checkbox, column, container, row, rule, space, text},
 };
 use iced_fonts::lucide;
 
@@ -64,7 +60,13 @@ impl Inspector {
             .center_x(Length::Fill),
             visible_toggle(*id, visible),
             match kind {
-                LayerInner::Image(image) => self.details_image(*id, image),
+                LayerInner::Image(inner) => column(
+                    inner
+                        .properties()
+                        .into_iter()
+                        .map(|property| Self::view_property(property, *id)),
+                )
+                .spacing(12),
                 LayerInner::Perlin(inner) => column(
                     inner
                         .properties()
@@ -90,9 +92,22 @@ impl Inspector {
 
     fn view_property<'a>(property: Property<'a>, id: LayerId) -> Element<'a, Message> {
         match property {
+            Property::Group { info, children } => {
+                let row = row(children
+                    .into_iter()
+                    .map(|property| Self::view_property(property, id)))
+                .spacing(12);
+                match info {
+                    Some(info) => column![text(info.label).style(text::secondary), row]
+                        .spacing(4)
+                        .into(),
+                    None => row.into(),
+                }
+            }
+
             Property::Action {
                 info,
-                value,
+                display_value: value,
                 action_hint,
                 action,
             } => column![
@@ -118,11 +133,36 @@ impl Inspector {
             .spacing(4)
             .into(),
 
-            Property::Text {
+            Property::File {
+                info,
+                display_value,
+                kind,
+            } => column![
+                text(info.label).style(text::secondary),
+                space::horizontal(),
+                row![
+                    display_value.map(text),
+                    space::horizontal(),
+                    button("Load").on_press(Message::LoadAsset {
+                        caller: id,
+                        kind,
+                        process: IoProcess::Start
+                    })
+                ]
+                .align_y(Alignment::Center)
+            ]
+            .into(),
+
+            Property::Boolean {
                 info,
                 value,
                 on_submit,
-            } => todo!(),
+            } => row![
+                text(info.label).style(text::secondary),
+                space::horizontal(),
+                checkbox(value).on_toggle(move |new| Message::Scene((on_submit)(new, id)))
+            ]
+            .into(),
             Property::Float {
                 info,
                 value,
@@ -194,88 +234,4 @@ fn visible_toggle<'a>(id: LayerId, visible: &bool) -> Row<'a, Message> {
             visible: !*visible,
         })));
     row![space::horizontal(), toggle, space::horizontal()]
-}
-
-impl Inspector {
-    fn details_image(&self, id: LayerId, layer: &ImageLayer) -> Column<'_, Message> {
-        let image = layer.image;
-        let Size { width, height } = layer.get_size();
-        let Point { x, y } = layer.position;
-        let lock_aspect_ratio = layer.lock_aspect_ratio;
-
-        let image_control = row![
-            text(
-                image
-                    .map(|id| format!("{id:?}"))
-                    .unwrap_or("No image loaded".into())
-            )
-            .style(text::secondary),
-            space::horizontal(),
-            button("Load").on_press(Message::LoadAsset {
-                caller: id,
-                process: IoProcess::Start
-            })
-        ]
-        .align_y(Alignment::Center);
-
-        let opacity_control = bounded_float_field(
-            "Opacity",
-            layer.get_opacity() as f64,
-            0.0..=1.0,
-            move |value| {
-                SetImageOpacity {
-                    id,
-                    opacity: value as f32,
-                }
-                .into()
-            },
-        );
-
-        let x_control = float_field("X", x as f64, move |x_value| {
-            let position = Point::new(x_value as f32, y);
-            SetImagePosition { id, position }.into()
-        })
-        .vertical();
-
-        let y_control = float_field("Y", y as f64, move |y_value| {
-            let position = Point::new(x, y_value as f32);
-            SetImagePosition { id, position }.into()
-        })
-        .vertical();
-
-        let width_control = float_field("Width", width as f64, move |width_value| {
-            let size = Size::new(width_value as f32, height);
-            SetImageSize { id, size }.into()
-        })
-        .vertical();
-
-        let height_control = float_field("Height", height as f64, move |height_value| {
-            let size = Size::new(width, height_value as f32);
-            SetImageSize { id, size }.into()
-        })
-        .vertical();
-
-        let aspect_ratio_control = row![
-            text("Lock aspect ratio").style(text::secondary),
-            space::horizontal(),
-            checkbox(lock_aspect_ratio).on_toggle(move |value| {
-                SetImageLockAspectRatio {
-                    id,
-                    lock_aspect_ratio: value,
-                }
-                .into()
-            })
-        ];
-
-        column![
-            image_control,
-            opacity_control,
-            row![x_control, y_control].spacing(12),
-            row![width_control, height_control].spacing(12),
-            aspect_ratio_control
-        ]
-        .spacing(12)
-        .padding(8)
-        .into()
-    }
 }

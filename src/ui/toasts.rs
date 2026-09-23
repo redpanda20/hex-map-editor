@@ -61,7 +61,7 @@ impl Toasts {
                 Finished(Ok(_)) => {}
             },
 
-            Message::LoadAsset { caller: _, process } => match process {
+            Message::LoadAsset { process, .. } => match process {
                 IoProcess::Start => self.add_toast("Opening asset", "Opening user asset..."),
                 Cancelled => {
                     self.add_toast("Asset upload cancelled", "User cancelled loading asset.")

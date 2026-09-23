@@ -229,7 +229,7 @@ impl Inspectable for PerlinNoiseLayer {
         vec![
             Property::Action {
                 info: PropertyInfo { label: "Seed" },
-                value: Some(format!("{}", self.seed)),
+                display_value: Some(format!("{}", self.seed)),
                 action_hint: ActionHint::Refresh,
                 action: Box::new(|id| {
                     Box::new(SetNoiseSeed {
