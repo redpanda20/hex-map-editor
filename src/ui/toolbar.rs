@@ -84,6 +84,13 @@ impl Toolbar {
             "Export scene as a PNG",
         );
 
+        let export_pdf = tool_button(
+            lucide::file_text(),
+            State::active(),
+            Action::ExportPdf,
+            "Export scene as a PDF",
+        );
+
         let open_about = tooltip(
             button(lucide::info())
                 .on_press(Message::About(crate::ui::AboutMessage::Show))
@@ -108,6 +115,7 @@ impl Toolbar {
             save_scene,
             rule::horizontal(1),
             export_png,
+            export_pdf,
             open_about
         ]
         .spacing(8.0)

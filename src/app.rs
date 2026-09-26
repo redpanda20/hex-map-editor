@@ -5,14 +5,14 @@ use iced::{
 
 use crate::{
     domain::{
-        History, Scene, Tool,
+        History, PrintSettings, Scene, Tool,
         assets::{FileAsset, FileKind},
         edit::{EditCommand, SetImageAndSize},
         id::LayerId,
     },
     infrastructure::{
-        Document, IoProcess, export_png, load_asset_async, load_project_async, save_bytes_async,
-        save_project_async,
+        Document, ExportFormat, IoProcess, export_pdf, export_png, load_asset_async,
+        load_project_async, save_bytes_async, save_project_async,
     },
     theme,
     ui::{
@@ -21,6 +21,10 @@ use crate::{
         canvas_panel,
     },
 };
+
+/// Physical parameters used for PDF exports (1 hex = 2cm, A4, 1.5cm margin).
+/// Hardcoded until export configuration is exposed in the UI.
+const PDF_PRINT_SETTINGS: PrintSettings = PrintSettings::DEFAULT;
 
 #[derive(Default)]
 pub struct App {
@@ -49,6 +53,7 @@ pub enum Action {
     Save,
     Load,
     ExportPng,
+    ExportPdf,
 }
 
 #[derive(Debug, Clone)]
@@ -73,7 +78,7 @@ pub enum Message {
     },
     Load(IoProcess<Document>),
     Save(IoProcess<()>),
-    Export(IoProcess<()>),
+    Export(ExportFormat, IoProcess<()>),
 }
 
 impl<T> From<T> for Message
@@ -120,8 +125,18 @@ impl App {
 
             Message::Scene(command) => self.history.apply(&mut self.scene, command),
 
-            Message::Export(process) => match process {
-                IoProcess::Start => return save_bytes_async(export_png(&self.scene), "hexmap.png"),
+            Message::Export(format, process) => match process {
+                IoProcess::Start => {
+                    let bytes = match format {
+                        ExportFormat::Png => export_png(&self.scene),
+                        ExportFormat::Pdf => export_pdf(&self.scene, PDF_PRINT_SETTINGS),
+                    };
+                    return save_bytes_async(
+                        bytes,
+                        &format!("hexmap.{}", format.extension()),
+                        format,
+                    );
+                }
                 IoProcess::Cancelled => eprintln!("Export cancelled"),
                 IoProcess::Finished(Ok(_)) => eprintln!("Export succeeded"),
                 IoProcess::Finished(Err(err)) => eprintln!("Export failed: {err}"),
@@ -182,7 +197,12 @@ impl App {
                 }
                 Action::Save => return Task::done(Message::Save(IoProcess::Start)),
                 Action::Load => return Task::done(Message::Load(IoProcess::Start)),
-                Action::ExportPng => return Task::done(Message::Export(IoProcess::Start)),
+                Action::ExportPng => {
+                    return Task::done(Message::Export(ExportFormat::Png, IoProcess::Start));
+                }
+                Action::ExportPdf => {
+                    return Task::done(Message::Export(ExportFormat::Pdf, IoProcess::Start));
+                }
             },
             Message::Canvas(event) => return event.into_task(&self.current_layer, &self.tool),
         }

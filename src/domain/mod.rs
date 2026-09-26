@@ -5,12 +5,15 @@ mod hex;
 pub mod history;
 pub mod id;
 pub mod layer;
+pub mod print;
 mod scene;
 mod tool;
 
 mod ports;
 
 pub use hex::{HexBounds, HexCoord, flood_fill};
+
+pub use print::PrintSettings;
 
 pub use scene::Scene;
 

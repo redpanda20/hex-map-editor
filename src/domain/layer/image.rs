@@ -9,6 +9,11 @@ use crate::domain::{
     layer::{Inspectable, Renderable},
 };
 
+/// TODO: Route this appropriately.
+/// Shouldn't be known outside of UI but export
+/// needs to know for correct sizing of images.
+pub const EDITOR_HEX_SIZE: f32 = 16.0;
+
 #[derive(Debug, Default, Clone)]
 pub struct ImageLayer {
     pub image: Option<ImageId>,
@@ -76,9 +81,6 @@ impl ImageLayer {
 
 impl Renderable for ImageLayer {
     fn bounds(&self, hex_size: f32) -> Option<Rectangle> {
-        // Technically this shouldn't be known,
-        // exports are currently broken otherwise
-        const EDITOR_HEX_SIZE: f32 = 16.0;
         let relative_size = hex_size / EDITOR_HEX_SIZE;
         Some(self.get_bounds() * relative_size)
     }

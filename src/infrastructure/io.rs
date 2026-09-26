@@ -8,6 +8,7 @@ use crate::domain::id::LayerId;
 use crate::infrastructure::image_codec::decode_image_asset;
 use crate::{app::Message, domain::assets::ImageAsset};
 
+use super::export::ExportFormat;
 use super::schema::{self, Document, LoadError};
 
 const DEFAULT_FILE_NAME: &str = "map.hexmap";
@@ -49,22 +50,23 @@ pub fn save_project_async(layers: &Scene) -> Task<Message> {
     })
 }
 
-pub fn save_bytes_async(bytes: Vec<u8>, default_name: &str) -> Task<Message> {
+pub fn save_bytes_async(bytes: Vec<u8>, default_name: &str, format: ExportFormat) -> Task<Message> {
     use rfd::AsyncFileDialog;
 
     Task::future(
         AsyncFileDialog::new()
+            .add_filter(format.name(), &[format.extension()])
             .set_file_name(default_name)
-            .set_title("Export to PNG")
+            .set_title(format!("Export to {}", format.name()))
             .save_file(),
     )
     .then(move |handle| {
         let inner_bytes = bytes.clone();
         match handle {
-            Some(file_handle) => Task::perform(write_future(file_handle, inner_bytes), |content| {
-                Message::Export(IoProcess::Finished(content))
+            Some(file_handle) => Task::perform(write_future(file_handle, inner_bytes), move |content| {
+                Message::Export(format, IoProcess::Finished(content))
             }),
-            None => Task::done(Message::Export(IoProcess::Cancelled)),
+            None => Task::done(Message::Export(format, IoProcess::Cancelled)),
         }
     })
 }

@@ -33,8 +33,10 @@ pub struct Toasts {
 impl Toasts {
     pub fn listen_to_events(&mut self, message: &Message) {
         match message {
-            Message::Export(process) => match process {
-                IoProcess::Start => self.add_toast("Exporting", "Exporting map to PNG..."),
+            Message::Export(format, process) => match process {
+                IoProcess::Start => {
+                    self.add_toast("Exporting", format!("Exporting map to {}...", format.name()))
+                }
                 IoProcess::Cancelled => {
                     self.add_toast("Export cancelled", "Export cancelled by user.")
                 }
