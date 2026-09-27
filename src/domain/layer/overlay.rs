@@ -44,7 +44,7 @@ impl HexGridOverlay {
 impl Renderable for HexGridOverlay {
     fn draw(&self, renderer: &mut dyn RenderTarget) {
         let bounds = renderer.get_bounds();
-        let hexes = HexBounds::from_rect(bounds).into_hexes();
+        let hexes = HexBounds::hexes_in_rect(bounds);
 
         for coord in hexes {
             let point = renderer.hex_to_point(&coord);
@@ -98,7 +98,7 @@ mod tests {
     fn draw_strokes_every_visible_hex_with_the_configured_style() {
         let overlay = HexGridOverlay::new(Color::WHITE, 2.5);
         let bounds = HexBounds::new(-1, 1, -1, 1).into_rect();
-        let expected = HexBounds::from_rect(bounds).into_hexes().count();
+        let expected = HexBounds::hexes_in_rect(bounds).count();
 
         let mut renderer = MockRenderer::with_bounds(bounds);
         overlay.draw(&mut renderer);

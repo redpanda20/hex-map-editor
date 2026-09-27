@@ -107,7 +107,7 @@ impl Renderable for SparseTiles {
 
     fn draw(&self, renderer: &mut dyn RenderTarget) {
         let bounds = renderer.get_bounds();
-        let hexes = HexBounds::from_rect(bounds).into_hexes();
+        let hexes = HexBounds::hexes_in_rect(bounds);
 
         for coord in hexes {
             if self.tiles.contains(&coord) ^ self.inverted {
@@ -197,14 +197,8 @@ mod tests {
         assert!(tiles.bounds(16.0).is_none());
     }
 
-    /// The exact set of hexes `draw()` will iterate for a given viewport,
-    /// computed the same way `draw()` does internally
-    /// (`HexBounds::from_rect(renderer.get_bounds())`). Used instead of a
-    /// hand-picked hex range so these tests don't have to duplicate (and
-    /// risk getting wrong) `HexBounds::from_rect`'s corner-rounding
-    /// behaviour.
     fn visible_hexes(bounds: Rectangle) -> Vec<HexCoord> {
-        HexBounds::from_rect(bounds).into_hexes().collect()
+        HexBounds::hexes_in_rect(bounds).collect()
     }
 
     #[test]

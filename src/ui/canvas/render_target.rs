@@ -52,7 +52,8 @@ impl RenderTarget for GpuRenderTarget<'_> {
     }
 
     fn get_bounds(&self) -> Rectangle {
-        self.bounds
+        // Overdraw to remove flickering at edge of screen
+        self.bounds.expand(HEX_SIZE)
     }
 
     fn fill_polygon(&mut self, point: &Point, fill: Color) {

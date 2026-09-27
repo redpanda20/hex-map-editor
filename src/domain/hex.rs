@@ -113,7 +113,8 @@ impl HexBounds {
 
     /// Create an axial bounding box, that conservatively covers every hex in `rect`.
     ///
-    /// Excludes intersecting hexes with centres outside of `rect`.
+    /// Callers that only need hexes inside of a `Rectangle` should use
+    /// [`HexBounds::hexes_in_rect`] instead of iterating this directly.
     pub fn from_rect(rect: Rectangle) -> Self {
         let coords = [
             Vector::new(rect.x, rect.y),
@@ -124,6 +125,14 @@ impl HexBounds {
         .map(HexCoord::from_cartesian);
 
         Self::from_hexes(coords).expect("A rectangle always produces four corners")
+    }
+
+    /// Creates an iterator of hexes who are contained by a `Rectangle`.
+    pub fn hexes_in_rect(rect: Rectangle) -> impl Iterator<Item = HexCoord> {
+        Self::from_rect(rect).into_hexes().filter(move |coord| {
+            let centre = coord.to_cartesian();
+            rect.contains(Point::new(centre.x, centre.y))
+        })
     }
 
     pub fn into_rect(&self) -> Rectangle {
@@ -338,6 +347,41 @@ mod tests {
     fn into_hexes_enumerates_every_cell_in_the_box() {
         let hexes: Vec<_> = HexBounds::new(0, 1, 0, 1).into_hexes().collect();
         assert_eq!(hexes, vec![c(0, 0), c(0, 1), c(1, 0), c(1, 1)]);
+    }
+
+    #[test]
+    fn from_rect_over_covers_a_rect_that_hexes_in_rect_trims_back() {
+        // A tall, narrow rect: the shear in `to_cartesian` (row position
+        // depends on column) makes the axial box swept out by its corners
+        // noticeably bigger than the rect it was built from.
+        let rect = Rectangle::new(Point::new(0.0, 0.0), Size::new(6.0, 8.0));
+
+        let raw_count = HexBounds::from_rect(rect).into_hexes().count();
+        let trimmed: Vec<_> = HexBounds::hexes_in_rect(rect).collect();
+
+        assert!(
+            trimmed.len() < raw_count,
+            "from_rect's box should be a strict superset for this rect"
+        );
+        for coord in &trimmed {
+            let v = coord.to_cartesian();
+            assert!(rect.contains(Point::new(v.x, v.y)));
+        }
+    }
+
+    #[test]
+    fn hexes_in_rect_never_assigns_a_hex_to_two_adjacent_tiles() {
+        let tile = Size::new(6.0, 8.0);
+        let page_a = Rectangle::new(Point::new(0.0, 0.0), tile);
+        let page_b = Rectangle::new(Point::new(0.0, tile.height), tile);
+
+        let hexes_a: HashSet<_> = HexBounds::hexes_in_rect(page_a).collect();
+        let hexes_b: HashSet<_> = HexBounds::hexes_in_rect(page_b).collect();
+
+        assert!(
+            hexes_a.is_disjoint(&hexes_b),
+            "a hex centred in one page tile must not also be drawn on the next"
+        );
     }
 
     #[test]

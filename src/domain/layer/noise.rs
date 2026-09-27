@@ -189,7 +189,7 @@ impl PerlinNoiseLayer {
 impl Renderable for PerlinNoiseLayer {
     fn draw(&self, renderer: &mut dyn RenderTarget) {
         let bounds = renderer.get_bounds();
-        let hexes = HexBounds::from_rect(bounds).into_hexes();
+        let hexes = HexBounds::hexes_in_rect(bounds);
 
         for coord in hexes {
             let Vector { x, y } = coord.to_cartesian();
