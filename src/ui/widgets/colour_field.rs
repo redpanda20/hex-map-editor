@@ -7,6 +7,7 @@ use iced::{
 };
 
 use crate::domain::colour::{parse_hex_rgb, to_hex_rgb};
+use crate::theme;
 use crate::ui::widgets::{INPUT_WIDTH, colour_picker};
 
 const SWATCH_SIZE: f32 = 24.0;
@@ -159,7 +160,7 @@ fn hex_field<'a>(
             .on_input(on_change)
             .on_submit(on_submit)
             .style(move |theme: &Theme, status| {
-                let mut style = text_input::default(theme, status);
+                let mut style = theme::input(theme, status);
 
                 if !is_valid {
                     style.border.color = theme.palette().danger;
@@ -221,7 +222,7 @@ fn popover_content<'a>(colour: Color, raw: &str) -> Element<'a, Internal> {
 
     container(column![picker, field].spacing(8))
         .padding(8)
-        .style(container::rounded_box)
+        .style(theme::modal)
         .width(Length::Fixed(POPOVER_WIDTH))
         .height(Length::Shrink)
         .into()

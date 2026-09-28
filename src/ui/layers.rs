@@ -1,5 +1,5 @@
 use iced::{
-    Element, Length, Padding, Task, alignment,
+    Alignment, Element, Length, Padding, Task, alignment,
     mouse::Interaction,
     widget::{
         Button, Text, button, column, container, mouse_area, pick_list, row, rule, scrollable,
@@ -15,6 +15,7 @@ use crate::{
         edit::{MoveLayerTo, PushLayer, RemoveLayer, Rename, SetVisible},
         id::LayerId,
     },
+    theme,
     ui::widgets::{context_menu, inline_text_field},
 };
 
@@ -88,18 +89,14 @@ impl Layers {
                 .into(),
         };
 
-        container(
-            column![
-                rule::horizontal(1),
-                scrollable(content).height(Length::Fill),
-                add_layer_button(self)
-            ]
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .spacing(8.0)
-            .padding(8.0),
-        )
-        .style(container::bordered_box)
+        column![
+            rule::horizontal(1),
+            scrollable(content).height(Length::Fill),
+            add_layer_button(self)
+        ]
+        .height(Length::Fill)
+        .width(Length::Fill)
+        .spacing(8.0)
         .into()
     }
 }
@@ -141,10 +138,11 @@ fn layer_preview<'a>(
         .padding(Padding::from([4, 8]))
         .spacing(8),
     )
-    .style(match (is_active, is_dragged) {
-        (_, true) => container::secondary,
-        (true, false) => container::rounded_box,
-        (false, false) => container::transparent,
+    .style(match (is_dragged, is_active, is_hovered) {
+        (true, _, _) => theme::panel,
+        (false, true, _) => theme::focused_panel,
+        (false, _, true) => theme::focused_panel,
+        _ => container::transparent,
     });
 
     let row = mouse_area(content)
@@ -175,7 +173,7 @@ fn layer_context_menu<'a>(id: LayerId) -> Element<'a, Message> {
         ]
         .spacing(0),
     )
-    .style(container::bordered_box)
+    .style(theme::panel)
     .width(Length::Fixed(160.0))
     .into()
 }
@@ -214,25 +212,29 @@ fn thumbnail<'a>(kind: &LayerInner) -> Text<'a> {
 }
 
 fn add_layer_button<'a>(layers: &Layers) -> Element<'a, Message> {
+    let kind = layers.active_layer_type;
+    let name = format!("{kind} layer");
+
     let add_layer_button = button(
         row![lucide::plus(), text("Add layer")]
             .spacing(4.0)
-            .align_y(alignment::Vertical::Center),
+            .align_y(Alignment::Center),
     )
     .width(Length::Fill)
-    .on_press(
-        PushLayer {
-            name: format!("{} layer", layers.active_layer_type),
-            kind: layers.active_layer_type,
-        }
-        .into(),
-    );
+    .on_press(PushLayer { name, kind }.into())
+    .style(theme::button_primary);
 
     let add_layer_list = pick_list(
         [LayerKind::Tiles, LayerKind::Noise, LayerKind::Image],
-        Some(layers.active_layer_type),
+        Some(kind),
         |kind| Message::Layers(LayersMessage::ChangeLayerType { kind }),
-    );
+    )
+    .style(theme::dropdown)
+    .menu_style(theme::dropdown_menu);
 
-    row![add_layer_button, add_layer_list].spacing(8.0).into()
+    row![add_layer_button, add_layer_list]
+        .height(Length::Shrink)
+        .spacing(8.0)
+        .align_y(Alignment::Center)
+        .into()
 }

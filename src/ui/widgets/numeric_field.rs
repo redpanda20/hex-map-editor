@@ -5,6 +5,7 @@ use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};
 use iced::widget::{column, row, space, text, text_input};
 use iced::{Alignment, Element, Event, Length, Rectangle, Renderer, Size, Theme};
 
+use crate::theme;
 use crate::ui::widgets::INPUT_WIDTH;
 use crate::ui::widgets::helper::subtree_is_focused;
 
@@ -117,7 +118,7 @@ where
         .on_input(Internal::Change)
         .on_submit(Internal::Submit)
         .style(move |theme: &Theme, status| {
-            let mut style = text_input::default(theme, status);
+            let mut style = theme::input(theme, status);
 
             if !is_valid {
                 style.border.color = theme.palette().danger;

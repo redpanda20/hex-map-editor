@@ -8,6 +8,7 @@ use crate::{
         layer::Inspectable,
     },
     infrastructure::IoProcess,
+    theme,
     ui::widgets::{
         bounded_float_field, bounded_integer_field, colour_field, float_field, inline_text_field,
         integer_field,
@@ -105,15 +106,7 @@ impl Inspector {
                     space::horizontal(),
                     button(render_action_hint(action_hint))
                         .on_press_with(move || Message::Scene((action)(id)))
-                        .style(|theme, status| {
-                            let mut style = button::subtle(theme, status);
-
-                            if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-                                style.text_color = theme.palette().primary
-                            }
-
-                            style
-                        })
+                        .style(theme::button_ghost)
                 ]
                 .align_y(Alignment::Center),
                 // No space is allocated for a None value
@@ -149,7 +142,9 @@ impl Inspector {
             } => row![
                 text(info.label).style(text::secondary),
                 space::horizontal(),
-                checkbox(value).on_toggle(move |new| Message::Scene((on_submit)(new, id)))
+                checkbox(value)
+                    .on_toggle(move |new| Message::Scene((on_submit)(new, id)))
+                    .style(theme::check)
             ]
             .into(),
             Property::Float {

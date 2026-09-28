@@ -3,7 +3,7 @@ use iced::{
     widget::{container, pane_grid},
 };
 
-use crate::{app::Message, domain::Scene};
+use crate::{app::Message, domain::Scene, theme};
 
 pub enum PaneKind {
     Canvas,
@@ -48,8 +48,8 @@ impl Panes {
     ) -> Element<'a, Message> {
         pane_grid(&self.state, |_id, state, _is_maximised| {
             let inner: Element<'_, Message> = match state {
-                PaneKind::Toolbar => toolbar(scene),
-                PaneKind::LayerStack => layers(scene),
+                PaneKind::Toolbar => wrap_with_pane(toolbar(scene)),
+                PaneKind::LayerStack => wrap_with_pane(layers(scene)),
                 PaneKind::Canvas => canvas(scene),
                 PaneKind::Inspector => wrap_with_pane(inspector(scene)),
             };
@@ -59,7 +59,7 @@ impl Panes {
         .on_resize(10, |resize| {
             Message::Panes(PanesMessage::PaneResized(resize))
         })
-        .spacing(2)
+        .spacing(4)
         .into()
     }
 }
@@ -97,8 +97,5 @@ impl Default for Panes {
 }
 
 pub fn wrap_with_pane<'a>(inner: Element<'a, Message>) -> Element<'a, Message> {
-    container(inner)
-        .padding(8.0)
-        .style(container::bordered_box)
-        .into()
+    container(inner).padding(8.0).style(theme::panel).into()
 }

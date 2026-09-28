@@ -5,6 +5,8 @@ use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};
 use iced::widget::{column, row, slider, space, text};
 use iced::{Element, Event, Length, Rectangle, Renderer, Size, Theme};
 
+use crate::theme;
+
 /// Creates a [`BoundedFloatField`] widget.
 pub fn bounded_float_field<'a, Message>(
     name: impl Into<String>,
@@ -66,23 +68,7 @@ fn content<'a>(name: String, value: f64, range: RangeInclusive<f64>) -> Element<
 
     let slider = slider(range, value, Internal::Change)
         .on_release(Internal::Submit)
-        .style(|theme, status| {
-            let mut style = slider::default(theme, status);
-            let palette = theme.extended_palette();
-
-            // Pretty much just an over-ride of the slider default theme
-            let colour = match status {
-                slider::Status::Active => palette.secondary.strong.color,
-                slider::Status::Hovered => palette.primary.strong.color,
-                slider::Status::Dragged => palette.primary.weak.color,
-            }
-            .into();
-
-            style.handle.background = colour;
-            style.rail.backgrounds.0 = colour;
-
-            style
-        })
+        .style(theme::range)
         .step(step);
 
     column![
