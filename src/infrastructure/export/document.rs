@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use iced::advanced::image::Handle;
+use iced::{Size, advanced::image::Handle};
 use pdf_writer::{Filter, Finish, Name, Pdf, Ref, TextStr};
 
 use crate::domain::{assets::AssetStore, id::ImageId};
@@ -105,7 +105,7 @@ pub(super) fn image_name(index: usize) -> ResourceName {
 pub(super) fn assemble_pdf(
     doc: PdfDocument,
     pages: Vec<(Vec<u8>, Vec<usize>)>,
-    page_size_pt: (f32, f32),
+    page_size_pt: Size,
     title: &str,
 ) -> Vec<u8> {
     let mut next = 1;
@@ -138,13 +138,16 @@ pub(super) fn assemble_pdf(
         .title(TextStr(title))
         .creator(TextStr("HexMap Editor"));
 
-    let (page_w, page_h) = page_size_pt;
-
     for (i, (page_id, (_, used_images))) in page_ids.iter().zip(&pages).enumerate() {
         let mut page = pdf.page(*page_id);
-        page.media_box(pdf_writer::Rect::new(0.0, 0.0, page_w, page_h))
-            .parent(pages_id)
-            .contents(content_ids[i]);
+        page.media_box(pdf_writer::Rect::new(
+            0.0,
+            0.0,
+            page_size_pt.width,
+            page_size_pt.height,
+        ))
+        .parent(pages_id)
+        .contents(content_ids[i]);
 
         let mut resources = page.resources();
         resources.fonts().pair(Name(b"F1"), font_id);

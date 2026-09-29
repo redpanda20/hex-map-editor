@@ -2,56 +2,43 @@
 
 use iced::{Rectangle, Size};
 
-/// Points (1/72 inch) per centimetre.
-/// Typographic standard.
-pub const POINTS_PER_CM: f32 = 72.0 / 2.54;
-
+/// Physical size of a hex tile.
+/// Measured edge to edge.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PhysicalScale {
-    /// Physical distance measured edge-to-edge
-    pub hex_height_cm: f32,
+pub struct TileSize {
+    pub cm: f32,
 }
 
-impl PhysicalScale {
-    /// Points per logical unit.
-    pub fn points_per_unit(&self) -> f32 {
-        self.hex_height_cm.max(f32::EPSILON) * POINTS_PER_CM / 3.0_f32.sqrt()
-    }
-
-    pub fn hex_height_points(&self) -> f32 {
-        self.hex_height_cm * POINTS_PER_CM
+impl TileSize {
+    pub fn cm_per_unit(&self) -> f32 {
+        self.cm.max(f32::EPSILON) / 3.0_f32.sqrt()
     }
 }
 
 /// Paper sizes a print export can be tiled across (portrait; width <= height).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PageSize {
-    A4,
+    A2,
     A3,
-    UsLetter,
-    UsLegal,
-    UsTabloid,
+    A4,
 }
 
 impl PageSize {
-    /// Page size in points (1/72 inch), portrait orientation.
-    pub const fn size_points(self) -> (f32, f32) {
+    pub const fn size(self) -> Size {
+        let (width, height) = self.size_cm();
+        Size { width, height }
+    }
+
+    pub const fn size_cm(self) -> (f32, f32) {
         match self {
-            PageSize::A4 => (595.28, 841.89),
-            PageSize::A3 => (841.89, 1190.55),
-            PageSize::UsLetter => (612.0, 792.0),
-            PageSize::UsLegal => (612.0, 1008.0),
-            PageSize::UsTabloid => (792.0, 1224.0),
+            PageSize::A2 => (42.0, 59.4),
+            PageSize::A3 => (29.7, 42.0),
+            PageSize::A4 => (21.0, 29.7),
         }
     }
 }
 
-/// A margin, in centimetres, reserved on every edge of every page. Printers
-/// generally can't print edge-to-edge, so content placed in that dead zone
-/// would either be clipped outright or - if the print driver compensates by
-/// scaling the page down to fit - thrown off the fixed hex scale. Reserving
-/// the margin at generation time keeps both the scale and the content intact
-/// regardless of what the printer does with its unprintable border.
+/// Page margin.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PageMargin {
     pub cm: f32,
@@ -59,74 +46,50 @@ pub struct PageMargin {
 
 impl PageMargin {
     pub const NONE: PageMargin = PageMargin { cm: 0.0 };
-
-    pub fn points(self) -> f32 {
-        self.cm.max(0.0) * POINTS_PER_CM
-    }
-}
-
-/// A columns x rows grid of pages a map tiles into. Computing this only
-/// needs the map's bounding box - already known cheaply, since
-/// `Renderable::bounds` never renders anything - so it's suitable for a live
-/// preview ("this will print as 3 x 2 pages") without drawing a single hex.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PageGrid {
-    pub columns: u32,
-    pub rows: u32,
-}
-
-impl PageGrid {
-    pub fn total(&self) -> u32 {
-        self.columns * self.rows
-    }
 }
 
 /// The full set of physical parameters a scene is printed with.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PrintSettings {
-    pub scale: PhysicalScale,
+    pub scale: TileSize,
     pub page_size: PageSize,
     pub margin: PageMargin,
 }
 
 impl PrintSettings {
-    /// 1 hex = 2 cm, on A4, with a 1.5 cm margin.
     pub const DEFAULT: PrintSettings = PrintSettings {
-        scale: PhysicalScale { hex_height_cm: 2.0 },
+        scale: TileSize { cm: 2.0 },
         page_size: PageSize::A4,
         margin: PageMargin { cm: 1.5 },
     };
 
-    /// The page's usable content area, in points - the page with the margin
-    /// removed from every edge.
+    /// The page's usable content area.
     ///
-    /// Clamped well above zero so a margin close to (or larger than) the
-    /// page can't produce a zero or negative tile and send tiling into an
-    /// infinite/NaN loop.
-    fn content_size_points(&self) -> (f32, f32) {
+    /// Clamped at 1 so that excessive margins can't produce zero or negative tilings.
+    fn content_size(&self) -> Size {
         const MIN_CONTENT_PT: f32 = 1.0;
-        let (page_w, page_h) = self.page_size.size_points();
-        let margin = 2.0 * self.margin.points();
-        (
-            (page_w - margin).max(MIN_CONTENT_PT),
-            (page_h - margin).max(MIN_CONTENT_PT),
-        )
+        let margin = 2.0 * self.margin.cm;
+        let (width, height) = self.page_size.size_cm();
+
+        let width = (width - margin).max(MIN_CONTENT_PT);
+        let height = (height - margin).max(MIN_CONTENT_PT);
+        Size { width, height }
     }
 
     /// The size, in logical units, of a single page's content area.
     pub fn tile_size(&self) -> Size {
-        let (w, h) = self.content_size_points();
-        let ppu = self.scale.points_per_unit();
-        Size::new(w / ppu, h / ppu)
+        self.content_size() / self.scale.cm_per_unit()
     }
 
-    /// How many pages (in a columns x rows grid) `bounds` (in logical units)
-    /// tiles into at these settings.
-    pub fn page_grid(&self, bounds: Rectangle) -> PageGrid {
+    /// Calculate pages (columns x rows) required to cover `bounds`.
+    pub fn page_grid(&self, bounds: Rectangle) -> Size<u32> {
         let tile = self.tile_size();
-        PageGrid {
-            columns: (bounds.width / tile.width).ceil().max(1.0) as u32,
-            rows: (bounds.height / tile.height).ceil().max(1.0) as u32,
+        let columns = (bounds.width / tile.width).max(1.0);
+        let rows = (bounds.height / tile.height).max(1.0);
+
+        Size {
+            width: columns.ceil() as u32,
+            height: rows.ceil() as u32,
         }
     }
 }
@@ -143,20 +106,20 @@ mod tests {
 
     use super::*;
 
-    const TEST_SCALE: PhysicalScale = PhysicalScale { hex_height_cm: 2.0 };
+    const TEST_SCALE: TileSize = TileSize { cm: 2.0 };
 
     #[test]
     fn default_is_2cm_hexes_on_a4_with_a_1_5cm_margin() {
         let settings = PrintSettings::default();
-        assert_eq!(settings.scale.hex_height_cm, 2.0);
+        assert_eq!(settings.scale.cm, 2.0);
         assert_eq!(settings.page_size, PageSize::A4);
         assert_eq!(settings.margin.cm, 1.5);
     }
 
     #[test]
     fn margin_reduces_usable_page_area_so_more_pages_are_needed() {
-        // At 2cm/hex on A4, a 14x14-unit map fits a single page with no
-        // margin (a full A4 page is ~14.57 units wide at this scale).
+        // With the default sizing (2cm tall, 1.15cm wide),
+        // An A4 page is 18.82 x 14.85 tiles.
         let bounds = Rectangle::new(Point::new(0.0, 0.0), Size::new(14.0, 14.0));
 
         let no_margin = PrintSettings {
@@ -164,21 +127,18 @@ mod tests {
             page_size: PageSize::A4,
             margin: PageMargin::NONE,
         };
-        assert_eq!(
-            no_margin.page_grid(bounds),
-            PageGrid {
-                columns: 1,
-                rows: 1
-            }
-        );
 
-        // A generous margin eats enough of the page that the same map now
-        // needs more than one sheet.
+        assert_eq!(no_margin.page_grid(bounds), Size::new(1, 1));
+
+        // A wide enough margin to decrease width by 1 tile
         let with_margin = PrintSettings {
             margin: PageMargin { cm: 3.0 },
             ..no_margin
         };
-        assert!(with_margin.page_grid(bounds).total() > no_margin.page_grid(bounds).total());
+
+        let total = |size: Size<u32>| size.width * size.height;
+
+        assert!(total(with_margin.page_grid(bounds)) > total(no_margin.page_grid(bounds)));
     }
 
     #[test]
@@ -196,7 +156,7 @@ mod tests {
     #[test]
     fn zero_scale_does_not_divide_by_zero() {
         let settings = PrintSettings {
-            scale: PhysicalScale { hex_height_cm: 0.0 },
+            scale: TileSize { cm: 0.0 },
             page_size: PageSize::A4,
             margin: PageMargin::NONE,
         };

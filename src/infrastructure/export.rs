@@ -2,14 +2,10 @@ mod document;
 mod pdf_target;
 mod png_export;
 
-use iced::{Point, Rectangle};
+use iced::{Point, Rectangle, Size};
 use image::{ImageBuffer, Rgba};
 
-use crate::domain::{
-    Scene,
-    layer::overlay::HexGridOverlay,
-    print::{PageGrid, PrintSettings},
-};
+use crate::domain::{Scene, layer::overlay::HexGridOverlay, print::PrintSettings};
 use document::{PdfDocument, assemble_pdf};
 use pdf_target::PdfPageTarget;
 use png_export::PngRenderTarget;
@@ -107,7 +103,7 @@ fn pdf_export_bounds(scene: &Scene) -> Rectangle {
 
 /// Calculate the number of pages required to draw
 /// a `Scene` with the given `PrintSettings`.
-pub fn pdf_page_count(scene: &Scene, settings: PrintSettings) -> PageGrid {
+pub fn pdf_page_count(scene: &Scene, settings: PrintSettings) -> Size<u32> {
     settings.page_grid(pdf_export_bounds(scene))
 }
 
@@ -118,15 +114,14 @@ pub fn export_pdf(scene: &Scene, settings: PrintSettings) -> Vec<u8> {
 
     let grid = settings.page_grid(bounds);
     let tile = settings.tile_size();
-    let page_size_pt = settings.page_size.size_points();
 
     const TITLE: &str = "HexMap";
 
     let mut doc = PdfDocument::default();
     let mut pages = Vec::new();
 
-    for row in 0..grid.rows {
-        for col in 0..grid.columns {
+    for row in 0..grid.height {
+        for col in 0..grid.width {
             let tile_bounds = Rectangle::new(
                 Point::new(
                     bounds.x + col as f32 * tile.width,
@@ -135,8 +130,7 @@ pub fn export_pdf(scene: &Scene, settings: PrintSettings) -> Vec<u8> {
                 tile,
             );
 
-            let mut target =
-                PdfPageTarget::new(&mut doc, &scene.assets, tile_bounds, settings, page_size_pt);
+            let mut target = PdfPageTarget::new(&mut doc, &scene.assets, tile_bounds, settings);
 
             let mut layers = scene.get_visible_layers();
             let overlay = HexGridOverlay::new_dark(1.5);
@@ -150,5 +144,6 @@ pub fn export_pdf(scene: &Scene, settings: PrintSettings) -> Vec<u8> {
         }
     }
 
+    let page_size_pt = settings.page_size.size() * 72.0 / 2.54;
     assemble_pdf(doc, pages, page_size_pt, TITLE)
 }

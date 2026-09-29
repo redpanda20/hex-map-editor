@@ -116,10 +116,11 @@ impl Default for Keybinds {
             (Binding::ctrl_shift("z"), Action::Redo),
             (Binding::ctrl("y"), Action::Redo),
             (Binding::ctrl("b"), Action::SetTool(Tool::Paint)),
-            (Binding::ctrl("e"), Action::SetTool(Tool::Erase)),
+            // (Binding::ctrl("e"), Action::SetTool(Tool::Erase)),
             (Binding::ctrl("m"), Action::SetTool(Tool::Pan)),
             (Binding::ctrl("s"), Action::Save),
             (Binding::ctrl("o"), Action::Load),
+            (Binding::ctrl("e"), Action::ExportPdf),
         ]);
         Self::new_with(bindings)
     }

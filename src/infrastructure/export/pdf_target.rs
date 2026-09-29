@@ -10,12 +10,14 @@ use crate::domain::{
 
 use super::document::{PdfDocument, alpha_name, image_name};
 
-/// Width of the hex grid lines, in points.
-const GRID_LINE_WIDTH_PT: f32 = 0.5;
+/// Width of the hex grid lines, in cm.
+const GRID_LINE_WIDTH: f32 = 0.04;
 
-/// Width of the outline of opaque fills, in points.
+/// Width of the outline of opaque fills, in cm.
 /// Outline covers seams between hexes.
-const SEAM_WIDTH_PT: f32 = 0.25;
+const SEAM_WIDTH: f32 = 0.02;
+
+const CM_TO_PT: f32 = 72.0 / 2.54;
 
 /// A single page's worth of drawing.
 pub struct PdfPageTarget<'a> {
@@ -36,26 +38,22 @@ impl<'a> PdfPageTarget<'a> {
         assets: &'a AssetStore,
         bounds: Rectangle,
         settings: PrintSettings,
-        page_size_pt: (f32, f32),
     ) -> Self {
         let mut content = Content::new();
-        let s = settings.scale.points_per_unit();
-        let margin_pt = settings.margin.points();
-        let (_, page_h_pt) = page_size_pt;
+
+        let scale = settings.scale.cm_per_unit() * CM_TO_PT;
+        let margin = settings.margin.cm * CM_TO_PT;
+        let page_h_cm = settings.page_size.size().height * CM_TO_PT;
 
         // Map logical units to page space
-        // Scale,
-        // flip Y (PDF is Y-up),
-        // Translate to match origin,
-        // Inset by margin.
         content.save_state();
         content.transform([
-            s,
+            scale,
             0.0,
             0.0,
-            -s,
-            margin_pt - bounds.x * s,
-            page_h_pt - margin_pt + bounds.y * s,
+            -scale,
+            margin - bounds.x * scale,
+            page_h_cm - margin + bounds.y * scale,
         ]);
 
         Self {
@@ -116,7 +114,7 @@ impl RenderTarget for PdfPageTarget<'_> {
         if fill.a >= 1.0 {
             self.content.set_stroke_rgb(fill.r, fill.g, fill.b);
             self.content
-                .set_line_width(SEAM_WIDTH_PT / self.settings.scale.points_per_unit());
+                .set_line_width(SEAM_WIDTH / self.settings.scale.cm_per_unit());
             self.content.fill_nonzero_and_stroke();
         } else {
             self.content.fill_nonzero();
@@ -127,7 +125,7 @@ impl RenderTarget for PdfPageTarget<'_> {
         self.set_alpha(colour.a);
         self.content.set_stroke_rgb(colour.r, colour.g, colour.b);
         self.content
-            .set_line_width(GRID_LINE_WIDTH_PT / self.settings.scale.points_per_unit());
+            .set_line_width(GRID_LINE_WIDTH / self.settings.scale.cm_per_unit());
         self.hex_path(point);
         self.content.stroke();
     }
