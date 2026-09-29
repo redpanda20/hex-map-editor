@@ -1,10 +1,9 @@
 use iced::{
-    Alignment, Color, Element, Length,
-    widget::{button, column, container, row, scrollable, space, text, text_input},
+    Alignment, Element, Length,
+    widget::{button, column, row, scrollable, space, text, text_input},
 };
-use iced_fonts::lucide;
 
-use crate::app::Message;
+use crate::{app::Message, theme, ui::widgets::modal};
 
 const LICENSE_NOTICES: &str = include_str!("../../license-notices.json");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -68,29 +67,42 @@ impl About {
         }
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self) -> Option<Element<'_, Message>> {
         if !self.shown {
-            return space().into();
+            return None;
         }
+
+        let version_info = column![
+            text("Version").style(text::secondary),
+            text!("{VERSION}").style(text::secondary),
+        ];
 
         let licenses = column(self.licenses.iter().map(license_view))
             .spacing(16)
             .width(Length::Fill);
 
+        let buttons = row![
+            space::horizontal(),
+            button("Close")
+                .style(theme::button_secondary)
+                .on_press(AboutMessage::Hide),
+        ]
+        .spacing(8);
+
         let content = column![
             text!("Hex Map Editor {VERSION}").size(24),
-            text("Version").style(text::secondary),
-            text!("{VERSION}").style(text::secondary),
-            space().height(16),
-            scrollable(licenses)
+            version_info,
+            scrollable(licenses).height(300),
+            buttons
         ]
+        .spacing(16)
         .align_x(Alignment::Center);
 
-        modal(content)
+        Some(modal(content).map(Message::About))
     }
 }
 
-fn license_view<'a>(content: &'a License) -> Element<'a, Message> {
+fn license_view<'a>(content: &'a License) -> Element<'a, AboutMessage> {
     let bold = iced::Font {
         weight: iced::font::Weight::Bold,
         ..Default::default()
@@ -105,8 +117,8 @@ fn license_view<'a>(content: &'a License) -> Element<'a, Message> {
     .into()
 }
 
-fn crates_view<'a>(content: &'a Crate) -> Element<'a, Message> {
-    let repository: Element<'_, Message> = match &content.repository {
+fn crates_view<'a>(content: &'a Crate) -> Element<'a, AboutMessage> {
+    let repository: Element<'_, AboutMessage> = match &content.repository {
         None => space().into(),
         Some(repo) => text_input(repo, repo)
             .style(|theme, status| {
@@ -126,32 +138,32 @@ fn crates_view<'a>(content: &'a Crate) -> Element<'a, Message> {
     .into()
 }
 
-fn modal<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
-    let close_button = row![
-        space::horizontal(),
-        button(lucide::x())
-            .style(button::text)
-            .on_press(Message::About(AboutMessage::Hide))
-    ];
+// fn modal<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+//     let close_button = row![
+//         space::horizontal(),
+//         button(lucide::x())
+//             .style(button::text)
+//             .on_press(Message::About(AboutMessage::Hide))
+//     ];
 
-    let inner = column![close_button, container(content).padding(16)];
+//     let inner = column![close_button, container(content).padding(16)];
 
-    let modal = container(inner)
-        .height(Length::FillPortion(1))
-        .width(Length::Fixed(600.0))
-        .padding(0)
-        .style(container::rounded_box);
+//     let modal = container(inner)
+//         .height(Length::FillPortion(1))
+//         .width(Length::Fixed(600.0))
+//         .padding(0)
+//         .style(container::rounded_box);
 
-    const BACKGROUND_COLOR: Color = {
-        let mut background = Color::BLACK;
-        background.a = 0.65;
-        background
-    };
-    container(modal)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .align_x(Alignment::Center)
-        .align_y(Alignment::Center)
-        .style(|_| container::background(BACKGROUND_COLOR))
-        .into()
-}
+//     const BACKGROUND_COLOR: Color = {
+//         let mut background = Color::BLACK;
+//         background.a = 0.65;
+//         background
+//     };
+//     container(modal)
+//         .width(Length::Fill)
+//         .height(Length::Fill)
+//         .align_x(Alignment::Center)
+//         .align_y(Alignment::Center)
+//         .style(|_| container::background(BACKGROUND_COLOR))
+//         .into()
+// }

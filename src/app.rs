@@ -50,6 +50,7 @@ pub enum Action {
     Save,
     Load,
     Export,
+    About,
     ExportAs(ExportFormat),
 }
 
@@ -199,8 +200,9 @@ impl App {
                 Action::Save => return Task::done(Message::Save(IoProcess::Start)),
                 Action::Load => return Task::done(Message::Load(IoProcess::Start)),
                 Action::Export => {
-                    return Task::done(Message::ExportDialog(ExportDialogMessage::Open));
+                    return Task::done(Message::ExportDialog(ExportDialogMessage::Show));
                 }
+                Action::About => return Task::done(Message::About(AboutMessage::Show)),
                 Action::ExportAs(format) => {
                     let export_settings = match format {
                         ExportFormat::Png => ExportSettings::Png(100.0),
@@ -230,8 +232,8 @@ impl App {
         let export_dialog = self.export.view();
 
         container(stack![grid, about, export_dialog, toasts])
-            .padding(2)
-            .style(|theme| container::background(theme.extended_palette().background.base.color))
+            .padding(4)
+            // .style(|theme| container::background(theme.extended_palette().background.base.color))
             .into()
     }
 }

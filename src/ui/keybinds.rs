@@ -120,7 +120,9 @@ impl Default for Keybinds {
             (Binding::ctrl("m"), Action::SetTool(Tool::Pan)),
             (Binding::ctrl("s"), Action::Save),
             (Binding::ctrl("o"), Action::Load),
+            // Popovers
             (Binding::ctrl("e"), Action::Export),
+            (Binding::ctrl_shift("i"), Action::About),
         ]);
         Self::new_with(bindings)
     }

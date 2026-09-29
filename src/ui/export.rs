@@ -4,8 +4,8 @@
 //! it does not know how to export anything.
 
 use iced::{
-    Alignment, Element, Length, Task,
-    widget::{Column, button, column, container, opaque, pick_list, row, space, text},
+    Element, Length, Task,
+    widget::{Column, button, column, pick_list, row, space, text},
 };
 
 use crate::{
@@ -13,13 +13,13 @@ use crate::{
     domain::print::{PageSize, PrintSettings},
     infrastructure::{ExportFormat, ExportSettings, IoProcess},
     theme::{self, choice_marker},
-    ui::widgets::{INPUT_WIDTH, f32_field},
+    ui::widgets::{INPUT_WIDTH, f32_field, modal},
 };
 
 #[derive(Debug, Clone)]
 pub enum ExportDialogMessage {
-    Open,
-    Close,
+    Show,
+    Hide,
     Confirm,
 
     SetFormat(ExportFormat),
@@ -54,8 +54,8 @@ impl ExportDialog {
     /// Returns the format to export when the user confirms the dialog.
     pub fn update(&mut self, message: ExportDialogMessage) -> Task<Message> {
         match message {
-            ExportDialogMessage::Open => self.shown = true,
-            ExportDialogMessage::Close => self.shown = false,
+            ExportDialogMessage::Show => self.shown = true,
+            ExportDialogMessage::Hide => self.shown = false,
             ExportDialogMessage::SetFormat(export_format) => self.format = export_format,
 
             ExportDialogMessage::SetImageScale(scale) => self.image_scale = scale,
@@ -118,7 +118,7 @@ impl ExportDialog {
             space::horizontal(),
             button("Cancel")
                 .style(theme::button_secondary)
-                .on_press(ExportDialogMessage::Close),
+                .on_press(ExportDialogMessage::Hide),
             button("Export")
                 .style(theme::button_primary)
                 .on_press_maybe(is_valid.then_some(ExportDialogMessage::Confirm))
@@ -126,7 +126,7 @@ impl ExportDialog {
         .spacing(8);
 
         let content = column![
-            text("Export scene").size(20),
+            text("Export scene").size(24),
             format_selector,
             config,
             buttons
@@ -172,23 +172,4 @@ impl ExportDialog {
         ]
         .spacing(8)
     }
-}
-
-fn modal<'a>(
-    content: impl Into<Element<'a, ExportDialogMessage>>,
-) -> Element<'a, ExportDialogMessage> {
-    let dialog = container(content)
-        .padding(16)
-        .width(400)
-        .style(theme::modal);
-
-    // `opaque` stops clicks reaching the editor underneath.
-    opaque(
-        container(dialog)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .align_x(Alignment::Center)
-            .align_y(Alignment::Center)
-            .style(theme::backdrop),
-    )
 }
