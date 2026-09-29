@@ -11,20 +11,16 @@ use crate::{
         id::LayerId,
     },
     infrastructure::{
-        Document, ExportFormat, IoProcess, export_pdf, export_png, load_asset_async,
-        load_project_async, save_bytes_async, save_project_async,
+        Document, ExportFormat, ExportSettings, IoProcess, export_pdf, export_png,
+        load_asset_async, load_project_async, save_bytes_async, save_project_async,
     },
     theme,
     ui::{
-        About, AboutMessage, CanvasEvent, Inspector, InspectorMessage, KeybindMessage, Keybinds,
-        Layers, LayersMessage, Panes, PanesMessage, ToastMessage, Toasts, Toolbar, ToolbarMessage,
-        canvas_panel,
+        About, AboutMessage, CanvasEvent, ExportDialog, ExportDialogMessage, Inspector,
+        InspectorMessage, KeybindMessage, Keybinds, Layers, LayersMessage, Panes, PanesMessage,
+        ToastMessage, Toasts, Toolbar, ToolbarMessage, canvas_panel,
     },
 };
-
-/// Physical parameters used for PDF exports (1 hex = 2cm, A4, 1.5cm margin).
-/// Hardcoded until export configuration is exposed in the UI.
-const PDF_PRINT_SETTINGS: PrintSettings = PrintSettings::DEFAULT;
 
 #[derive(Default)]
 pub struct App {
@@ -40,6 +36,7 @@ pub struct App {
 
     pub toasts: Toasts,
     pub about: About,
+    pub export: ExportDialog,
     pub keybinds: Keybinds,
     pub panes: Panes,
 }
@@ -52,8 +49,8 @@ pub enum Action {
     Redo,
     Save,
     Load,
-    ExportPng,
-    ExportPdf,
+    Export,
+    ExportAs(ExportFormat),
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +64,7 @@ pub enum Message {
     Toolbar(ToolbarMessage),
 
     Toasts(ToastMessage),
+    ExportDialog(ExportDialogMessage),
     About(AboutMessage),
     Keybinds(KeybindMessage),
     Panes(PanesMessage),
@@ -78,7 +76,7 @@ pub enum Message {
     },
     Load(IoProcess<Document>),
     Save(IoProcess<()>),
-    Export(ExportFormat, IoProcess<()>),
+    Export(ExportSettings, IoProcess<()>),
 }
 
 impl<T> From<T> for Message
@@ -116,6 +114,7 @@ impl App {
         match message {
             Message::Panes(message) => self.panes.update(message),
             Message::Toasts(message) => return self.toasts.update(message),
+            Message::ExportDialog(message) => return self.export.update(message),
             Message::About(message) => self.about.update(message),
             Message::Keybinds(message) => self.keybinds.update(message),
 
@@ -125,16 +124,18 @@ impl App {
 
             Message::Scene(command) => self.history.apply(&mut self.scene, command),
 
-            Message::Export(format, process) => match process {
+            Message::Export(settings, process) => match process {
                 IoProcess::Start => {
-                    let bytes = match format {
-                        ExportFormat::Png => export_png(&self.scene),
-                        ExportFormat::Pdf => export_pdf(&self.scene, PDF_PRINT_SETTINGS),
+                    let bytes = match settings {
+                        ExportSettings::Png(hex_size) => export_png(&self.scene, hex_size),
+                        ExportSettings::Pdf(print_settings) => {
+                            export_pdf(&self.scene, print_settings)
+                        }
                     };
                     return save_bytes_async(
                         bytes,
-                        &format!("hexmap.{}", format.extension()),
-                        format,
+                        &format!("hexmap.{}", settings.get_format().extension()),
+                        settings,
                     );
                 }
                 IoProcess::Cancelled => eprintln!("Export cancelled"),
@@ -197,11 +198,15 @@ impl App {
                 }
                 Action::Save => return Task::done(Message::Save(IoProcess::Start)),
                 Action::Load => return Task::done(Message::Load(IoProcess::Start)),
-                Action::ExportPng => {
-                    return Task::done(Message::Export(ExportFormat::Png, IoProcess::Start));
+                Action::Export => {
+                    return Task::done(Message::ExportDialog(ExportDialogMessage::Open));
                 }
-                Action::ExportPdf => {
-                    return Task::done(Message::Export(ExportFormat::Pdf, IoProcess::Start));
+                Action::ExportAs(format) => {
+                    let export_settings = match format {
+                        ExportFormat::Png => ExportSettings::Png(100.0),
+                        ExportFormat::Pdf => ExportSettings::Pdf(PrintSettings::DEFAULT),
+                    };
+                    return Task::done(Message::Export(export_settings, IoProcess::Start));
                 }
             },
             Message::Canvas(event) => return event.into_task(&self.current_layer, &self.tool),
@@ -222,8 +227,9 @@ impl App {
 
         let toasts = self.toasts.view().map(Message::Toasts);
         let about = self.about.view();
+        let export_dialog = self.export.view();
 
-        container(stack!(grid, about, toasts))
+        container(stack![grid, about, export_dialog, toasts])
             .padding(2)
             .style(|theme| container::background(theme.extended_palette().background.base.color))
             .into()

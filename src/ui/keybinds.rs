@@ -120,7 +120,7 @@ impl Default for Keybinds {
             (Binding::ctrl("m"), Action::SetTool(Tool::Pan)),
             (Binding::ctrl("s"), Action::Save),
             (Binding::ctrl("o"), Action::Load),
-            (Binding::ctrl("e"), Action::ExportPdf),
+            (Binding::ctrl("e"), Action::Export),
         ]);
         Self::new_with(bindings)
     }

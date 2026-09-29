@@ -9,6 +9,18 @@ use crate::theme;
 use crate::ui::widgets::INPUT_WIDTH;
 use crate::ui::widgets::helper::subtree_is_focused;
 
+/// Creates a [`NumericField`] widget for a f32 value.
+pub fn f32_field<'a, Message, OnSubmit>(
+    name: impl Into<String>,
+    starting_value: f32,
+    on_submit: OnSubmit,
+) -> NumericField<'a, f32, Message, OnSubmit>
+where
+    OnSubmit: Fn(f32) -> Message,
+{
+    NumericField::new(name.into(), starting_value, on_submit)
+}
+
 /// Creates a [`NumericField`] widget for a f64 value.
 pub fn float_field<'a, Message, OnSubmit>(
     name: impl Into<String>,

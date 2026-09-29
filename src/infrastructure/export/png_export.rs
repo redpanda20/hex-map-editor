@@ -3,12 +3,11 @@ use image::{ImageBuffer, Rgba};
 
 use crate::domain::{HexCoord, RenderTarget, assets::AssetStore, id::ImageId};
 
-use super::EXPORT_HEX_SIZE;
-
 pub struct PngRenderTarget<'a> {
     image: &'a mut ImageBuffer<Rgba<u8>, Vec<u8>>,
     bounds: Rectangle,
     assets: &'a AssetStore,
+    hex_size: f32,
 }
 
 impl<'a> PngRenderTarget<'a> {
@@ -16,11 +15,13 @@ impl<'a> PngRenderTarget<'a> {
         image: &'a mut ImageBuffer<Rgba<u8>, Vec<u8>>,
         bounds: Rectangle,
         assets: &'a AssetStore,
+        hex_size: f32,
     ) -> Self {
         Self {
             image,
             bounds,
             assets,
+            hex_size,
         }
     }
 }
@@ -29,17 +30,17 @@ impl RenderTarget for PngRenderTarget<'_> {
     fn hex_to_point(&self, coord: &HexCoord) -> Point {
         let point = coord.to_cartesian();
 
-        Point::new(point.x * EXPORT_HEX_SIZE, point.y * EXPORT_HEX_SIZE)
+        Point::new(point.x * self.hex_size, point.y * self.hex_size)
     }
 
     fn get_bounds(&self) -> Rectangle {
-        self.bounds * (1.0 / EXPORT_HEX_SIZE)
+        self.bounds * (1.0 / self.hex_size)
     }
 
     fn fill_polygon(&mut self, point: &Point, fill: Color) {
         let centre = Point::new(point.x - self.bounds.x, point.y - self.bounds.y);
 
-        let vertices = hex_vertices_f(centre.x, centre.y);
+        let vertices = hex_vertices_f(centre.x, centre.y, self.hex_size);
 
         fill_polygon(self.image, &vertices, fill.into_rgba8());
     }
@@ -48,7 +49,7 @@ impl RenderTarget for PngRenderTarget<'_> {
     fn stroke_polygon(&mut self, point: &Point, colour: Color, _stroke_width: f32) {
         let centre = Point::new(point.x - self.bounds.x, point.y - self.bounds.y);
 
-        let vertices = hex_vertices_f(centre.x, centre.y);
+        let vertices = hex_vertices_f(centre.x, centre.y, self.hex_size);
 
         stroke_polygon(self.image, &vertices, colour.into_rgba8());
     }
@@ -74,10 +75,10 @@ impl RenderTarget for PngRenderTarget<'_> {
         let y = (bounds.y - self.bounds.y).round() as i64;
 
         // Technically this shouldn't be known, but image will look different to the main applicaiton otherwise
-        const RELATIVE_EXPORT_SIZE: f32 = EXPORT_HEX_SIZE / 16.0;
+        let relative_export_size: f32 = self.hex_size / 16.0;
 
-        let dst_width = (bounds.width * RELATIVE_EXPORT_SIZE).max(0.0).round() as u32;
-        let dst_height = (bounds.height * RELATIVE_EXPORT_SIZE).max(0.0).round() as u32;
+        let dst_width = (bounds.width * relative_export_size).max(0.0).round() as u32;
+        let dst_height = (bounds.height * relative_export_size).max(0.0).round() as u32;
 
         if dst_width == 0 || dst_height == 0 {
             return;
@@ -125,13 +126,13 @@ impl RenderTarget for PngRenderTarget<'_> {
     }
 }
 
-fn hex_vertices_f(cx: f32, cy: f32) -> [(f32, f32); 6] {
+fn hex_vertices_f(cx: f32, cy: f32, hex_size: f32) -> [(f32, f32); 6] {
     std::array::from_fn(|i| {
         let angle_rad = (60.0 * i as f32).to_radians();
 
         (
-            cx + EXPORT_HEX_SIZE * angle_rad.cos(),
-            cy + EXPORT_HEX_SIZE * angle_rad.sin(),
+            cx + hex_size * angle_rad.cos(),
+            cy + hex_size * angle_rad.sin(),
         )
     })
 }

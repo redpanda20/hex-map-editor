@@ -10,7 +10,21 @@ use document::{PdfDocument, assemble_pdf};
 use pdf_target::PdfPageTarget;
 use png_export::PngRenderTarget;
 
-const EXPORT_HEX_SIZE: f32 = 100.0;
+/// The file formats a scene can be exported to.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ExportSettings {
+    Png(f32),
+    Pdf(PrintSettings),
+}
+
+impl ExportSettings {
+    pub fn get_format(&self) -> ExportFormat {
+        match self {
+            ExportSettings::Png(_) => ExportFormat::Png,
+            ExportSettings::Pdf(_) => ExportFormat::Pdf,
+        }
+    }
+}
 
 /// The file formats a scene can be exported to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -20,6 +34,8 @@ pub enum ExportFormat {
 }
 
 impl ExportFormat {
+    pub const ALL: [ExportFormat; 2] = [ExportFormat::Png, ExportFormat::Pdf];
+
     pub fn name(self) -> &'static str {
         match self {
             ExportFormat::Png => "PNG",
@@ -35,17 +51,23 @@ impl ExportFormat {
     }
 }
 
+impl std::fmt::Display for ExportFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
 /// Margin around the map content, in hexes (matches the PNG export).
 const EXPORT_MARGIN_HEXES: f32 = 2.0;
 
 /// Page size, in hexes, used when there is nothing to export.
 const EMPTY_PAGE_HEXES: f32 = 8.0;
 
-pub fn export_png(scene: &Scene) -> Vec<u8> {
+pub fn export_png(scene: &Scene, hex_size: f32) -> Vec<u8> {
     let bounding_box = scene
         .get_visible_layers()
         .iter()
-        .filter_map(|inner| inner.bounds(EXPORT_HEX_SIZE))
+        .filter_map(|inner| inner.bounds(hex_size))
         .reduce(|acc, bounds| Rectangle::union(&acc, &bounds));
 
     let Some(bounding_box) = bounding_box else {
@@ -59,14 +81,14 @@ pub fn export_png(scene: &Scene) -> Vec<u8> {
         return out;
     };
 
-    let bounds = bounding_box.expand(2.0 * EXPORT_HEX_SIZE);
+    let bounds = bounding_box.expand(2.0 * hex_size);
 
     let width = bounds.width.ceil() as u32;
     let height = bounds.height.ceil() as u32;
 
     let mut image = ImageBuffer::from_pixel(width, height, Rgba([0, 0, 0, 0]));
 
-    let mut target = PngRenderTarget::new(&mut image, bounds, &scene.assets);
+    let mut target = PngRenderTarget::new(&mut image, bounds, &scene.assets, hex_size);
     let mut layers = scene.get_visible_layers();
     let overlay = HexGridOverlay::new_dark(1.5);
     layers.push(&overlay);

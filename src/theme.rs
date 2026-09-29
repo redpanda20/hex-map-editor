@@ -120,9 +120,19 @@ pub fn tool_button(_: &Theme, status: button::Status) -> button::Style {
 }
 
 pub fn tool_marker<'a, M: 'a>(active: bool) -> Container<'a, M> {
-    container(iced::widget::space())
+    container(space())
         .width(2)
-        .height(iced::Length::Fill)
+        .height(Length::Fill)
+        .style(move |_| container::Style {
+            background: active.then(|| ACCENT.into()),
+            ..container::Style::default()
+        })
+}
+
+pub fn choice_marker<'a, M: 'a>(active: bool) -> Container<'a, M> {
+    container(space())
+        .height(2)
+        .width(Length::Fill)
         .style(move |_| container::Style {
             background: active.then(|| ACCENT.into()),
             ..container::Style::default()

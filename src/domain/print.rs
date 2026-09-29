@@ -1,5 +1,7 @@
 //! Physical parameters for printing
 
+use std::fmt;
+
 use iced::{Rectangle, Size};
 
 /// Physical size of a hex tile.
@@ -24,6 +26,8 @@ pub enum PageSize {
 }
 
 impl PageSize {
+    pub const ALL: [PageSize; 3] = [PageSize::A2, PageSize::A3, PageSize::A4];
+
     pub const fn size(self) -> Size {
         let (width, height) = self.size_cm();
         Size { width, height }
@@ -35,6 +39,16 @@ impl PageSize {
             PageSize::A3 => (29.7, 42.0),
             PageSize::A4 => (21.0, 29.7),
         }
+    }
+}
+
+impl fmt::Display for PageSize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            PageSize::A2 => "A2",
+            PageSize::A3 => "A3",
+            PageSize::A4 => "A4",
+        })
     }
 }
 
@@ -91,6 +105,14 @@ impl PrintSettings {
             width: columns.ceil() as u32,
             height: rows.ceil() as u32,
         }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        let scale = self.scale.cm;
+        let margin = self.margin.cm;
+        let (width, height) = self.page_size.size_cm();
+
+        scale > 0.0 && margin >= 0.0 && margin * 2.0 < width && margin * 2.0 < height
     }
 }
 

@@ -9,7 +9,7 @@ pub use bounded_float_field::bounded_float_field;
 pub use bounded_integer_field::bounded_integer_field;
 pub use colour_field::colour_field;
 pub use context_menu::context_menu;
-pub use numeric_field::{float_field, integer_field};
+pub use numeric_field::{f32_field, float_field, integer_field};
 pub use text_field::inline_text_field;
 
 // Local components
@@ -18,4 +18,4 @@ mod helper;
 use colour_picker::colour_picker;
 
 /// Implements Into<iced::Length>
-const INPUT_WIDTH: u32 = 80;
+pub const INPUT_WIDTH: u32 = 80;

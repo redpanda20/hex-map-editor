@@ -1,5 +1,6 @@
 mod about;
 mod canvas;
+mod export;
 mod inspector;
 mod keybinds;
 mod layers;
@@ -16,6 +17,7 @@ pub use toolbar::{Toolbar, ToolbarMessage};
 
 // Sub elements
 pub use about::{About, AboutMessage};
+pub use export::{ExportDialog, ExportDialogMessage};
 pub use keybinds::{Binding, KeybindMessage, Keybinds};
 pub use toasts::{ToastMessage, Toasts};
 
