@@ -13,6 +13,7 @@ Try it out now for free: [stephens.ac/hex-map-editor/](stephens.ac/hex-map-edito
   - [X] Paint bucket for filling large regions in one click
   - [X] Undo/redo full edit history, so nothing is ever a mistake you can't take back
   - [X] Keybinds for common actions
+
 - Layers
   - [X] Create, remove, and reorder layers to keep complex maps organized
   - [X] Toggle visibility and rename layers on the fly
@@ -21,10 +22,10 @@ Try it out now for free: [stephens.ac/hex-map-editor/](stephens.ac/hex-map-edito
   - [X] Image layers for reference art, tokens, or custom assets as their own movable layer
 - Data management
   - [X] Save and load scenes to pick up projects where you left off
-  - [X] Export to PNG for easy sharing
+  - [X] Export scenes to PNG for thumbnails or easy sharing
+  - [X] Export to PDF for scalable, print-ready versions your maps
 
 ## Coming Soon
-- **PDF export.** Scalable, print-ready exports of your maps
 - **Resizable tools.** A usability boost for blocking in large sections
 - **Incremental saves.** Automatically save changes to the current scene.
 
