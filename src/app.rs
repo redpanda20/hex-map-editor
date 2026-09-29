@@ -1,6 +1,6 @@
 use iced::{
     Element, Size, Subscription, Task, Theme,
-    widget::{container, stack},
+    widget::{column, container, row, stack},
 };
 
 use crate::{
@@ -17,8 +17,8 @@ use crate::{
     theme,
     ui::{
         About, AboutMessage, CanvasEvent, ExportDialog, ExportDialogMessage, Inspector,
-        InspectorMessage, KeybindMessage, Keybinds, Layers, LayersMessage, Panes, PanesMessage,
-        ToastMessage, Toasts, Toolbar, ToolbarMessage, canvas_panel,
+        InspectorMessage, KeybindMessage, Keybinds, Layers, LayersMessage, Menubar, Panes,
+        PanesMessage, ToastMessage, Toasts, Toolbar, ToolbarMessage, canvas_panel,
     },
 };
 
@@ -38,7 +38,7 @@ pub struct App {
     pub about: About,
     pub export: ExportDialog,
     pub keybinds: Keybinds,
-    pub panes: Panes,
+    pub panels: Panes,
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -113,7 +113,7 @@ impl App {
         self.toasts.listen_to_events(&message);
 
         match message {
-            Message::Panes(message) => self.panes.update(message),
+            Message::Panes(message) => self.panels.update(message),
             Message::Toasts(message) => return self.toasts.update(message),
             Message::ExportDialog(message) => return self.export.update(message),
             Message::About(message) => self.about.update(message),
@@ -218,22 +218,26 @@ impl App {
     }
 
     pub fn view<'a>(&'a self) -> Element<'a, Message> {
+        let toolbar = self.toolbar.view(self.tool, &self.history);
+        let canvas = canvas_panel(&self.scene, self.tool);
+        let viewport = row![toolbar, canvas];
+
         let inspector = |scene| self.inspector.view(scene, self.current_layer);
         let layers = |scene| self.layers.view(scene, self.current_layer);
-        let toolbar = |_| self.toolbar.view(self.tool, &self.history);
-        let canvas = |scene| canvas_panel(scene, self.tool);
+        let panels = self.panels.view(&self.scene, inspector, layers);
 
-        let grid = self
-            .panes
-            .view(&self.scene, canvas, inspector, layers, toolbar);
+        let body = row![viewport, panels];
+
+        let menubar = Menubar.view();
+        let app = column![menubar, body].spacing(4);
 
         let toasts = self.toasts.view().map(Message::Toasts);
         let about = self.about.view();
         let export_dialog = self.export.view();
 
-        container(stack![grid, about, export_dialog, toasts])
+        container(stack![app, about, export_dialog, toasts])
             .padding(4)
-            // .style(|theme| container::background(theme.extended_palette().background.base.color))
+            .style(|_| container::background(theme::BG))
             .into()
     }
 }

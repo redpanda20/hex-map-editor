@@ -131,7 +131,8 @@ impl ExportDialog {
             config,
             buttons
         ]
-        .spacing(16);
+        .spacing(16)
+        .width(400);
 
         Some(modal(content).map(Message::ExportDialog))
     }

@@ -4,6 +4,7 @@ mod export;
 mod inspector;
 mod keybinds;
 mod layers;
+mod menubar;
 mod panes;
 mod toasts;
 mod toolbar;
@@ -12,6 +13,7 @@ mod toolbar;
 pub use canvas::{CanvasEvent, canvas_panel};
 pub use inspector::{Inspector, InspectorMessage};
 pub use layers::{Layers, LayersMessage};
+pub use menubar::Menubar;
 pub use panes::{Panes, PanesMessage};
 pub use toolbar::{Toolbar, ToolbarMessage};
 

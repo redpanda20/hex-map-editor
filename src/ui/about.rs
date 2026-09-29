@@ -137,33 +137,3 @@ fn crates_view<'a>(content: &'a Crate) -> Element<'a, AboutMessage> {
     .align_y(Alignment::Center)
     .into()
 }
-
-// fn modal<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
-//     let close_button = row![
-//         space::horizontal(),
-//         button(lucide::x())
-//             .style(button::text)
-//             .on_press(Message::About(AboutMessage::Hide))
-//     ];
-
-//     let inner = column![close_button, container(content).padding(16)];
-
-//     let modal = container(inner)
-//         .height(Length::FillPortion(1))
-//         .width(Length::Fixed(600.0))
-//         .padding(0)
-//         .style(container::rounded_box);
-
-//     const BACKGROUND_COLOR: Color = {
-//         let mut background = Color::BLACK;
-//         background.a = 0.65;
-//         background
-//     };
-//     container(modal)
-//         .width(Length::Fill)
-//         .height(Length::Fill)
-//         .align_x(Alignment::Center)
-//         .align_y(Alignment::Center)
-//         .style(|_| container::background(BACKGROUND_COLOR))
-//         .into()
-// }

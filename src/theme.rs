@@ -100,6 +100,40 @@ pub fn button_danger(_: &Theme, s: button::Status) -> button::Style {
 pub fn button_ghost(_: &Theme, s: button::Status) -> button::Style {
     filled(None, TEXT, GRID, SLATE, s)
 }
+
+/// Button that opens a `popup_menu`
+pub fn button_menu_trigger(_: &Theme, _: button::Status) -> button::Style {
+    button::Style {
+        text_color: TEXT,
+        border: Border {
+            radius: 4.0.into(),
+            ..Border::default()
+        },
+        ..button::Style::default()
+    }
+}
+
+/// Item inside a popup menu
+pub fn button_menu_item(_: &Theme, s: button::Status) -> button::Style {
+    let mut base = button::Style {
+        text_color: TEXT,
+        border: Border {
+            radius: 4.0.into(),
+            ..Border::default()
+        },
+        ..button::Style::default()
+    };
+
+    match s {
+        button::Status::Active => {}
+        button::Status::Hovered => base.background = Some(GRID.into()),
+        button::Status::Pressed => base.background = Some(SLATE.into()),
+        button::Status::Disabled => base.text_color = TEXT_3,
+    };
+
+    base
+}
+
 pub fn tool_button(_: &Theme, status: button::Status) -> button::Style {
     let mut base = button::Style {
         border: Border {

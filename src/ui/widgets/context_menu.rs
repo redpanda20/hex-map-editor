@@ -1,26 +1,57 @@
 use iced::advanced::widget::{Operation, Tree, tree};
-use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, overlay, renderer};
+use iced::advanced::{
+    Clipboard, Layout, Renderer as _, Shell, Widget, layout, mouse, overlay, renderer,
+};
 use iced::{
-    Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, keyboard, touch,
-    window,
+    Border, Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, keyboard,
+    touch, window,
 };
 
-use crate::app::Message;
+use crate::{app::Message, theme};
+
+/// Gap between a dropdown's trigger and its menu.
+const DROPDOWN_GAP: f32 = 4.0;
 
 /// Creates a [`ContextMenu`] widget.
 ///
-/// Displays `menu` at the cursor position when `content` is right clicked.
+/// Displays `menu` at the cursor position when `content` is clicked.
 pub fn context_menu<'a>(
     content: impl Into<Element<'a, Message>>,
     menu: impl Fn() -> Element<'a, Message> + 'a,
+    button: mouse::Button,
 ) -> Element<'a, Message> {
-    ContextMenu::new(content.into(), menu).into()
+    ContextMenu::new(content.into(), menu, button, Placement::Cursor).into()
+}
+
+/// Creates a menubar-style dropdown.
+///
+/// Clicking `content` opens `menu` directly below it. The menu stays open
+/// until an item is activated, `Esc` is pressed, or the user clicks elsewhere
+/// (clicking `content` again toggles it closed). While open, `content` stays
+/// highlighted, and it is highlighted on hover.
+pub fn popup_menu<'a>(
+    content: impl Into<Element<'a, Message>>,
+    menu: impl Fn() -> Element<'a, Message> + 'a,
+) -> Element<'a, Message> {
+    ContextMenu::new(content.into(), menu, mouse::Button::Left, Placement::Below).into()
+}
+
+/// Where the menu appears when opened.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Placement {
+    /// At the cursor position of the click.
+    Cursor,
+    /// Below the wrapped content, like a menubar dropdown.
+    Below,
 }
 
 // Lives in the [`Tree`].
 #[derive(Debug, Default, Clone, Copy)]
 struct State {
     open: bool,
+    /// Whether the cursor is over the wrapped content. Only used to trigger
+    /// redraws so the hover highlight of a dropdown stays current.
+    hovered: bool,
     position: Point,
 }
 
@@ -29,14 +60,23 @@ struct ContextMenu<'a> {
     menu: Box<dyn Fn() -> Element<'a, Message> + 'a>,
     // Built during `layout`, consumed by `overlay`. Only `Some` while open.
     menu_content: Option<Element<'a, Message>>,
+    button: mouse::Button,
+    placement: Placement,
 }
 
 impl<'a> ContextMenu<'a> {
-    fn new(content: Element<'a, Message>, menu: impl Fn() -> Element<'a, Message> + 'a) -> Self {
+    fn new(
+        content: Element<'a, Message>,
+        menu: impl Fn() -> Element<'a, Message> + 'a,
+        button: mouse::Button,
+        placement: Placement,
+    ) -> Self {
         Self {
             content,
             menu: Box::new(menu),
             menu_content: None,
+            button,
+            placement,
         }
     }
 }
@@ -118,7 +158,17 @@ impl<'a> Widget<Message, Theme, Renderer> for ContextMenu<'a> {
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) = event
+        if self.placement == Placement::Below {
+            let over = cursor.is_over(layout.bounds());
+            let state = tree.state.downcast_mut::<State>();
+            if state.hovered != over {
+                state.hovered = over;
+                shell.request_redraw();
+            }
+        }
+
+        if let Event::Mouse(mouse::Event::ButtonPressed(button)) = event
+            && button == &self.button
             && cursor.is_over(layout.bounds())
         {
             let state = tree.state.downcast_mut::<State>();
@@ -150,13 +200,23 @@ impl<'a> Widget<Message, Theme, Renderer> for ContextMenu<'a> {
         viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
-        self.content.as_widget().mouse_interaction(
+        let interaction = self.content.as_widget().mouse_interaction(
             &tree.children[0],
             layout,
             cursor,
             viewport,
             renderer,
-        )
+        );
+
+        // A dropdown trigger is clickable even if its content isn't.
+        if self.placement == Placement::Below
+            && interaction == mouse::Interaction::None
+            && cursor.is_over(layout.bounds())
+        {
+            mouse::Interaction::Pointer
+        } else {
+            interaction
+        }
     }
 
     fn draw(
@@ -169,6 +229,28 @@ impl<'a> Widget<Message, Theme, Renderer> for ContextMenu<'a> {
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
+        if self.placement == Placement::Below {
+            let open = tree.state.downcast_ref::<State>().open;
+            let highlight = if open {
+                Some(theme::SLATE)
+            } else if cursor.is_over(layout.bounds()) {
+                Some(theme::GRID)
+            } else {
+                None
+            };
+
+            if let Some(colour) = highlight {
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: layout.bounds(),
+                        border: Border::default().rounded(4.0),
+                        ..renderer::Quad::default()
+                    },
+                    colour,
+                );
+            }
+        }
+
         self.content.as_widget().draw(
             &tree.children[0],
             renderer,
@@ -183,7 +265,7 @@ impl<'a> Widget<Message, Theme, Renderer> for ContextMenu<'a> {
     fn overlay<'b>(
         &'b mut self,
         tree: &'b mut Tree,
-        _layout: Layout<'_>,
+        layout: Layout<'_>,
         _renderer: &Renderer,
         _viewport: &Rectangle,
         translation: Vector,
@@ -199,6 +281,8 @@ impl<'a> Widget<Message, Theme, Renderer> for ContextMenu<'a> {
         Some(
             MenuOverlay {
                 position: state.position + translation,
+                anchor: layout.bounds() + translation,
+                placement: self.placement,
                 state,
                 tree: &mut tree.children[1],
                 content,
@@ -220,6 +304,9 @@ impl<'a> From<ContextMenu<'a>> for Element<'a, Message> {
 /// 'long is the lifetime of the content borrowed from
 struct MenuOverlay<'short, 'long: 'short> {
     position: Point,
+    /// Bounds of the wrapped content, in the same space as `position`.
+    anchor: Rectangle,
+    placement: Placement,
     state: &'short mut State,
     tree: &'short mut Tree,
     content: &'short mut Element<'long, Message>,
@@ -241,14 +328,35 @@ impl<'short, 'long> overlay::Overlay<Message, Theme, Renderer> for MenuOverlay<'
             .as_widget_mut()
             .layout(self.tree, renderer, &limits);
 
-        // Flip above/left of the click point if menu would overflow the window
-        let mut position = self.position;
-        if position.x + content.size().width > bounds.width {
-            position.x = f32::max(0.0, position.x - content.size().width);
-        }
-        if position.y + content.size().height > bounds.height {
-            position.y = f32::max(0.0, position.y - content.size().height);
-        }
+        let size = content.size();
+        let position = match self.placement {
+            Placement::Cursor => {
+                // Flip above/left of the click point if menu would overflow the window
+                let mut position = self.position;
+                if position.x + size.width > bounds.width {
+                    position.x = f32::max(0.0, position.x - size.width);
+                }
+                if position.y + size.height > bounds.height {
+                    position.y = f32::max(0.0, position.y - size.height);
+                }
+                position
+            }
+            Placement::Below => {
+                // Left-aligned under the trigger. Falls back to right-aligned
+                // (or above) if it would overflow the window.
+                let mut position = Point::new(
+                    self.anchor.x,
+                    self.anchor.y + self.anchor.height + DROPDOWN_GAP,
+                );
+                if position.x + size.width > bounds.width {
+                    position.x = f32::max(0.0, self.anchor.x + self.anchor.width - size.width);
+                }
+                if position.y + size.height > bounds.height {
+                    position.y = f32::max(0.0, self.anchor.y - size.height - DROPDOWN_GAP);
+                }
+                position
+            }
+        };
 
         content.move_to_mut(position);
 
@@ -295,6 +403,7 @@ impl<'short, 'long> overlay::Overlay<Message, Theme, Renderer> for MenuOverlay<'
 
         let mut forward = true;
         let mut capture = false;
+        let mut close_if_handled = false;
 
         match event {
             Event::Keyboard(keyboard::Event::KeyPressed { key, .. })
@@ -316,14 +425,23 @@ impl<'short, 'long> overlay::Overlay<Message, Theme, Renderer> for MenuOverlay<'
                     // Close menu and let click fall through
                     self.state.open = false;
                     forward = false;
+
+                    // ...unless it landed on a dropdown's own trigger: that
+                    // click should only close it, not fall through and
+                    // reopen it.
+                    if self.placement == Placement::Below && cursor.is_over(self.anchor) {
+                        capture = true;
+                    }
                     shell.request_redraw();
                 }
             }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                // Close after handling input
-                self.state.open = false;
-                capture = true;
-                shell.request_redraw();
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+            | Event::Touch(touch::Event::FingerLifted { .. }) => {
+                // The menu must survive the release that follows the click
+                // which opened it, and releases on inert parts of the menu.
+                // It closes only once an item actually handles the release.
+                capture = cursor.is_over(content_layout.bounds());
+                close_if_handled = true;
             }
             Event::Window(window::Event::Resized { .. }) => {
                 self.state.open = false;
@@ -345,6 +463,11 @@ impl<'short, 'long> overlay::Overlay<Message, Theme, Renderer> for MenuOverlay<'
                 shell,
                 &layout.bounds(),
             );
+        }
+        if close_if_handled && shell.is_event_captured() {
+            // An item consumed the release (i.e. a button was activated)
+            self.state.open = false;
+            shell.request_redraw();
         }
         if capture {
             shell.capture_event();

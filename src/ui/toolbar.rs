@@ -1,6 +1,6 @@
 use iced::{
     Element, Length, Task,
-    widget::{button, column, row},
+    widget::{button, column, container, row},
 };
 use iced_fonts::lucide;
 
@@ -39,8 +39,10 @@ impl Toolbar {
             .height(Length::Shrink)
             .into()
         }))
-        .spacing(8);
+        .spacing(8)
+        .padding(8)
+        .height(Length::Fill);
 
-        content.into()
+        container(content).style(theme::panel).into()
     }
 }

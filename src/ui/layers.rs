@@ -1,6 +1,6 @@
 use iced::{
     Alignment, Element, Length, Padding, Task, alignment,
-    mouse::Interaction,
+    mouse::{self, Interaction},
     widget::{
         Button, Text, button, column, container, mouse_area, pick_list, row, rule, scrollable,
         space, text,
@@ -153,7 +153,7 @@ fn layer_preview<'a>(
             dropped: *id,
         }));
 
-    context_menu(row, move || layer_context_menu(*id))
+    context_menu(row, move || layer_context_menu(*id), mouse::Button::Right)
 }
 
 fn layer_context_menu<'a>(id: LayerId) -> Element<'a, Message> {

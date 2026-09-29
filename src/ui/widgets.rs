@@ -8,7 +8,7 @@ mod text_field;
 pub use bounded_float_field::bounded_float_field;
 pub use bounded_integer_field::bounded_integer_field;
 pub use colour_field::colour_field;
-pub use context_menu::context_menu;
+pub use context_menu::{context_menu, popup_menu};
 pub use modal::modal;
 pub use numeric_field::{f32_field, float_field, integer_field};
 pub use text_field::inline_text_field;
@@ -34,7 +34,7 @@ mod modal {
     ) -> Element<'a, Message> {
         let dialog = container(content)
             .padding(16)
-            .width(400)
+            .max_width(600)
             .style(theme::modal);
 
         // `opaque` stops clicks reaching the editor underneath.
