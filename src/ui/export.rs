@@ -138,11 +138,14 @@ impl ExportDialog {
     }
 
     fn png_config(&self) -> Column<'_, ExportDialogMessage> {
-        column![f32_field(
-            "Scale (pixels per hex)",
-            self.image_scale,
-            ExportDialogMessage::SetImageScale
-        )]
+        column![
+            f32_field(
+                "Scale (pixels per hex)",
+                self.image_scale,
+                ExportDialogMessage::SetImageScale
+            )
+            .commit_on_input()
+        ]
     }
 
     fn pdf_config(&self) -> Column<'_, ExportDialogMessage> {
@@ -164,12 +167,13 @@ impl ExportDialog {
                 .menu_style(theme::dropdown_menu)
                 .width(INPUT_WIDTH)
             ],
-            f32_field("Margin", margin.cm, ExportDialogMessage::SetMargin),
+            f32_field("Margin", margin.cm, ExportDialogMessage::SetMargin).commit_on_input(),
             f32_field(
                 "Scale (cm per hex)",
                 scale.cm,
                 ExportDialogMessage::SetScale
-            ),
+            )
+            .commit_on_input(),
         ]
         .spacing(8)
     }

@@ -74,6 +74,7 @@ where
     value: T,
     on_submit: Callback,
     layout: FieldLayout,
+    commit_on_input: bool,
     content: Element<'a, Internal>,
 }
 
@@ -90,8 +91,15 @@ where
             value,
             on_submit,
             layout,
+            commit_on_input: false,
             content,
         }
+    }
+
+    /// Publishes every valid value as it is typed, not only on Enter.
+    pub fn commit_on_input(mut self) -> Self {
+        self.commit_on_input = true;
+        self
     }
 
     pub fn horizontal(mut self) -> Self {
@@ -179,7 +187,12 @@ where
 
         if state.committed != self.value {
             state.committed = self.value;
-            state.raw = self.value.to_string();
+
+            // Keep what the user is typing if it already means this value
+            // ("0." parses as 0 but would be rewritten to "0", losing the dot).
+            if parse_input::<T>(&state.raw) != Some(self.value) {
+                state.raw = self.value.to_string();
+            }
         }
 
         tree.diff_children(std::slice::from_ref(&self.content));
@@ -278,6 +291,12 @@ where
 
                     if *raw != new_text {
                         *raw = new_text;
+
+                        if self.commit_on_input
+                            && let Some(value) = parse_input::<T>(raw)
+                        {
+                            shell.publish((self.on_submit)(value));
+                        }
 
                         // Invalidating layout rebuilds content
                         shell.invalidate_layout();

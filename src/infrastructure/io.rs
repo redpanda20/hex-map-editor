@@ -36,7 +36,7 @@ pub fn save_project_async(layers: &Scene) -> Task<Message> {
         AsyncFileDialog::new()
             .add_filter("HexMap Project", FILE_EXTENSIONS)
             .set_file_name(DEFAULT_FILE_NAME)
-            .set_title("Save Project")
+            .set_title("Save Scene")
             .save_file(),
     )
     .then(move |handle| {
@@ -83,7 +83,7 @@ pub fn load_project_async() -> Task<Message> {
     Task::future(
         AsyncFileDialog::new()
             .add_filter("HexMap Project", FILE_EXTENSIONS)
-            .set_title("Open Project")
+            .set_title("Open Scene")
             .pick_file(),
     )
     .then(|handle| match handle {

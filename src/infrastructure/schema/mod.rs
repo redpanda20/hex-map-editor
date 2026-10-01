@@ -58,11 +58,11 @@ impl std::fmt::Display for LoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LoadError::NotAProjectFile => {
-                write!(f, "This file doesn't look like a hex-map-editor project.")
+                write!(f, "This file doesn't look like a hex-map-editor scene.")
             }
             LoadError::UnsupportedVersion(v) => write!(
                 f,
-                "This project was saved with a newer version of the editor (format v{v}). Please update the app."
+                "This scene was saved with a newer version of the editor (format v{v}). Please update the app."
             ),
             LoadError::MissingEntry(path) => write!(f, "Save file is corrupted: missing {path}"),
             LoadError::Malformed(err) => write!(f, "Save file is corrupted: {err}"),

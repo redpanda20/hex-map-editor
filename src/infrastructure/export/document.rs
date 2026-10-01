@@ -165,8 +165,6 @@ pub(super) fn assemble_pdf(
         }
     }
 
-    pdf.type1_font(font_id).base_font(Name(b"Helvetica"));
-
     for (alpha, id) in &alpha_ids {
         let a = *alpha as f32 / 255.0;
         pdf.ext_graphics(*id)

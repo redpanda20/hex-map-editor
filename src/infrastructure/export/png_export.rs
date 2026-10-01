@@ -1,7 +1,9 @@
 use iced::{Color, Point, Rectangle, advanced::image::Handle};
 use image::{ImageBuffer, Rgba};
 
-use crate::domain::{HexCoord, RenderTarget, assets::AssetStore, id::ImageId};
+use crate::domain::{
+    HexCoord, RenderTarget, assets::AssetStore, id::ImageId, layer::image::EDITOR_HEX_SIZE,
+};
 
 pub struct PngRenderTarget<'a> {
     image: &'a mut ImageBuffer<Rgba<u8>, Vec<u8>>,
@@ -69,16 +71,13 @@ impl RenderTarget for PngRenderTarget<'_> {
             return;
         };
 
-        // `bounds` is in the same coordinate system as the other rendering
-        // operations, so translate it relative to the export image.
-        let x = (bounds.x - self.bounds.x).round() as i64;
-        let y = (bounds.y - self.bounds.y).round() as i64;
+        let scale = self.hex_size / EDITOR_HEX_SIZE;
 
-        // Technically this shouldn't be known, but image will look different to the main applicaiton otherwise
-        let relative_export_size: f32 = self.hex_size / 16.0;
+        let x = (bounds.x * scale - self.bounds.x).round() as i64;
+        let y = (bounds.y * scale - self.bounds.y).round() as i64;
 
-        let dst_width = (bounds.width * relative_export_size).max(0.0).round() as u32;
-        let dst_height = (bounds.height * relative_export_size).max(0.0).round() as u32;
+        let dst_width = (bounds.width * scale).max(0.0).round() as u32;
+        let dst_height = (bounds.height * scale).max(0.0).round() as u32;
 
         if dst_width == 0 || dst_height == 0 {
             return;
@@ -164,13 +163,22 @@ fn draw_line(
         return;
     }
 
-    for step in 0..=steps {
+    let mut last = None;
+
+    // The end point is excluded: the next edge of a closed polygon starts there,
+    // so a shared vertex is blended once rather than twice.
+    for step in 0..steps {
         let t = step as f32 / steps as f32;
         let x = x0 + dx * t;
         let y = y0 + dy * t;
 
         if x >= 0.0 && y >= 0.0 && x < buf.width() as f32 && y < buf.height() as f32 {
-            buf.put_pixel(x as u32, y as u32, Rgba(colour));
+            let pixel = (x as u32, y as u32);
+
+            if last != Some(pixel) {
+                blend(buf.get_pixel_mut(pixel.0, pixel.1), colour);
+                last = Some(pixel);
+            }
         }
     }
 }
@@ -242,4 +250,97 @@ fn blend(dst: &mut Rgba<u8>, src: [u8; 4]) {
         b.round() as u8,
         (out_a * 255.0).round() as u8,
     ]);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{Layer, LayerInner, Scene, assets::ImageAsset, layer::image::ImageLayer};
+    use iced::Size;
+
+    fn solid(width: u32, height: u32, colour: [u8; 4]) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        ImageBuffer::from_pixel(width, height, Rgba(colour))
+    }
+
+    #[test]
+    fn stroking_blends_over_existing_pixels_instead_of_replacing_them() {
+        let mut buf = solid(10, 10, [200, 200, 200, 255]);
+        draw_line(&mut buf, (0.0, 5.0), (10.0, 5.0), [0, 0, 0, 25]);
+
+        for x in 0..10 {
+            let px = buf.get_pixel(x, 5);
+            assert_eq!(px[3], 255, "an opaque pixel must stay opaque");
+            assert!(px[0] < 200, "the line should darken the pixel");
+        }
+        assert_eq!(buf.get_pixel(0, 4).0, [200, 200, 200, 255]);
+    }
+
+    #[test]
+    fn every_pixel_on_a_line_is_blended_exactly_once() {
+        // Slope close to 1 with a fractional length: samples can repeat a pixel.
+        let mut buf = solid(20, 20, [200, 200, 200, 255]);
+        draw_line(&mut buf, (0.0, 0.0), (10.0, 10.5), [0, 0, 0, 25]);
+
+        let touched: Vec<_> = buf
+            .pixels()
+            .filter(|p| p.0 != [200, 200, 200, 255])
+            .map(|p| p.0)
+            .collect();
+        assert!(!touched.is_empty());
+        assert!(
+            touched.iter().all(|p| *p == touched[0]),
+            "a pixel was darkened more than once: {touched:?}"
+        );
+    }
+
+    #[test]
+    fn closed_polygon_does_not_double_blend_its_first_vertex() {
+        let mut buf = solid(40, 40, [200, 200, 200, 255]);
+        let square = [(5.0, 5.0), (25.0, 5.0), (25.0, 25.0), (5.0, 25.0)];
+        stroke_polygon(&mut buf, &square, [0, 0, 0, 25]);
+
+        let reference = buf.get_pixel(15, 5).0;
+        assert_eq!(buf.get_pixel(5, 5).0, reference);
+        assert_eq!(buf.get_pixel(25, 5).0, reference);
+    }
+
+    #[test]
+    fn exported_image_lands_where_the_editor_shows_it_at_any_scale() {
+        // The editor draws an image layer at `position` in editor pixels,
+        // which is `position / EDITOR_HEX_SIZE` hexes.
+        let mut scene = Scene::default();
+        let id = scene.assets.register_image(ImageAsset {
+            encoded: Vec::new(),
+            extension: "png".into(),
+            data: [255, 0, 0, 255].repeat(4),
+            width: 2,
+            height: 2,
+            name: "red".into(),
+        });
+        let mut layer = ImageLayer::new_with(id);
+        layer.position = iced::Point::new(16.0, 16.0);
+        layer.set_size_ignore_aspect_ratio(Size::new(32.0, 32.0));
+        let at = scene.inner.len();
+        scene.insert_layer(Layer::new("img", LayerInner::Image(layer)), at);
+
+        // hex_size 32 is twice the editor's 16, so the image is 64 px at (32, 32),
+        // and the exported bounds are padded by 2 hexes (64 px) on every side.
+        let bytes = crate::infrastructure::export_png(&scene, 32.0);
+        let out = image::load_from_memory(&bytes).unwrap().to_rgba8();
+
+        let (mut min_x, mut min_y, mut max_x, mut max_y) = (u32::MAX, u32::MAX, 0, 0);
+        for (x, y, p) in out.enumerate_pixels() {
+            // Grid lines darken red slightly but never below this.
+            if p[3] == 255 && p[0] > 150 && p[1] < 40 && p[2] < 40 {
+                min_x = min_x.min(x);
+                min_y = min_y.min(y);
+                max_x = max_x.max(x);
+                max_y = max_y.max(y);
+            }
+        }
+
+        // Bounds start at (32 - 64) = -32 px, so the image sits at 32 - (-32) = 64.
+        assert_eq!((min_x, min_y), (64, 64));
+        assert_eq!((max_x, max_y), (127, 127));
+    }
 }

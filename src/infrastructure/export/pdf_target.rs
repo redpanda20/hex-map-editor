@@ -43,7 +43,7 @@ impl<'a> PdfPageTarget<'a> {
 
         let scale = settings.scale.cm_per_unit() * CM_TO_PT;
         let margin = settings.margin.cm * CM_TO_PT;
-        let page_h_cm = settings.page_size.size().height * CM_TO_PT;
+        let page_h_pt = settings.page_size.size().height * CM_TO_PT;
 
         // Map logical units to page space
         content.save_state();
@@ -53,7 +53,7 @@ impl<'a> PdfPageTarget<'a> {
             0.0,
             -scale,
             margin - bounds.x * scale,
-            page_h_cm - margin + bounds.y * scale,
+            page_h_pt - margin + bounds.y * scale,
         ]);
 
         Self {

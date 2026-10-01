@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use iced::Color;
 use rand::random;
 
@@ -16,6 +18,12 @@ const DEFAULT_COLORS: [Color; 5] = [
     Color::from_rgba8(245, 168, 200, 0.9),
 ];
 
+/// Revision counter for `Scene`. Independant of loaded content.
+fn next_revision() -> u64 {
+    static COUNTER: AtomicU64 = AtomicU64::new(1);
+    COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
 #[derive(Debug, Clone)]
 pub struct Scene {
     pub inner: Vec<Layer>,
@@ -28,7 +36,7 @@ impl Scene {
     pub fn from_layers_with_assets(inner: Vec<Layer>, assets: AssetStore) -> Self {
         Self {
             inner,
-            revision: 1,
+            revision: next_revision(),
             assets,
         }
     }
@@ -42,7 +50,7 @@ impl Scene {
     }
 
     fn change_revision(&mut self) {
-        self.revision = self.revision().wrapping_add(1);
+        self.revision = next_revision();
     }
 
     pub fn new_kind(&self, kind: LayerKind) -> LayerInner {
@@ -253,6 +261,18 @@ mod tests {
 
         assert_eq!(scene.inner.len(), 2);
         assert_eq!(scene.get_layer(id).unwrap().name, "New");
+    }
+
+    #[test]
+    fn independently_built_scenes_never_share_a_revision() {
+        let a = Scene::from_layers_with_assets(Vec::new(), AssetStore::default());
+        let b = Scene::from_layers_with_assets(Vec::new(), AssetStore::default());
+        assert_ne!(a.revision(), b.revision());
+
+        // Mutating one must not land on the other's revision either.
+        let mut a = a;
+        a.insert_layer(tiles_layer("x"), 0);
+        assert_ne!(a.revision(), b.revision());
     }
 
     #[test]

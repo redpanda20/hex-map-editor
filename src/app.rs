@@ -116,7 +116,7 @@ impl App {
             Message::Panes(message) => self.panels.update(message),
             Message::Toasts(message) => return self.toasts.update(message),
             Message::ExportDialog(message) => return self.export.update(message),
-            Message::About(message) => self.about.update(message),
+            Message::About(message) => return self.about.update(message),
             Message::Keybinds(message) => self.keybinds.update(message),
 
             Message::Inspector(message) => return self.inspector.update(message),
@@ -146,19 +146,24 @@ impl App {
 
             Message::Save(process) => match process {
                 IoProcess::Start => return save_project_async(&self.scene),
-                IoProcess::Cancelled => eprintln!("Project save cancelled"),
-                IoProcess::Finished(Ok(_)) => eprintln!("Project save succeeded"),
-                IoProcess::Finished(Err(err)) => eprintln!("Project save failed: {err}"),
+                IoProcess::Cancelled => eprintln!("Scene save cancelled"),
+                IoProcess::Finished(Ok(_)) => eprintln!("Scene save succeeded"),
+                IoProcess::Finished(Err(err)) => eprintln!("Scene save failed: {err}"),
             },
 
             Message::Load(process) => match process {
                 IoProcess::Start => return load_project_async(),
-                IoProcess::Cancelled => eprintln!("Project load cancelled"),
+                IoProcess::Cancelled => eprintln!("Scene load cancelled"),
                 IoProcess::Finished(Ok(document)) => {
                     self.scene = document.into_scene();
-                    eprintln!("Project load succeeded")
+                    // Clears everything that could refer to previous scene.
+                    self.current_layer = None;
+                    self.layers = Layers::default();
+                    self.history = History::default();
+
+                    eprintln!("Scene load succeeded")
                 }
-                IoProcess::Finished(Err(err)) => eprintln!("Project load failed: {err}"),
+                IoProcess::Finished(Err(err)) => eprintln!("Scene load failed: {err}"),
             },
 
             Message::LoadAsset {
@@ -228,11 +233,11 @@ impl App {
 
         let body = row![viewport, panels];
 
-        let menubar = Menubar.view();
+        let menubar = Menubar.view(&self.keybinds);
         let app = column![menubar, body].spacing(4);
 
         let toasts = self.toasts.view().map(Message::Toasts);
-        let about = self.about.view();
+        let about = self.about.view().map(|el| el.map(Message::About));
         let export_dialog = self.export.view();
 
         container(stack![app, about, export_dialog, toasts])

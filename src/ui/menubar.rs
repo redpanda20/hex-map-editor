@@ -7,7 +7,7 @@ use iced_fonts::lucide;
 use crate::{
     app::{Action, Message},
     theme,
-    ui::widgets::popup_menu,
+    ui::{Keybinds, widgets::popup_menu},
 };
 
 const MENU_WIDTH: f32 = 200.0;
@@ -15,16 +15,16 @@ const MENU_WIDTH: f32 = 200.0;
 pub struct Menubar;
 
 impl Menubar {
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view<'a>(&self, keybinds: &'a Keybinds) -> Element<'a, Message> {
         let file_menu = button("File").style(theme::button_menu_trigger);
-        let file_menu = popup_menu(file_menu, Self::file_menu);
+        let file_menu = popup_menu(file_menu, move || Self::file_menu(keybinds));
 
         let export = button("Export")
             .style(theme::button_primary)
             .on_press(Message::Action(Action::Export));
 
         let settings = button(lucide::settings()).style(theme::button_menu_trigger);
-        let settings = popup_menu(settings, Self::settings_menu);
+        let settings = popup_menu(settings, move || Self::settings_menu(keybinds));
 
         let content = row![file_menu, space::horizontal(), export, settings]
             .spacing(8)
@@ -34,24 +34,24 @@ impl Menubar {
         container(content).style(theme::panel).into()
     }
 
-    fn file_menu<'a>() -> Element<'a, Message> {
+    fn file_menu<'a>(keybinds: &Keybinds) -> Element<'a, Message> {
         menu_panel(
             column![
-                menu_item("Open scene", Some("Ctrl + O"), Some(Action::Load)),
-                menu_item("Save scene", Some("Ctrl + S"), Some(Action::Save)),
+                menu_item("Open scene", Some(Action::Load), keybinds),
+                menu_item("Save scene", Some(Action::Save), keybinds),
             ]
             .spacing(4),
         )
         .map(Message::Action)
     }
 
-    fn settings_menu<'a>() -> Element<'a, Message> {
+    fn settings_menu<'a>(keybinds: &Keybinds) -> Element<'a, Message> {
         menu_panel(
             column![
                 // Intentional stub: no action yet.
-                menu_item("Settings", None, None),
+                menu_item("Settings", None, keybinds),
                 rule::horizontal(1),
-                menu_item("About", None, Some(Action::About)),
+                menu_item("About", Some(Action::About), keybinds),
             ]
             .spacing(4),
         )
@@ -72,16 +72,17 @@ fn menu_panel<'a, M: 'a>(items: impl Into<Element<'a, M>>) -> Element<'a, M> {
 /// With no `action` the row is shown dimmed and does nothing.
 fn menu_item<'a>(
     label: &'a str,
-    shortcut: Option<&'a str>,
     action: Option<Action>,
+    keybinds: &Keybinds,
 ) -> Element<'a, Action> {
-    let content = row![
-        text(label).size(14),
-        space::horizontal(),
-        shortcut.map(|s| text(s).size(12).style(text::secondary)),
-    ]
-    .spacing(8)
-    .align_y(Alignment::Center);
+    let shortcut = action
+        .and_then(|action| keybinds.binding_for(action))
+        .map(|binding| format!("{binding}"))
+        .map(|s| text(s).size(12).style(text::secondary));
+
+    let content = row![text(label).size(14), space::horizontal(), shortcut]
+        .spacing(8)
+        .align_y(Alignment::Center);
 
     button(content)
         .width(Length::Fill)

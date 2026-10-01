@@ -81,12 +81,12 @@ impl PrintSettings {
     ///
     /// Clamped at 1 so that excessive margins can't produce zero or negative tilings.
     fn content_size(&self) -> Size {
-        const MIN_CONTENT_PT: f32 = 1.0;
+        const MIN_CONTENT_CM: f32 = 1.0;
         let margin = 2.0 * self.margin.cm;
         let (width, height) = self.page_size.size_cm();
 
-        let width = (width - margin).max(MIN_CONTENT_PT);
-        let height = (height - margin).max(MIN_CONTENT_PT);
+        let width = (width - margin).max(MIN_CONTENT_CM);
+        let height = (height - margin).max(MIN_CONTENT_CM);
         Size { width, height }
     }
 

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 use iced::{
     Subscription,
@@ -16,6 +16,28 @@ pub struct Binding {
     modifiers: keyboard::Modifiers,
 }
 
+impl std::fmt::Display for Binding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.modifiers.control() {
+            write!(f, "Ctrl + ")?;
+        }
+        if self.modifiers.shift() {
+            write!(f, "Shift + ")?;
+        }
+        if self.modifiers.alt() {
+            write!(f, "Alt + ")?;
+        }
+        if self.modifiers.logo() {
+            write!(f, "Super + ")?;
+        }
+
+        match self.key.as_ref() {
+            keyboard::Key::Character(s) => write!(f, "{}", s.to_uppercase()),
+            keyboard::Key::Unidentified => write!(f, "Unidentified"),
+            keyboard::Key::Named(named) => write!(f, "{named:?}"),
+        }
+    }
+}
 impl Binding {
     pub fn new<'a>(key: impl Into<&'a str>, modifiers: Modifiers) -> Self {
         Self {
@@ -70,6 +92,13 @@ impl Keybinds {
             bindings,
             revision: 0,
         }
+    }
+
+    /// Get the binding corresponding to an action, if it exists.
+    pub fn binding_for(&self, action: Action) -> Option<Binding> {
+        self.bindings
+            .iter()
+            .find_map(|(binding, bound_action)| (*bound_action == action).then(|| binding.clone()))
     }
 
     /// Get the action corresponding to a binding, if it exists

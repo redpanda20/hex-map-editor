@@ -4,7 +4,7 @@ use iced::{
 };
 use iced_fonts::lucide;
 
-use crate::{app::Message, infrastructure::IoProcess};
+use crate::{app::Message, infrastructure::IoProcess, ui::AboutMessage};
 use crate::{
     infrastructure::{
         Duration, Instant,
@@ -44,6 +44,14 @@ pub struct Toasts {
 impl Toasts {
     pub fn listen_to_events(&mut self, message: &Message) {
         match message {
+            Message::About(AboutMessage::CopyText(text)) => {
+                self.add_toast(
+                    "Copied to clipboard",
+                    format!("Copied \"{text}\""),
+                    ToastKind::Success,
+                );
+            }
+
             Message::Export(export, process) => match process {
                 IoProcess::Start => self.add_toast(
                     "Exporting",
@@ -66,9 +74,7 @@ impl Toasts {
             },
 
             Message::Save(process) => match process {
-                IoProcess::Start => {
-                    self.add_toast("Saving", "Saving project...", ToastKind::Success)
-                }
+                IoProcess::Start => self.add_toast("Saving", "Saving scene...", ToastKind::Success),
                 IoProcess::Cancelled => self.add_toast(
                     "Save cancelled",
                     "Save cancelled by user.",
@@ -76,7 +82,7 @@ impl Toasts {
                 ),
                 IoProcess::Finished(Ok(_)) => self.add_toast(
                     "Save complete",
-                    "Project saved successfully.",
+                    "Scene saved successfully.",
                     ToastKind::Success,
                 ),
                 IoProcess::Finished(Err(err)) => {
@@ -86,15 +92,14 @@ impl Toasts {
 
             Message::Load(process) => match process {
                 IoProcess::Start => {
-                    self.add_toast("Opening", "Opening project...", ToastKind::Success)
+                    self.add_toast("Opening", "Opening scene...", ToastKind::Success)
                 }
                 Cancelled => self.add_toast(
                     "Open cancelled",
                     "Open cancelled by user.",
                     ToastKind::Warning,
                 ),
-                Finished(Err(err)) => self.add_toast("Project load failed", err, ToastKind::Error),
-                // Finished(Ok) ommited. Loading a project visually changes the active scene
+                Finished(Err(err)) => self.add_toast("Loading scene failed", err, ToastKind::Error),
                 Finished(Ok(_)) => {}
             },
 

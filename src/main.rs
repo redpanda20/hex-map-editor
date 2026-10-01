@@ -13,12 +13,6 @@ pub fn main() -> iced::Result {
     #[cfg(target_arch = "wasm32")]
     console_error_panic_hook::set_once();
 
-    // Fix: Force XWayland usage until iced/wgpu fixes the problem
-    #[cfg(target_os = "linux")]
-    unsafe {
-        std::env::set_var("WAYLAND_DISPLAY", "");
-    }
-
     let app = iced::application(App::boot, App::update, App::view)
         .antialiasing(true)
         .title(App::title)
