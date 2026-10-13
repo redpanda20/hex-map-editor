@@ -63,7 +63,7 @@ fn embed_image(assets: &AssetStore, id: ImageId) -> Option<EmbeddedImage> {
 
     let mut rgb = Vec::with_capacity(pixel_count * 3);
     let mut alpha = Vec::with_capacity(pixel_count);
-    for px in pixels[..pixel_count * 4].chunks_exact(4) {
+    for px in pixels[..pixel_count * 4].as_chunks::<4>().0 {
         rgb.extend_from_slice(&px[..3]);
         alpha.push(px[3]);
     }
